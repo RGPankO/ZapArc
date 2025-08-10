@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  nickname      String
+  passwordHash  String
+  isVerified    Boolean  @default(false)
+  verificationToken String?
+  premiumStatus PremiumStatus @default(FREE)
+  premiumExpiry DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  payments      Payment[]
+  sessions      Session[]
+  
+  @@map("users")
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  userId        String
+  type          PaymentType
+  amount        Float
+  currency      String
+  status        PaymentStatus
+  platformId    String?     // Store ID from Google Play/App Store
+  createdAt     DateTime    @default(now())
+  
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("payments")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @db.VarChar(512) @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+model AppConfig {
+  id              String   @id @default(cuid())
+  appName         String
+  primaryColor    String
+  secondaryColor  String
+  logoUrl         String?
+  paymentModel    PaymentModel
+  subscriptionPrice Float?
+  oneTimePrice    Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("app_configs")
+}
+
+enum PremiumStatus {
+  FREE
+  PREMIUM_SUBSCRIPTION
+  PREMIUM_LIFETIME
+}
+
+enum PaymentType {
+  SUBSCRIPTION
+  ONE_TIME
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PaymentModel {
+  SUBSCRIPTION_ONLY
+  ONE_TIME_ONLY
+  BOTH
+}
