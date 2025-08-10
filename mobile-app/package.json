@@ -1,0 +1,50 @@
+{
+  "name": "mobile-app",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint 'src/**/*.{ts,tsx}' --ignore-pattern '!src/**'",
+    "lint:fix": "eslint 'src/**/*.{ts,tsx}' --fix --ignore-pattern '!src/**'",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
+    "@hookform/resolvers": "^5.2.1",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "expo": "~53.0.20",
+    "expo-router": "^5.1.4",
+    "expo-secure-store": "^14.2.3",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-hook-form": "^7.62.0",
+    "react-native": "0.79.5",
+    "react-native-paper": "^5.14.5",
+    "react-native-safe-area-context": "^5.6.0",
+    "react-native-web": "^0.20.0",
+    "yup": "^1.7.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@testing-library/react-native": "^13.2.2",
+    "@types/jest": "^30.0.0",
+    "@types/react": "~19.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "jest": "^30.0.5",
+    "jest-expo": "^53.0.9",
+    "prettier": "^3.6.2",
+    "typescript": "~5.8.3"
+  },
+  "private": true
+}
