@@ -53,18 +53,18 @@ export default function RegisterScreen(): React.JSX.Element {
 
   const onSubmit = async (data: RegisterFormData): Promise<void> => {
     setIsLoading(true);
-    
+
     try {
       console.log('Starting registration with data:', data);
-      
+
       const result = await authService.register({
         nickname: data.nickname,
         email: data.email,
         password: data.password,
       });
-      
+
       console.log('Registration result:', result);
-      
+
       if (result.success) {
         Alert.alert(
           'Registration Successful',
@@ -97,11 +97,11 @@ export default function RegisterScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -116,128 +116,128 @@ export default function RegisterScreen(): React.JSX.Element {
             </Text>
 
             <View style={styles.form}>
-            <Controller
-              control={control}
-              name="nickname"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    label="Nickname"
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    error={!!errors.nickname}
-                    style={styles.input}
-                    mode="outlined"
-                  />
-                  <HelperText type="error" visible={!!errors.nickname}>
-                    {errors.nickname?.message}
-                  </HelperText>
-                </View>
-              )}
-            />
+              <Controller
+                control={control}
+                name="nickname"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      label="Nickname"
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      error={!!errors.nickname}
+                      style={styles.input}
+                      mode="outlined"
+                    />
+                    <HelperText type="error" visible={!!errors.nickname}>
+                      {errors.nickname?.message}
+                    </HelperText>
+                  </View>
+                )}
+              />
 
-            <Controller
-              control={control}
-              name="email"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    label="Email"
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    error={!!errors.email}
-                    style={styles.input}
-                    mode="outlined"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                  <HelperText type="error" visible={!!errors.email}>
-                    {errors.email?.message}
-                  </HelperText>
-                </View>
-              )}
-            />
+              <Controller
+                control={control}
+                name="email"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      label="Email"
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      error={!!errors.email}
+                      style={styles.input}
+                      mode="outlined"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                    <HelperText type="error" visible={!!errors.email}>
+                      {errors.email?.message}
+                    </HelperText>
+                  </View>
+                )}
+              />
 
-            <Controller
-              control={control}
-              name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    label="Password"
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    error={!!errors.password}
-                    style={styles.input}
-                    mode="outlined"
-                    secureTextEntry={!showPassword}
-                    right={
-                      <TextInput.Icon
-                        icon={showPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowPassword(!showPassword)}
-                      />
-                    }
-                  />
-                  <HelperText type="error" visible={!!errors.password}>
-                    {errors.password?.message}
-                  </HelperText>
-                </View>
-              )}
-            />
+              <Controller
+                control={control}
+                name="password"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      label="Password"
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      error={!!errors.password}
+                      style={styles.input}
+                      mode="outlined"
+                      secureTextEntry={!showPassword}
+                      right={
+                        <TextInput.Icon
+                          icon={showPassword ? 'eye-off' : 'eye'}
+                          onPress={() => setShowPassword(!showPassword)}
+                        />
+                      }
+                    />
+                    <HelperText type="error" visible={!!errors.password}>
+                      {errors.password?.message}
+                    </HelperText>
+                  </View>
+                )}
+              />
 
-            <Controller
-              control={control}
-              name="confirmPassword"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    label="Confirm Password"
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    error={!!errors.confirmPassword}
-                    style={styles.input}
-                    mode="outlined"
-                    secureTextEntry={!showConfirmPassword}
-                    right={
-                      <TextInput.Icon
-                        icon={showConfirmPassword ? 'eye-off' : 'eye'}
-                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                      />
-                    }
-                  />
-                  <HelperText type="error" visible={!!errors.confirmPassword}>
-                    {errors.confirmPassword?.message}
-                  </HelperText>
-                </View>
-              )}
-            />
+              <Controller
+                control={control}
+                name="confirmPassword"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      label="Confirm Password"
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      error={!!errors.confirmPassword}
+                      style={styles.input}
+                      mode="outlined"
+                      secureTextEntry={!showConfirmPassword}
+                      right={
+                        <TextInput.Icon
+                          icon={showConfirmPassword ? 'eye-off' : 'eye'}
+                          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                        />
+                      }
+                    />
+                    <HelperText type="error" visible={!!errors.confirmPassword}>
+                      {errors.confirmPassword?.message}
+                    </HelperText>
+                  </View>
+                )}
+              />
 
-            <Button
-              mode="contained"
-              onPress={handleSubmit(onSubmit)}
-              loading={isLoading}
-              disabled={isLoading}
-              style={styles.submitButton}
-              contentStyle={styles.buttonContent}
-            >
-              Create Account
-            </Button>
-
-            <View style={styles.loginContainer}>
-              <Text variant="bodyMedium">Already have an account? </Text>
               <Button
-                mode="text"
-                onPress={handleLoginPress}
-                compact
-                style={styles.loginButton}
+                mode="contained"
+                onPress={handleSubmit(onSubmit)}
+                loading={isLoading}
+                disabled={isLoading}
+                style={styles.submitButton}
+                contentStyle={styles.buttonContent}
               >
-                Login
+                Create Account
               </Button>
-            </View>
+
+              <View style={styles.loginContainer}>
+                <Text variant="bodyMedium">Already have an account? </Text>
+                <Button
+                  mode="text"
+                  onPress={handleLoginPress}
+                  compact
+                  style={styles.loginButton}
+                >
+                  Login
+                </Button>
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   content: {
     paddingHorizontal: 24,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 24,
-    marginBottom: 40,
+    marginBottom: 20,
   },
   loginButton: {
     marginLeft: -8,

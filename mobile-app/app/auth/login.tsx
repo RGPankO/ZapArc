@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   content: {
     paddingHorizontal: 24,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 24,
-    marginBottom: 40,
+    marginBottom: 20,
   },
   registerButton: {
     marginLeft: -8,
