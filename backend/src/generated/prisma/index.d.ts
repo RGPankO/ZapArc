@@ -33,6 +33,16 @@ export type Session = $Result.DefaultSelection<Prisma.$SessionPayload>
  * 
  */
 export type AppConfig = $Result.DefaultSelection<Prisma.$AppConfigPayload>
+/**
+ * Model AdConfig
+ * 
+ */
+export type AdConfig = $Result.DefaultSelection<Prisma.$AdConfigPayload>
+/**
+ * Model AdAnalytics
+ * 
+ */
+export type AdAnalytics = $Result.DefaultSelection<Prisma.$AdAnalyticsPayload>
 
 /**
  * Enums
@@ -73,6 +83,24 @@ export const PaymentModel: {
 
 export type PaymentModel = (typeof PaymentModel)[keyof typeof PaymentModel]
 
+
+export const AdType: {
+  BANNER: 'BANNER',
+  INTERSTITIAL: 'INTERSTITIAL'
+};
+
+export type AdType = (typeof AdType)[keyof typeof AdType]
+
+
+export const AdAction: {
+  IMPRESSION: 'IMPRESSION',
+  CLICK: 'CLICK',
+  CLOSE: 'CLOSE',
+  ERROR: 'ERROR'
+};
+
+export type AdAction = (typeof AdAction)[keyof typeof AdAction]
+
 }
 
 export type PremiumStatus = $Enums.PremiumStatus
@@ -90,6 +118,14 @@ export const PaymentStatus: typeof $Enums.PaymentStatus
 export type PaymentModel = $Enums.PaymentModel
 
 export const PaymentModel: typeof $Enums.PaymentModel
+
+export type AdType = $Enums.AdType
+
+export const AdType: typeof $Enums.AdType
+
+export type AdAction = $Enums.AdAction
+
+export const AdAction: typeof $Enums.AdAction
 
 /**
  * ##  Prisma Client ʲˢ
@@ -255,6 +291,26 @@ export class PrismaClient<
     * ```
     */
   get appConfig(): Prisma.AppConfigDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.adConfig`: Exposes CRUD operations for the **AdConfig** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AdConfigs
+    * const adConfigs = await prisma.adConfig.findMany()
+    * ```
+    */
+  get adConfig(): Prisma.AdConfigDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.adAnalytics`: Exposes CRUD operations for the **AdAnalytics** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AdAnalytics
+    * const adAnalytics = await prisma.adAnalytics.findMany()
+    * ```
+    */
+  get adAnalytics(): Prisma.AdAnalyticsDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -698,7 +754,9 @@ export namespace Prisma {
     User: 'User',
     Payment: 'Payment',
     Session: 'Session',
-    AppConfig: 'AppConfig'
+    AppConfig: 'AppConfig',
+    AdConfig: 'AdConfig',
+    AdAnalytics: 'AdAnalytics'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -717,7 +775,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "payment" | "session" | "appConfig"
+      modelProps: "user" | "payment" | "session" | "appConfig" | "adConfig" | "adAnalytics"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -985,6 +1043,138 @@ export namespace Prisma {
           }
         }
       }
+      AdConfig: {
+        payload: Prisma.$AdConfigPayload<ExtArgs>
+        fields: Prisma.AdConfigFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AdConfigFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AdConfigFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload>
+          }
+          findFirst: {
+            args: Prisma.AdConfigFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AdConfigFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload>
+          }
+          findMany: {
+            args: Prisma.AdConfigFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload>[]
+          }
+          create: {
+            args: Prisma.AdConfigCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload>
+          }
+          createMany: {
+            args: Prisma.AdConfigCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          delete: {
+            args: Prisma.AdConfigDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload>
+          }
+          update: {
+            args: Prisma.AdConfigUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload>
+          }
+          deleteMany: {
+            args: Prisma.AdConfigDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AdConfigUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.AdConfigUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdConfigPayload>
+          }
+          aggregate: {
+            args: Prisma.AdConfigAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAdConfig>
+          }
+          groupBy: {
+            args: Prisma.AdConfigGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AdConfigGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AdConfigCountArgs<ExtArgs>
+            result: $Utils.Optional<AdConfigCountAggregateOutputType> | number
+          }
+        }
+      }
+      AdAnalytics: {
+        payload: Prisma.$AdAnalyticsPayload<ExtArgs>
+        fields: Prisma.AdAnalyticsFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AdAnalyticsFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AdAnalyticsFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload>
+          }
+          findFirst: {
+            args: Prisma.AdAnalyticsFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AdAnalyticsFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload>
+          }
+          findMany: {
+            args: Prisma.AdAnalyticsFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload>[]
+          }
+          create: {
+            args: Prisma.AdAnalyticsCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload>
+          }
+          createMany: {
+            args: Prisma.AdAnalyticsCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          delete: {
+            args: Prisma.AdAnalyticsDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload>
+          }
+          update: {
+            args: Prisma.AdAnalyticsUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload>
+          }
+          deleteMany: {
+            args: Prisma.AdAnalyticsDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AdAnalyticsUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.AdAnalyticsUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AdAnalyticsPayload>
+          }
+          aggregate: {
+            args: Prisma.AdAnalyticsAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAdAnalytics>
+          }
+          groupBy: {
+            args: Prisma.AdAnalyticsGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AdAnalyticsGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AdAnalyticsCountArgs<ExtArgs>
+            result: $Utils.Optional<AdAnalyticsCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -1081,6 +1271,8 @@ export namespace Prisma {
     payment?: PaymentOmit
     session?: SessionOmit
     appConfig?: AppConfigOmit
+    adConfig?: AdConfigOmit
+    adAnalytics?: AdAnalyticsOmit
   }
 
   /* Types for Logging */
@@ -1182,11 +1374,13 @@ export namespace Prisma {
   export type UserCountOutputType = {
     payments: number
     sessions: number
+    adAnalytics: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     payments?: boolean | UserCountOutputTypeCountPaymentsArgs
     sessions?: boolean | UserCountOutputTypeCountSessionsArgs
+    adAnalytics?: boolean | UserCountOutputTypeCountAdAnalyticsArgs
   }
 
   // Custom InputTypes
@@ -1212,6 +1406,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: SessionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountAdAnalyticsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AdAnalyticsWhereInput
   }
 
 
@@ -1425,6 +1626,7 @@ export namespace Prisma {
     updatedAt?: boolean
     payments?: boolean | User$paymentsArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
+    adAnalytics?: boolean | User$adAnalyticsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -1447,6 +1649,7 @@ export namespace Prisma {
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     payments?: boolean | User$paymentsArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
+    adAnalytics?: boolean | User$adAnalyticsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
 
@@ -1455,6 +1658,7 @@ export namespace Prisma {
     objects: {
       payments: Prisma.$PaymentPayload<ExtArgs>[]
       sessions: Prisma.$SessionPayload<ExtArgs>[]
+      adAnalytics: Prisma.$AdAnalyticsPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -1809,6 +2013,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     payments<T extends User$paymentsArgs<ExtArgs> = {}>(args?: Subset<T, User$paymentsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PaymentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    adAnalytics<T extends User$adAnalyticsArgs<ExtArgs> = {}>(args?: Subset<T, User$adAnalyticsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2236,6 +2441,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: SessionScalarFieldEnum | SessionScalarFieldEnum[]
+  }
+
+  /**
+   * User.adAnalytics
+   */
+  export type User$adAnalyticsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    where?: AdAnalyticsWhereInput
+    orderBy?: AdAnalyticsOrderByWithRelationInput | AdAnalyticsOrderByWithRelationInput[]
+    cursor?: AdAnalyticsWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: AdAnalyticsScalarFieldEnum | AdAnalyticsScalarFieldEnum[]
   }
 
   /**
@@ -5158,6 +5387,1903 @@ export namespace Prisma {
 
 
   /**
+   * Model AdConfig
+   */
+
+  export type AggregateAdConfig = {
+    _count: AdConfigCountAggregateOutputType | null
+    _avg: AdConfigAvgAggregateOutputType | null
+    _sum: AdConfigSumAggregateOutputType | null
+    _min: AdConfigMinAggregateOutputType | null
+    _max: AdConfigMaxAggregateOutputType | null
+  }
+
+  export type AdConfigAvgAggregateOutputType = {
+    displayFrequency: number | null
+  }
+
+  export type AdConfigSumAggregateOutputType = {
+    displayFrequency: number | null
+  }
+
+  export type AdConfigMinAggregateOutputType = {
+    id: string | null
+    adType: $Enums.AdType | null
+    adNetworkId: string | null
+    isActive: boolean | null
+    displayFrequency: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AdConfigMaxAggregateOutputType = {
+    id: string | null
+    adType: $Enums.AdType | null
+    adNetworkId: string | null
+    isActive: boolean | null
+    displayFrequency: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AdConfigCountAggregateOutputType = {
+    id: number
+    adType: number
+    adNetworkId: number
+    isActive: number
+    displayFrequency: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type AdConfigAvgAggregateInputType = {
+    displayFrequency?: true
+  }
+
+  export type AdConfigSumAggregateInputType = {
+    displayFrequency?: true
+  }
+
+  export type AdConfigMinAggregateInputType = {
+    id?: true
+    adType?: true
+    adNetworkId?: true
+    isActive?: true
+    displayFrequency?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type AdConfigMaxAggregateInputType = {
+    id?: true
+    adType?: true
+    adNetworkId?: true
+    isActive?: true
+    displayFrequency?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type AdConfigCountAggregateInputType = {
+    id?: true
+    adType?: true
+    adNetworkId?: true
+    isActive?: true
+    displayFrequency?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type AdConfigAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdConfig to aggregate.
+     */
+    where?: AdConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdConfigs to fetch.
+     */
+    orderBy?: AdConfigOrderByWithRelationInput | AdConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AdConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdConfigs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AdConfigs
+    **/
+    _count?: true | AdConfigCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: AdConfigAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: AdConfigSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AdConfigMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AdConfigMaxAggregateInputType
+  }
+
+  export type GetAdConfigAggregateType<T extends AdConfigAggregateArgs> = {
+        [P in keyof T & keyof AggregateAdConfig]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAdConfig[P]>
+      : GetScalarType<T[P], AggregateAdConfig[P]>
+  }
+
+
+
+
+  export type AdConfigGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AdConfigWhereInput
+    orderBy?: AdConfigOrderByWithAggregationInput | AdConfigOrderByWithAggregationInput[]
+    by: AdConfigScalarFieldEnum[] | AdConfigScalarFieldEnum
+    having?: AdConfigScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AdConfigCountAggregateInputType | true
+    _avg?: AdConfigAvgAggregateInputType
+    _sum?: AdConfigSumAggregateInputType
+    _min?: AdConfigMinAggregateInputType
+    _max?: AdConfigMaxAggregateInputType
+  }
+
+  export type AdConfigGroupByOutputType = {
+    id: string
+    adType: $Enums.AdType
+    adNetworkId: string
+    isActive: boolean
+    displayFrequency: number
+    createdAt: Date
+    updatedAt: Date
+    _count: AdConfigCountAggregateOutputType | null
+    _avg: AdConfigAvgAggregateOutputType | null
+    _sum: AdConfigSumAggregateOutputType | null
+    _min: AdConfigMinAggregateOutputType | null
+    _max: AdConfigMaxAggregateOutputType | null
+  }
+
+  type GetAdConfigGroupByPayload<T extends AdConfigGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AdConfigGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AdConfigGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AdConfigGroupByOutputType[P]>
+            : GetScalarType<T[P], AdConfigGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AdConfigSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    adType?: boolean
+    adNetworkId?: boolean
+    isActive?: boolean
+    displayFrequency?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["adConfig"]>
+
+
+
+  export type AdConfigSelectScalar = {
+    id?: boolean
+    adType?: boolean
+    adNetworkId?: boolean
+    isActive?: boolean
+    displayFrequency?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type AdConfigOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "adType" | "adNetworkId" | "isActive" | "displayFrequency" | "createdAt" | "updatedAt", ExtArgs["result"]["adConfig"]>
+
+  export type $AdConfigPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AdConfig"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      adType: $Enums.AdType
+      adNetworkId: string
+      isActive: boolean
+      displayFrequency: number
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["adConfig"]>
+    composites: {}
+  }
+
+  type AdConfigGetPayload<S extends boolean | null | undefined | AdConfigDefaultArgs> = $Result.GetResult<Prisma.$AdConfigPayload, S>
+
+  type AdConfigCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AdConfigFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AdConfigCountAggregateInputType | true
+    }
+
+  export interface AdConfigDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AdConfig'], meta: { name: 'AdConfig' } }
+    /**
+     * Find zero or one AdConfig that matches the filter.
+     * @param {AdConfigFindUniqueArgs} args - Arguments to find a AdConfig
+     * @example
+     * // Get one AdConfig
+     * const adConfig = await prisma.adConfig.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AdConfigFindUniqueArgs>(args: SelectSubset<T, AdConfigFindUniqueArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AdConfig that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AdConfigFindUniqueOrThrowArgs} args - Arguments to find a AdConfig
+     * @example
+     * // Get one AdConfig
+     * const adConfig = await prisma.adConfig.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AdConfigFindUniqueOrThrowArgs>(args: SelectSubset<T, AdConfigFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdConfig that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdConfigFindFirstArgs} args - Arguments to find a AdConfig
+     * @example
+     * // Get one AdConfig
+     * const adConfig = await prisma.adConfig.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AdConfigFindFirstArgs>(args?: SelectSubset<T, AdConfigFindFirstArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdConfig that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdConfigFindFirstOrThrowArgs} args - Arguments to find a AdConfig
+     * @example
+     * // Get one AdConfig
+     * const adConfig = await prisma.adConfig.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AdConfigFindFirstOrThrowArgs>(args?: SelectSubset<T, AdConfigFindFirstOrThrowArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AdConfigs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdConfigFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AdConfigs
+     * const adConfigs = await prisma.adConfig.findMany()
+     * 
+     * // Get first 10 AdConfigs
+     * const adConfigs = await prisma.adConfig.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const adConfigWithIdOnly = await prisma.adConfig.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends AdConfigFindManyArgs>(args?: SelectSubset<T, AdConfigFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AdConfig.
+     * @param {AdConfigCreateArgs} args - Arguments to create a AdConfig.
+     * @example
+     * // Create one AdConfig
+     * const AdConfig = await prisma.adConfig.create({
+     *   data: {
+     *     // ... data to create a AdConfig
+     *   }
+     * })
+     * 
+     */
+    create<T extends AdConfigCreateArgs>(args: SelectSubset<T, AdConfigCreateArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AdConfigs.
+     * @param {AdConfigCreateManyArgs} args - Arguments to create many AdConfigs.
+     * @example
+     * // Create many AdConfigs
+     * const adConfig = await prisma.adConfig.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AdConfigCreateManyArgs>(args?: SelectSubset<T, AdConfigCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a AdConfig.
+     * @param {AdConfigDeleteArgs} args - Arguments to delete one AdConfig.
+     * @example
+     * // Delete one AdConfig
+     * const AdConfig = await prisma.adConfig.delete({
+     *   where: {
+     *     // ... filter to delete one AdConfig
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AdConfigDeleteArgs>(args: SelectSubset<T, AdConfigDeleteArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AdConfig.
+     * @param {AdConfigUpdateArgs} args - Arguments to update one AdConfig.
+     * @example
+     * // Update one AdConfig
+     * const adConfig = await prisma.adConfig.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AdConfigUpdateArgs>(args: SelectSubset<T, AdConfigUpdateArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AdConfigs.
+     * @param {AdConfigDeleteManyArgs} args - Arguments to filter AdConfigs to delete.
+     * @example
+     * // Delete a few AdConfigs
+     * const { count } = await prisma.adConfig.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AdConfigDeleteManyArgs>(args?: SelectSubset<T, AdConfigDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AdConfigs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdConfigUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AdConfigs
+     * const adConfig = await prisma.adConfig.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AdConfigUpdateManyArgs>(args: SelectSubset<T, AdConfigUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one AdConfig.
+     * @param {AdConfigUpsertArgs} args - Arguments to update or create a AdConfig.
+     * @example
+     * // Update or create a AdConfig
+     * const adConfig = await prisma.adConfig.upsert({
+     *   create: {
+     *     // ... data to create a AdConfig
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AdConfig we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AdConfigUpsertArgs>(args: SelectSubset<T, AdConfigUpsertArgs<ExtArgs>>): Prisma__AdConfigClient<$Result.GetResult<Prisma.$AdConfigPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AdConfigs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdConfigCountArgs} args - Arguments to filter AdConfigs to count.
+     * @example
+     * // Count the number of AdConfigs
+     * const count = await prisma.adConfig.count({
+     *   where: {
+     *     // ... the filter for the AdConfigs we want to count
+     *   }
+     * })
+    **/
+    count<T extends AdConfigCountArgs>(
+      args?: Subset<T, AdConfigCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AdConfigCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AdConfig.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdConfigAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AdConfigAggregateArgs>(args: Subset<T, AdConfigAggregateArgs>): Prisma.PrismaPromise<GetAdConfigAggregateType<T>>
+
+    /**
+     * Group by AdConfig.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdConfigGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AdConfigGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AdConfigGroupByArgs['orderBy'] }
+        : { orderBy?: AdConfigGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AdConfigGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAdConfigGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AdConfig model
+   */
+  readonly fields: AdConfigFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AdConfig.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AdConfigClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AdConfig model
+   */
+  interface AdConfigFieldRefs {
+    readonly id: FieldRef<"AdConfig", 'String'>
+    readonly adType: FieldRef<"AdConfig", 'AdType'>
+    readonly adNetworkId: FieldRef<"AdConfig", 'String'>
+    readonly isActive: FieldRef<"AdConfig", 'Boolean'>
+    readonly displayFrequency: FieldRef<"AdConfig", 'Int'>
+    readonly createdAt: FieldRef<"AdConfig", 'DateTime'>
+    readonly updatedAt: FieldRef<"AdConfig", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AdConfig findUnique
+   */
+  export type AdConfigFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * Filter, which AdConfig to fetch.
+     */
+    where: AdConfigWhereUniqueInput
+  }
+
+  /**
+   * AdConfig findUniqueOrThrow
+   */
+  export type AdConfigFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * Filter, which AdConfig to fetch.
+     */
+    where: AdConfigWhereUniqueInput
+  }
+
+  /**
+   * AdConfig findFirst
+   */
+  export type AdConfigFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * Filter, which AdConfig to fetch.
+     */
+    where?: AdConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdConfigs to fetch.
+     */
+    orderBy?: AdConfigOrderByWithRelationInput | AdConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdConfigs.
+     */
+    cursor?: AdConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdConfigs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdConfigs.
+     */
+    distinct?: AdConfigScalarFieldEnum | AdConfigScalarFieldEnum[]
+  }
+
+  /**
+   * AdConfig findFirstOrThrow
+   */
+  export type AdConfigFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * Filter, which AdConfig to fetch.
+     */
+    where?: AdConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdConfigs to fetch.
+     */
+    orderBy?: AdConfigOrderByWithRelationInput | AdConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdConfigs.
+     */
+    cursor?: AdConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdConfigs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdConfigs.
+     */
+    distinct?: AdConfigScalarFieldEnum | AdConfigScalarFieldEnum[]
+  }
+
+  /**
+   * AdConfig findMany
+   */
+  export type AdConfigFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * Filter, which AdConfigs to fetch.
+     */
+    where?: AdConfigWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdConfigs to fetch.
+     */
+    orderBy?: AdConfigOrderByWithRelationInput | AdConfigOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AdConfigs.
+     */
+    cursor?: AdConfigWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdConfigs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdConfigs.
+     */
+    skip?: number
+    distinct?: AdConfigScalarFieldEnum | AdConfigScalarFieldEnum[]
+  }
+
+  /**
+   * AdConfig create
+   */
+  export type AdConfigCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * The data needed to create a AdConfig.
+     */
+    data: XOR<AdConfigCreateInput, AdConfigUncheckedCreateInput>
+  }
+
+  /**
+   * AdConfig createMany
+   */
+  export type AdConfigCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AdConfigs.
+     */
+    data: AdConfigCreateManyInput | AdConfigCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AdConfig update
+   */
+  export type AdConfigUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * The data needed to update a AdConfig.
+     */
+    data: XOR<AdConfigUpdateInput, AdConfigUncheckedUpdateInput>
+    /**
+     * Choose, which AdConfig to update.
+     */
+    where: AdConfigWhereUniqueInput
+  }
+
+  /**
+   * AdConfig updateMany
+   */
+  export type AdConfigUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AdConfigs.
+     */
+    data: XOR<AdConfigUpdateManyMutationInput, AdConfigUncheckedUpdateManyInput>
+    /**
+     * Filter which AdConfigs to update
+     */
+    where?: AdConfigWhereInput
+    /**
+     * Limit how many AdConfigs to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdConfig upsert
+   */
+  export type AdConfigUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * The filter to search for the AdConfig to update in case it exists.
+     */
+    where: AdConfigWhereUniqueInput
+    /**
+     * In case the AdConfig found by the `where` argument doesn't exist, create a new AdConfig with this data.
+     */
+    create: XOR<AdConfigCreateInput, AdConfigUncheckedCreateInput>
+    /**
+     * In case the AdConfig was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AdConfigUpdateInput, AdConfigUncheckedUpdateInput>
+  }
+
+  /**
+   * AdConfig delete
+   */
+  export type AdConfigDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+    /**
+     * Filter which AdConfig to delete.
+     */
+    where: AdConfigWhereUniqueInput
+  }
+
+  /**
+   * AdConfig deleteMany
+   */
+  export type AdConfigDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdConfigs to delete
+     */
+    where?: AdConfigWhereInput
+    /**
+     * Limit how many AdConfigs to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdConfig without action
+   */
+  export type AdConfigDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdConfig
+     */
+    select?: AdConfigSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdConfig
+     */
+    omit?: AdConfigOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model AdAnalytics
+   */
+
+  export type AggregateAdAnalytics = {
+    _count: AdAnalyticsCountAggregateOutputType | null
+    _min: AdAnalyticsMinAggregateOutputType | null
+    _max: AdAnalyticsMaxAggregateOutputType | null
+  }
+
+  export type AdAnalyticsMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    adType: $Enums.AdType | null
+    action: $Enums.AdAction | null
+    adNetworkId: string | null
+    timestamp: Date | null
+  }
+
+  export type AdAnalyticsMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    adType: $Enums.AdType | null
+    action: $Enums.AdAction | null
+    adNetworkId: string | null
+    timestamp: Date | null
+  }
+
+  export type AdAnalyticsCountAggregateOutputType = {
+    id: number
+    userId: number
+    adType: number
+    action: number
+    adNetworkId: number
+    timestamp: number
+    _all: number
+  }
+
+
+  export type AdAnalyticsMinAggregateInputType = {
+    id?: true
+    userId?: true
+    adType?: true
+    action?: true
+    adNetworkId?: true
+    timestamp?: true
+  }
+
+  export type AdAnalyticsMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    adType?: true
+    action?: true
+    adNetworkId?: true
+    timestamp?: true
+  }
+
+  export type AdAnalyticsCountAggregateInputType = {
+    id?: true
+    userId?: true
+    adType?: true
+    action?: true
+    adNetworkId?: true
+    timestamp?: true
+    _all?: true
+  }
+
+  export type AdAnalyticsAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdAnalytics to aggregate.
+     */
+    where?: AdAnalyticsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdAnalytics to fetch.
+     */
+    orderBy?: AdAnalyticsOrderByWithRelationInput | AdAnalyticsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AdAnalyticsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdAnalytics from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdAnalytics.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AdAnalytics
+    **/
+    _count?: true | AdAnalyticsCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AdAnalyticsMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AdAnalyticsMaxAggregateInputType
+  }
+
+  export type GetAdAnalyticsAggregateType<T extends AdAnalyticsAggregateArgs> = {
+        [P in keyof T & keyof AggregateAdAnalytics]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAdAnalytics[P]>
+      : GetScalarType<T[P], AggregateAdAnalytics[P]>
+  }
+
+
+
+
+  export type AdAnalyticsGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AdAnalyticsWhereInput
+    orderBy?: AdAnalyticsOrderByWithAggregationInput | AdAnalyticsOrderByWithAggregationInput[]
+    by: AdAnalyticsScalarFieldEnum[] | AdAnalyticsScalarFieldEnum
+    having?: AdAnalyticsScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AdAnalyticsCountAggregateInputType | true
+    _min?: AdAnalyticsMinAggregateInputType
+    _max?: AdAnalyticsMaxAggregateInputType
+  }
+
+  export type AdAnalyticsGroupByOutputType = {
+    id: string
+    userId: string | null
+    adType: $Enums.AdType
+    action: $Enums.AdAction
+    adNetworkId: string
+    timestamp: Date
+    _count: AdAnalyticsCountAggregateOutputType | null
+    _min: AdAnalyticsMinAggregateOutputType | null
+    _max: AdAnalyticsMaxAggregateOutputType | null
+  }
+
+  type GetAdAnalyticsGroupByPayload<T extends AdAnalyticsGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AdAnalyticsGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AdAnalyticsGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AdAnalyticsGroupByOutputType[P]>
+            : GetScalarType<T[P], AdAnalyticsGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AdAnalyticsSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    adType?: boolean
+    action?: boolean
+    adNetworkId?: boolean
+    timestamp?: boolean
+    user?: boolean | AdAnalytics$userArgs<ExtArgs>
+  }, ExtArgs["result"]["adAnalytics"]>
+
+
+
+  export type AdAnalyticsSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    adType?: boolean
+    action?: boolean
+    adNetworkId?: boolean
+    timestamp?: boolean
+  }
+
+  export type AdAnalyticsOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "adType" | "action" | "adNetworkId" | "timestamp", ExtArgs["result"]["adAnalytics"]>
+  export type AdAnalyticsInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | AdAnalytics$userArgs<ExtArgs>
+  }
+
+  export type $AdAnalyticsPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AdAnalytics"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string | null
+      adType: $Enums.AdType
+      action: $Enums.AdAction
+      adNetworkId: string
+      timestamp: Date
+    }, ExtArgs["result"]["adAnalytics"]>
+    composites: {}
+  }
+
+  type AdAnalyticsGetPayload<S extends boolean | null | undefined | AdAnalyticsDefaultArgs> = $Result.GetResult<Prisma.$AdAnalyticsPayload, S>
+
+  type AdAnalyticsCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AdAnalyticsFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AdAnalyticsCountAggregateInputType | true
+    }
+
+  export interface AdAnalyticsDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AdAnalytics'], meta: { name: 'AdAnalytics' } }
+    /**
+     * Find zero or one AdAnalytics that matches the filter.
+     * @param {AdAnalyticsFindUniqueArgs} args - Arguments to find a AdAnalytics
+     * @example
+     * // Get one AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AdAnalyticsFindUniqueArgs>(args: SelectSubset<T, AdAnalyticsFindUniqueArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AdAnalytics that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AdAnalyticsFindUniqueOrThrowArgs} args - Arguments to find a AdAnalytics
+     * @example
+     * // Get one AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AdAnalyticsFindUniqueOrThrowArgs>(args: SelectSubset<T, AdAnalyticsFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdAnalytics that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdAnalyticsFindFirstArgs} args - Arguments to find a AdAnalytics
+     * @example
+     * // Get one AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AdAnalyticsFindFirstArgs>(args?: SelectSubset<T, AdAnalyticsFindFirstArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AdAnalytics that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdAnalyticsFindFirstOrThrowArgs} args - Arguments to find a AdAnalytics
+     * @example
+     * // Get one AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AdAnalyticsFindFirstOrThrowArgs>(args?: SelectSubset<T, AdAnalyticsFindFirstOrThrowArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AdAnalytics that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdAnalyticsFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.findMany()
+     * 
+     * // Get first 10 AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const adAnalyticsWithIdOnly = await prisma.adAnalytics.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends AdAnalyticsFindManyArgs>(args?: SelectSubset<T, AdAnalyticsFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AdAnalytics.
+     * @param {AdAnalyticsCreateArgs} args - Arguments to create a AdAnalytics.
+     * @example
+     * // Create one AdAnalytics
+     * const AdAnalytics = await prisma.adAnalytics.create({
+     *   data: {
+     *     // ... data to create a AdAnalytics
+     *   }
+     * })
+     * 
+     */
+    create<T extends AdAnalyticsCreateArgs>(args: SelectSubset<T, AdAnalyticsCreateArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AdAnalytics.
+     * @param {AdAnalyticsCreateManyArgs} args - Arguments to create many AdAnalytics.
+     * @example
+     * // Create many AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AdAnalyticsCreateManyArgs>(args?: SelectSubset<T, AdAnalyticsCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Delete a AdAnalytics.
+     * @param {AdAnalyticsDeleteArgs} args - Arguments to delete one AdAnalytics.
+     * @example
+     * // Delete one AdAnalytics
+     * const AdAnalytics = await prisma.adAnalytics.delete({
+     *   where: {
+     *     // ... filter to delete one AdAnalytics
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AdAnalyticsDeleteArgs>(args: SelectSubset<T, AdAnalyticsDeleteArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AdAnalytics.
+     * @param {AdAnalyticsUpdateArgs} args - Arguments to update one AdAnalytics.
+     * @example
+     * // Update one AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AdAnalyticsUpdateArgs>(args: SelectSubset<T, AdAnalyticsUpdateArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AdAnalytics.
+     * @param {AdAnalyticsDeleteManyArgs} args - Arguments to filter AdAnalytics to delete.
+     * @example
+     * // Delete a few AdAnalytics
+     * const { count } = await prisma.adAnalytics.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AdAnalyticsDeleteManyArgs>(args?: SelectSubset<T, AdAnalyticsDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AdAnalytics.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdAnalyticsUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AdAnalyticsUpdateManyArgs>(args: SelectSubset<T, AdAnalyticsUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one AdAnalytics.
+     * @param {AdAnalyticsUpsertArgs} args - Arguments to update or create a AdAnalytics.
+     * @example
+     * // Update or create a AdAnalytics
+     * const adAnalytics = await prisma.adAnalytics.upsert({
+     *   create: {
+     *     // ... data to create a AdAnalytics
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AdAnalytics we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AdAnalyticsUpsertArgs>(args: SelectSubset<T, AdAnalyticsUpsertArgs<ExtArgs>>): Prisma__AdAnalyticsClient<$Result.GetResult<Prisma.$AdAnalyticsPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AdAnalytics.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdAnalyticsCountArgs} args - Arguments to filter AdAnalytics to count.
+     * @example
+     * // Count the number of AdAnalytics
+     * const count = await prisma.adAnalytics.count({
+     *   where: {
+     *     // ... the filter for the AdAnalytics we want to count
+     *   }
+     * })
+    **/
+    count<T extends AdAnalyticsCountArgs>(
+      args?: Subset<T, AdAnalyticsCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AdAnalyticsCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AdAnalytics.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdAnalyticsAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AdAnalyticsAggregateArgs>(args: Subset<T, AdAnalyticsAggregateArgs>): Prisma.PrismaPromise<GetAdAnalyticsAggregateType<T>>
+
+    /**
+     * Group by AdAnalytics.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AdAnalyticsGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AdAnalyticsGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AdAnalyticsGroupByArgs['orderBy'] }
+        : { orderBy?: AdAnalyticsGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AdAnalyticsGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAdAnalyticsGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AdAnalytics model
+   */
+  readonly fields: AdAnalyticsFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AdAnalytics.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AdAnalyticsClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends AdAnalytics$userArgs<ExtArgs> = {}>(args?: Subset<T, AdAnalytics$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AdAnalytics model
+   */
+  interface AdAnalyticsFieldRefs {
+    readonly id: FieldRef<"AdAnalytics", 'String'>
+    readonly userId: FieldRef<"AdAnalytics", 'String'>
+    readonly adType: FieldRef<"AdAnalytics", 'AdType'>
+    readonly action: FieldRef<"AdAnalytics", 'AdAction'>
+    readonly adNetworkId: FieldRef<"AdAnalytics", 'String'>
+    readonly timestamp: FieldRef<"AdAnalytics", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AdAnalytics findUnique
+   */
+  export type AdAnalyticsFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * Filter, which AdAnalytics to fetch.
+     */
+    where: AdAnalyticsWhereUniqueInput
+  }
+
+  /**
+   * AdAnalytics findUniqueOrThrow
+   */
+  export type AdAnalyticsFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * Filter, which AdAnalytics to fetch.
+     */
+    where: AdAnalyticsWhereUniqueInput
+  }
+
+  /**
+   * AdAnalytics findFirst
+   */
+  export type AdAnalyticsFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * Filter, which AdAnalytics to fetch.
+     */
+    where?: AdAnalyticsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdAnalytics to fetch.
+     */
+    orderBy?: AdAnalyticsOrderByWithRelationInput | AdAnalyticsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdAnalytics.
+     */
+    cursor?: AdAnalyticsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdAnalytics from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdAnalytics.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdAnalytics.
+     */
+    distinct?: AdAnalyticsScalarFieldEnum | AdAnalyticsScalarFieldEnum[]
+  }
+
+  /**
+   * AdAnalytics findFirstOrThrow
+   */
+  export type AdAnalyticsFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * Filter, which AdAnalytics to fetch.
+     */
+    where?: AdAnalyticsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdAnalytics to fetch.
+     */
+    orderBy?: AdAnalyticsOrderByWithRelationInput | AdAnalyticsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AdAnalytics.
+     */
+    cursor?: AdAnalyticsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdAnalytics from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdAnalytics.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AdAnalytics.
+     */
+    distinct?: AdAnalyticsScalarFieldEnum | AdAnalyticsScalarFieldEnum[]
+  }
+
+  /**
+   * AdAnalytics findMany
+   */
+  export type AdAnalyticsFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * Filter, which AdAnalytics to fetch.
+     */
+    where?: AdAnalyticsWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AdAnalytics to fetch.
+     */
+    orderBy?: AdAnalyticsOrderByWithRelationInput | AdAnalyticsOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AdAnalytics.
+     */
+    cursor?: AdAnalyticsWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AdAnalytics from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AdAnalytics.
+     */
+    skip?: number
+    distinct?: AdAnalyticsScalarFieldEnum | AdAnalyticsScalarFieldEnum[]
+  }
+
+  /**
+   * AdAnalytics create
+   */
+  export type AdAnalyticsCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * The data needed to create a AdAnalytics.
+     */
+    data: XOR<AdAnalyticsCreateInput, AdAnalyticsUncheckedCreateInput>
+  }
+
+  /**
+   * AdAnalytics createMany
+   */
+  export type AdAnalyticsCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AdAnalytics.
+     */
+    data: AdAnalyticsCreateManyInput | AdAnalyticsCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AdAnalytics update
+   */
+  export type AdAnalyticsUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * The data needed to update a AdAnalytics.
+     */
+    data: XOR<AdAnalyticsUpdateInput, AdAnalyticsUncheckedUpdateInput>
+    /**
+     * Choose, which AdAnalytics to update.
+     */
+    where: AdAnalyticsWhereUniqueInput
+  }
+
+  /**
+   * AdAnalytics updateMany
+   */
+  export type AdAnalyticsUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AdAnalytics.
+     */
+    data: XOR<AdAnalyticsUpdateManyMutationInput, AdAnalyticsUncheckedUpdateManyInput>
+    /**
+     * Filter which AdAnalytics to update
+     */
+    where?: AdAnalyticsWhereInput
+    /**
+     * Limit how many AdAnalytics to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdAnalytics upsert
+   */
+  export type AdAnalyticsUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * The filter to search for the AdAnalytics to update in case it exists.
+     */
+    where: AdAnalyticsWhereUniqueInput
+    /**
+     * In case the AdAnalytics found by the `where` argument doesn't exist, create a new AdAnalytics with this data.
+     */
+    create: XOR<AdAnalyticsCreateInput, AdAnalyticsUncheckedCreateInput>
+    /**
+     * In case the AdAnalytics was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AdAnalyticsUpdateInput, AdAnalyticsUncheckedUpdateInput>
+  }
+
+  /**
+   * AdAnalytics delete
+   */
+  export type AdAnalyticsDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+    /**
+     * Filter which AdAnalytics to delete.
+     */
+    where: AdAnalyticsWhereUniqueInput
+  }
+
+  /**
+   * AdAnalytics deleteMany
+   */
+  export type AdAnalyticsDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AdAnalytics to delete
+     */
+    where?: AdAnalyticsWhereInput
+    /**
+     * Limit how many AdAnalytics to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * AdAnalytics.user
+   */
+  export type AdAnalytics$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * AdAnalytics without action
+   */
+  export type AdAnalyticsDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AdAnalytics
+     */
+    select?: AdAnalyticsSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AdAnalytics
+     */
+    omit?: AdAnalyticsOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AdAnalyticsInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -5228,6 +7354,31 @@ export namespace Prisma {
   export type AppConfigScalarFieldEnum = (typeof AppConfigScalarFieldEnum)[keyof typeof AppConfigScalarFieldEnum]
 
 
+  export const AdConfigScalarFieldEnum: {
+    id: 'id',
+    adType: 'adType',
+    adNetworkId: 'adNetworkId',
+    isActive: 'isActive',
+    displayFrequency: 'displayFrequency',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type AdConfigScalarFieldEnum = (typeof AdConfigScalarFieldEnum)[keyof typeof AdConfigScalarFieldEnum]
+
+
+  export const AdAnalyticsScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    adType: 'adType',
+    action: 'action',
+    adNetworkId: 'adNetworkId',
+    timestamp: 'timestamp'
+  };
+
+  export type AdAnalyticsScalarFieldEnum = (typeof AdAnalyticsScalarFieldEnum)[keyof typeof AdAnalyticsScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -5283,6 +7434,23 @@ export namespace Prisma {
   };
 
   export type AppConfigOrderByRelevanceFieldEnum = (typeof AppConfigOrderByRelevanceFieldEnum)[keyof typeof AppConfigOrderByRelevanceFieldEnum]
+
+
+  export const AdConfigOrderByRelevanceFieldEnum: {
+    id: 'id',
+    adNetworkId: 'adNetworkId'
+  };
+
+  export type AdConfigOrderByRelevanceFieldEnum = (typeof AdConfigOrderByRelevanceFieldEnum)[keyof typeof AdConfigOrderByRelevanceFieldEnum]
+
+
+  export const AdAnalyticsOrderByRelevanceFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    adNetworkId: 'adNetworkId'
+  };
+
+  export type AdAnalyticsOrderByRelevanceFieldEnum = (typeof AdAnalyticsOrderByRelevanceFieldEnum)[keyof typeof AdAnalyticsOrderByRelevanceFieldEnum]
 
 
   /**
@@ -5347,9 +7515,23 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'AdType'
+   */
+  export type EnumAdTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdType'>
+    
+
+
+  /**
    * Reference to a field of type 'Int'
    */
   export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+  /**
+   * Reference to a field of type 'AdAction'
+   */
+  export type EnumAdActionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdAction'>
     
   /**
    * Deep Input Types
@@ -5372,6 +7554,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     payments?: PaymentListRelationFilter
     sessions?: SessionListRelationFilter
+    adAnalytics?: AdAnalyticsListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -5387,6 +7570,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     payments?: PaymentOrderByRelationAggregateInput
     sessions?: SessionOrderByRelationAggregateInput
+    adAnalytics?: AdAnalyticsOrderByRelationAggregateInput
     _relevance?: UserOrderByRelevanceInput
   }
 
@@ -5406,6 +7590,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     payments?: PaymentListRelationFilter
     sessions?: SessionListRelationFilter
+    adAnalytics?: AdAnalyticsListRelationFilter
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -5649,6 +7834,132 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"AppConfig"> | Date | string
   }
 
+  export type AdConfigWhereInput = {
+    AND?: AdConfigWhereInput | AdConfigWhereInput[]
+    OR?: AdConfigWhereInput[]
+    NOT?: AdConfigWhereInput | AdConfigWhereInput[]
+    id?: StringFilter<"AdConfig"> | string
+    adType?: EnumAdTypeFilter<"AdConfig"> | $Enums.AdType
+    adNetworkId?: StringFilter<"AdConfig"> | string
+    isActive?: BoolFilter<"AdConfig"> | boolean
+    displayFrequency?: IntFilter<"AdConfig"> | number
+    createdAt?: DateTimeFilter<"AdConfig"> | Date | string
+    updatedAt?: DateTimeFilter<"AdConfig"> | Date | string
+  }
+
+  export type AdConfigOrderByWithRelationInput = {
+    id?: SortOrder
+    adType?: SortOrder
+    adNetworkId?: SortOrder
+    isActive?: SortOrder
+    displayFrequency?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _relevance?: AdConfigOrderByRelevanceInput
+  }
+
+  export type AdConfigWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: AdConfigWhereInput | AdConfigWhereInput[]
+    OR?: AdConfigWhereInput[]
+    NOT?: AdConfigWhereInput | AdConfigWhereInput[]
+    adType?: EnumAdTypeFilter<"AdConfig"> | $Enums.AdType
+    adNetworkId?: StringFilter<"AdConfig"> | string
+    isActive?: BoolFilter<"AdConfig"> | boolean
+    displayFrequency?: IntFilter<"AdConfig"> | number
+    createdAt?: DateTimeFilter<"AdConfig"> | Date | string
+    updatedAt?: DateTimeFilter<"AdConfig"> | Date | string
+  }, "id">
+
+  export type AdConfigOrderByWithAggregationInput = {
+    id?: SortOrder
+    adType?: SortOrder
+    adNetworkId?: SortOrder
+    isActive?: SortOrder
+    displayFrequency?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: AdConfigCountOrderByAggregateInput
+    _avg?: AdConfigAvgOrderByAggregateInput
+    _max?: AdConfigMaxOrderByAggregateInput
+    _min?: AdConfigMinOrderByAggregateInput
+    _sum?: AdConfigSumOrderByAggregateInput
+  }
+
+  export type AdConfigScalarWhereWithAggregatesInput = {
+    AND?: AdConfigScalarWhereWithAggregatesInput | AdConfigScalarWhereWithAggregatesInput[]
+    OR?: AdConfigScalarWhereWithAggregatesInput[]
+    NOT?: AdConfigScalarWhereWithAggregatesInput | AdConfigScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"AdConfig"> | string
+    adType?: EnumAdTypeWithAggregatesFilter<"AdConfig"> | $Enums.AdType
+    adNetworkId?: StringWithAggregatesFilter<"AdConfig"> | string
+    isActive?: BoolWithAggregatesFilter<"AdConfig"> | boolean
+    displayFrequency?: IntWithAggregatesFilter<"AdConfig"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"AdConfig"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"AdConfig"> | Date | string
+  }
+
+  export type AdAnalyticsWhereInput = {
+    AND?: AdAnalyticsWhereInput | AdAnalyticsWhereInput[]
+    OR?: AdAnalyticsWhereInput[]
+    NOT?: AdAnalyticsWhereInput | AdAnalyticsWhereInput[]
+    id?: StringFilter<"AdAnalytics"> | string
+    userId?: StringNullableFilter<"AdAnalytics"> | string | null
+    adType?: EnumAdTypeFilter<"AdAnalytics"> | $Enums.AdType
+    action?: EnumAdActionFilter<"AdAnalytics"> | $Enums.AdAction
+    adNetworkId?: StringFilter<"AdAnalytics"> | string
+    timestamp?: DateTimeFilter<"AdAnalytics"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }
+
+  export type AdAnalyticsOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    adType?: SortOrder
+    action?: SortOrder
+    adNetworkId?: SortOrder
+    timestamp?: SortOrder
+    user?: UserOrderByWithRelationInput
+    _relevance?: AdAnalyticsOrderByRelevanceInput
+  }
+
+  export type AdAnalyticsWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: AdAnalyticsWhereInput | AdAnalyticsWhereInput[]
+    OR?: AdAnalyticsWhereInput[]
+    NOT?: AdAnalyticsWhereInput | AdAnalyticsWhereInput[]
+    userId?: StringNullableFilter<"AdAnalytics"> | string | null
+    adType?: EnumAdTypeFilter<"AdAnalytics"> | $Enums.AdType
+    action?: EnumAdActionFilter<"AdAnalytics"> | $Enums.AdAction
+    adNetworkId?: StringFilter<"AdAnalytics"> | string
+    timestamp?: DateTimeFilter<"AdAnalytics"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }, "id">
+
+  export type AdAnalyticsOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    adType?: SortOrder
+    action?: SortOrder
+    adNetworkId?: SortOrder
+    timestamp?: SortOrder
+    _count?: AdAnalyticsCountOrderByAggregateInput
+    _max?: AdAnalyticsMaxOrderByAggregateInput
+    _min?: AdAnalyticsMinOrderByAggregateInput
+  }
+
+  export type AdAnalyticsScalarWhereWithAggregatesInput = {
+    AND?: AdAnalyticsScalarWhereWithAggregatesInput | AdAnalyticsScalarWhereWithAggregatesInput[]
+    OR?: AdAnalyticsScalarWhereWithAggregatesInput[]
+    NOT?: AdAnalyticsScalarWhereWithAggregatesInput | AdAnalyticsScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"AdAnalytics"> | string
+    userId?: StringNullableWithAggregatesFilter<"AdAnalytics"> | string | null
+    adType?: EnumAdTypeWithAggregatesFilter<"AdAnalytics"> | $Enums.AdType
+    action?: EnumAdActionWithAggregatesFilter<"AdAnalytics"> | $Enums.AdAction
+    adNetworkId?: StringWithAggregatesFilter<"AdAnalytics"> | string
+    timestamp?: DateTimeWithAggregatesFilter<"AdAnalytics"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -5662,6 +7973,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     payments?: PaymentCreateNestedManyWithoutUserInput
     sessions?: SessionCreateNestedManyWithoutUserInput
+    adAnalytics?: AdAnalyticsCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -5677,6 +7989,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     payments?: PaymentUncheckedCreateNestedManyWithoutUserInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    adAnalytics?: AdAnalyticsUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -5692,6 +8005,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     payments?: PaymentUpdateManyWithoutUserNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
+    adAnalytics?: AdAnalyticsUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -5707,6 +8021,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     payments?: PaymentUncheckedUpdateManyWithoutUserNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    adAnalytics?: AdAnalyticsUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -5970,6 +8285,138 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type AdConfigCreateInput = {
+    id?: string
+    adType: $Enums.AdType
+    adNetworkId: string
+    isActive?: boolean
+    displayFrequency?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AdConfigUncheckedCreateInput = {
+    id?: string
+    adType: $Enums.AdType
+    adNetworkId: string
+    isActive?: boolean
+    displayFrequency?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AdConfigUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    displayFrequency?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdConfigUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    displayFrequency?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdConfigCreateManyInput = {
+    id?: string
+    adType: $Enums.AdType
+    adNetworkId: string
+    isActive?: boolean
+    displayFrequency?: number
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AdConfigUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    displayFrequency?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdConfigUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    displayFrequency?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdAnalyticsCreateInput = {
+    id?: string
+    adType: $Enums.AdType
+    action: $Enums.AdAction
+    adNetworkId: string
+    timestamp?: Date | string
+    user?: UserCreateNestedOneWithoutAdAnalyticsInput
+  }
+
+  export type AdAnalyticsUncheckedCreateInput = {
+    id?: string
+    userId?: string | null
+    adType: $Enums.AdType
+    action: $Enums.AdAction
+    adNetworkId: string
+    timestamp?: Date | string
+  }
+
+  export type AdAnalyticsUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    action?: EnumAdActionFieldUpdateOperationsInput | $Enums.AdAction
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutAdAnalyticsNestedInput
+  }
+
+  export type AdAnalyticsUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    action?: EnumAdActionFieldUpdateOperationsInput | $Enums.AdAction
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdAnalyticsCreateManyInput = {
+    id?: string
+    userId?: string | null
+    adType: $Enums.AdType
+    action: $Enums.AdAction
+    adNetworkId: string
+    timestamp?: Date | string
+  }
+
+  export type AdAnalyticsUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    action?: EnumAdActionFieldUpdateOperationsInput | $Enums.AdAction
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdAnalyticsUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    action?: EnumAdActionFieldUpdateOperationsInput | $Enums.AdAction
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[]
@@ -6046,6 +8493,12 @@ export namespace Prisma {
     none?: SessionWhereInput
   }
 
+  export type AdAnalyticsListRelationFilter = {
+    every?: AdAnalyticsWhereInput
+    some?: AdAnalyticsWhereInput
+    none?: AdAnalyticsWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -6056,6 +8509,10 @@ export namespace Prisma {
   }
 
   export type SessionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type AdAnalyticsOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -6428,6 +8885,149 @@ export namespace Prisma {
     _max?: NestedFloatNullableFilter<$PrismaModel>
   }
 
+  export type EnumAdTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdType | EnumAdTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.AdType[]
+    notIn?: $Enums.AdType[]
+    not?: NestedEnumAdTypeFilter<$PrismaModel> | $Enums.AdType
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[]
+    notIn?: number[]
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type AdConfigOrderByRelevanceInput = {
+    fields: AdConfigOrderByRelevanceFieldEnum | AdConfigOrderByRelevanceFieldEnum[]
+    sort: SortOrder
+    search: string
+  }
+
+  export type AdConfigCountOrderByAggregateInput = {
+    id?: SortOrder
+    adType?: SortOrder
+    adNetworkId?: SortOrder
+    isActive?: SortOrder
+    displayFrequency?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdConfigAvgOrderByAggregateInput = {
+    displayFrequency?: SortOrder
+  }
+
+  export type AdConfigMaxOrderByAggregateInput = {
+    id?: SortOrder
+    adType?: SortOrder
+    adNetworkId?: SortOrder
+    isActive?: SortOrder
+    displayFrequency?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdConfigMinOrderByAggregateInput = {
+    id?: SortOrder
+    adType?: SortOrder
+    adNetworkId?: SortOrder
+    isActive?: SortOrder
+    displayFrequency?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AdConfigSumOrderByAggregateInput = {
+    displayFrequency?: SortOrder
+  }
+
+  export type EnumAdTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdType | EnumAdTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.AdType[]
+    notIn?: $Enums.AdType[]
+    not?: NestedEnumAdTypeWithAggregatesFilter<$PrismaModel> | $Enums.AdType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumAdTypeFilter<$PrismaModel>
+    _max?: NestedEnumAdTypeFilter<$PrismaModel>
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[]
+    notIn?: number[]
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type EnumAdActionFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdAction | EnumAdActionFieldRefInput<$PrismaModel>
+    in?: $Enums.AdAction[]
+    notIn?: $Enums.AdAction[]
+    not?: NestedEnumAdActionFilter<$PrismaModel> | $Enums.AdAction
+  }
+
+  export type UserNullableScalarRelationFilter = {
+    is?: UserWhereInput | null
+    isNot?: UserWhereInput | null
+  }
+
+  export type AdAnalyticsOrderByRelevanceInput = {
+    fields: AdAnalyticsOrderByRelevanceFieldEnum | AdAnalyticsOrderByRelevanceFieldEnum[]
+    sort: SortOrder
+    search: string
+  }
+
+  export type AdAnalyticsCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    adType?: SortOrder
+    action?: SortOrder
+    adNetworkId?: SortOrder
+    timestamp?: SortOrder
+  }
+
+  export type AdAnalyticsMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    adType?: SortOrder
+    action?: SortOrder
+    adNetworkId?: SortOrder
+    timestamp?: SortOrder
+  }
+
+  export type AdAnalyticsMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    adType?: SortOrder
+    action?: SortOrder
+    adNetworkId?: SortOrder
+    timestamp?: SortOrder
+  }
+
+  export type EnumAdActionWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdAction | EnumAdActionFieldRefInput<$PrismaModel>
+    in?: $Enums.AdAction[]
+    notIn?: $Enums.AdAction[]
+    not?: NestedEnumAdActionWithAggregatesFilter<$PrismaModel> | $Enums.AdAction
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumAdActionFilter<$PrismaModel>
+    _max?: NestedEnumAdActionFilter<$PrismaModel>
+  }
+
   export type PaymentCreateNestedManyWithoutUserInput = {
     create?: XOR<PaymentCreateWithoutUserInput, PaymentUncheckedCreateWithoutUserInput> | PaymentCreateWithoutUserInput[] | PaymentUncheckedCreateWithoutUserInput[]
     connectOrCreate?: PaymentCreateOrConnectWithoutUserInput | PaymentCreateOrConnectWithoutUserInput[]
@@ -6442,6 +9042,13 @@ export namespace Prisma {
     connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
   }
 
+  export type AdAnalyticsCreateNestedManyWithoutUserInput = {
+    create?: XOR<AdAnalyticsCreateWithoutUserInput, AdAnalyticsUncheckedCreateWithoutUserInput> | AdAnalyticsCreateWithoutUserInput[] | AdAnalyticsUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AdAnalyticsCreateOrConnectWithoutUserInput | AdAnalyticsCreateOrConnectWithoutUserInput[]
+    createMany?: AdAnalyticsCreateManyUserInputEnvelope
+    connect?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+  }
+
   export type PaymentUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<PaymentCreateWithoutUserInput, PaymentUncheckedCreateWithoutUserInput> | PaymentCreateWithoutUserInput[] | PaymentUncheckedCreateWithoutUserInput[]
     connectOrCreate?: PaymentCreateOrConnectWithoutUserInput | PaymentCreateOrConnectWithoutUserInput[]
@@ -6454,6 +9061,13 @@ export namespace Prisma {
     connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
     createMany?: SessionCreateManyUserInputEnvelope
     connect?: SessionWhereUniqueInput | SessionWhereUniqueInput[]
+  }
+
+  export type AdAnalyticsUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<AdAnalyticsCreateWithoutUserInput, AdAnalyticsUncheckedCreateWithoutUserInput> | AdAnalyticsCreateWithoutUserInput[] | AdAnalyticsUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AdAnalyticsCreateOrConnectWithoutUserInput | AdAnalyticsCreateOrConnectWithoutUserInput[]
+    createMany?: AdAnalyticsCreateManyUserInputEnvelope
+    connect?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -6508,6 +9122,20 @@ export namespace Prisma {
     deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
   }
 
+  export type AdAnalyticsUpdateManyWithoutUserNestedInput = {
+    create?: XOR<AdAnalyticsCreateWithoutUserInput, AdAnalyticsUncheckedCreateWithoutUserInput> | AdAnalyticsCreateWithoutUserInput[] | AdAnalyticsUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AdAnalyticsCreateOrConnectWithoutUserInput | AdAnalyticsCreateOrConnectWithoutUserInput[]
+    upsert?: AdAnalyticsUpsertWithWhereUniqueWithoutUserInput | AdAnalyticsUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: AdAnalyticsCreateManyUserInputEnvelope
+    set?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    disconnect?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    delete?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    connect?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    update?: AdAnalyticsUpdateWithWhereUniqueWithoutUserInput | AdAnalyticsUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: AdAnalyticsUpdateManyWithWhereWithoutUserInput | AdAnalyticsUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: AdAnalyticsScalarWhereInput | AdAnalyticsScalarWhereInput[]
+  }
+
   export type PaymentUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<PaymentCreateWithoutUserInput, PaymentUncheckedCreateWithoutUserInput> | PaymentCreateWithoutUserInput[] | PaymentUncheckedCreateWithoutUserInput[]
     connectOrCreate?: PaymentCreateOrConnectWithoutUserInput | PaymentCreateOrConnectWithoutUserInput[]
@@ -6534,6 +9162,20 @@ export namespace Prisma {
     update?: SessionUpdateWithWhereUniqueWithoutUserInput | SessionUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: SessionUpdateManyWithWhereWithoutUserInput | SessionUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: SessionScalarWhereInput | SessionScalarWhereInput[]
+  }
+
+  export type AdAnalyticsUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<AdAnalyticsCreateWithoutUserInput, AdAnalyticsUncheckedCreateWithoutUserInput> | AdAnalyticsCreateWithoutUserInput[] | AdAnalyticsUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: AdAnalyticsCreateOrConnectWithoutUserInput | AdAnalyticsCreateOrConnectWithoutUserInput[]
+    upsert?: AdAnalyticsUpsertWithWhereUniqueWithoutUserInput | AdAnalyticsUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: AdAnalyticsCreateManyUserInputEnvelope
+    set?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    disconnect?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    delete?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    connect?: AdAnalyticsWhereUniqueInput | AdAnalyticsWhereUniqueInput[]
+    update?: AdAnalyticsUpdateWithWhereUniqueWithoutUserInput | AdAnalyticsUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: AdAnalyticsUpdateManyWithWhereWithoutUserInput | AdAnalyticsUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: AdAnalyticsScalarWhereInput | AdAnalyticsScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutPaymentsInput = {
@@ -6590,6 +9232,38 @@ export namespace Prisma {
     decrement?: number
     multiply?: number
     divide?: number
+  }
+
+  export type EnumAdTypeFieldUpdateOperationsInput = {
+    set?: $Enums.AdType
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type UserCreateNestedOneWithoutAdAnalyticsInput = {
+    create?: XOR<UserCreateWithoutAdAnalyticsInput, UserUncheckedCreateWithoutAdAnalyticsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAdAnalyticsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type EnumAdActionFieldUpdateOperationsInput = {
+    set?: $Enums.AdAction
+  }
+
+  export type UserUpdateOneWithoutAdAnalyticsNestedInput = {
+    create?: XOR<UserCreateWithoutAdAnalyticsInput, UserUncheckedCreateWithoutAdAnalyticsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutAdAnalyticsInput
+    upsert?: UserUpsertWithoutAdAnalyticsInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAdAnalyticsInput, UserUpdateWithoutAdAnalyticsInput>, UserUncheckedUpdateWithoutAdAnalyticsInput>
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -6865,6 +9539,56 @@ export namespace Prisma {
     _max?: NestedFloatNullableFilter<$PrismaModel>
   }
 
+  export type NestedEnumAdTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdType | EnumAdTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.AdType[]
+    notIn?: $Enums.AdType[]
+    not?: NestedEnumAdTypeFilter<$PrismaModel> | $Enums.AdType
+  }
+
+  export type NestedEnumAdTypeWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdType | EnumAdTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.AdType[]
+    notIn?: $Enums.AdType[]
+    not?: NestedEnumAdTypeWithAggregatesFilter<$PrismaModel> | $Enums.AdType
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumAdTypeFilter<$PrismaModel>
+    _max?: NestedEnumAdTypeFilter<$PrismaModel>
+  }
+
+  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[]
+    notIn?: number[]
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+
+  export type NestedEnumAdActionFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdAction | EnumAdActionFieldRefInput<$PrismaModel>
+    in?: $Enums.AdAction[]
+    notIn?: $Enums.AdAction[]
+    not?: NestedEnumAdActionFilter<$PrismaModel> | $Enums.AdAction
+  }
+
+  export type NestedEnumAdActionWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.AdAction | EnumAdActionFieldRefInput<$PrismaModel>
+    in?: $Enums.AdAction[]
+    notIn?: $Enums.AdAction[]
+    not?: NestedEnumAdActionWithAggregatesFilter<$PrismaModel> | $Enums.AdAction
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumAdActionFilter<$PrismaModel>
+    _max?: NestedEnumAdActionFilter<$PrismaModel>
+  }
+
   export type PaymentCreateWithoutUserInput = {
     id?: string
     type: $Enums.PaymentType
@@ -6916,6 +9640,32 @@ export namespace Prisma {
 
   export type SessionCreateManyUserInputEnvelope = {
     data: SessionCreateManyUserInput | SessionCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type AdAnalyticsCreateWithoutUserInput = {
+    id?: string
+    adType: $Enums.AdType
+    action: $Enums.AdAction
+    adNetworkId: string
+    timestamp?: Date | string
+  }
+
+  export type AdAnalyticsUncheckedCreateWithoutUserInput = {
+    id?: string
+    adType: $Enums.AdType
+    action: $Enums.AdAction
+    adNetworkId: string
+    timestamp?: Date | string
+  }
+
+  export type AdAnalyticsCreateOrConnectWithoutUserInput = {
+    where: AdAnalyticsWhereUniqueInput
+    create: XOR<AdAnalyticsCreateWithoutUserInput, AdAnalyticsUncheckedCreateWithoutUserInput>
+  }
+
+  export type AdAnalyticsCreateManyUserInputEnvelope = {
+    data: AdAnalyticsCreateManyUserInput | AdAnalyticsCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -6976,6 +9726,34 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Session"> | Date | string
   }
 
+  export type AdAnalyticsUpsertWithWhereUniqueWithoutUserInput = {
+    where: AdAnalyticsWhereUniqueInput
+    update: XOR<AdAnalyticsUpdateWithoutUserInput, AdAnalyticsUncheckedUpdateWithoutUserInput>
+    create: XOR<AdAnalyticsCreateWithoutUserInput, AdAnalyticsUncheckedCreateWithoutUserInput>
+  }
+
+  export type AdAnalyticsUpdateWithWhereUniqueWithoutUserInput = {
+    where: AdAnalyticsWhereUniqueInput
+    data: XOR<AdAnalyticsUpdateWithoutUserInput, AdAnalyticsUncheckedUpdateWithoutUserInput>
+  }
+
+  export type AdAnalyticsUpdateManyWithWhereWithoutUserInput = {
+    where: AdAnalyticsScalarWhereInput
+    data: XOR<AdAnalyticsUpdateManyMutationInput, AdAnalyticsUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type AdAnalyticsScalarWhereInput = {
+    AND?: AdAnalyticsScalarWhereInput | AdAnalyticsScalarWhereInput[]
+    OR?: AdAnalyticsScalarWhereInput[]
+    NOT?: AdAnalyticsScalarWhereInput | AdAnalyticsScalarWhereInput[]
+    id?: StringFilter<"AdAnalytics"> | string
+    userId?: StringNullableFilter<"AdAnalytics"> | string | null
+    adType?: EnumAdTypeFilter<"AdAnalytics"> | $Enums.AdType
+    action?: EnumAdActionFilter<"AdAnalytics"> | $Enums.AdAction
+    adNetworkId?: StringFilter<"AdAnalytics"> | string
+    timestamp?: DateTimeFilter<"AdAnalytics"> | Date | string
+  }
+
   export type UserCreateWithoutPaymentsInput = {
     id?: string
     email: string
@@ -6988,6 +9766,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionCreateNestedManyWithoutUserInput
+    adAnalytics?: AdAnalyticsCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPaymentsInput = {
@@ -7002,6 +9781,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    adAnalytics?: AdAnalyticsUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPaymentsInput = {
@@ -7032,6 +9812,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUpdateManyWithoutUserNestedInput
+    adAnalytics?: AdAnalyticsUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPaymentsInput = {
@@ -7046,6 +9827,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    adAnalytics?: AdAnalyticsUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionsInput = {
@@ -7060,6 +9842,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     payments?: PaymentCreateNestedManyWithoutUserInput
+    adAnalytics?: AdAnalyticsCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -7074,6 +9857,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     payments?: PaymentUncheckedCreateNestedManyWithoutUserInput
+    adAnalytics?: AdAnalyticsUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -7104,6 +9888,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     payments?: PaymentUpdateManyWithoutUserNestedInput
+    adAnalytics?: AdAnalyticsUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -7118,6 +9903,83 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     payments?: PaymentUncheckedUpdateManyWithoutUserNestedInput
+    adAnalytics?: AdAnalyticsUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutAdAnalyticsInput = {
+    id?: string
+    email: string
+    nickname: string
+    passwordHash: string
+    isVerified?: boolean
+    verificationToken?: string | null
+    premiumStatus?: $Enums.PremiumStatus
+    premiumExpiry?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    payments?: PaymentCreateNestedManyWithoutUserInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutAdAnalyticsInput = {
+    id?: string
+    email: string
+    nickname: string
+    passwordHash: string
+    isVerified?: boolean
+    verificationToken?: string | null
+    premiumStatus?: $Enums.PremiumStatus
+    premiumExpiry?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    payments?: PaymentUncheckedCreateNestedManyWithoutUserInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutAdAnalyticsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutAdAnalyticsInput, UserUncheckedCreateWithoutAdAnalyticsInput>
+  }
+
+  export type UserUpsertWithoutAdAnalyticsInput = {
+    update: XOR<UserUpdateWithoutAdAnalyticsInput, UserUncheckedUpdateWithoutAdAnalyticsInput>
+    create: XOR<UserCreateWithoutAdAnalyticsInput, UserUncheckedCreateWithoutAdAnalyticsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutAdAnalyticsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutAdAnalyticsInput, UserUncheckedUpdateWithoutAdAnalyticsInput>
+  }
+
+  export type UserUpdateWithoutAdAnalyticsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    nickname?: StringFieldUpdateOperationsInput | string
+    passwordHash?: StringFieldUpdateOperationsInput | string
+    isVerified?: BoolFieldUpdateOperationsInput | boolean
+    verificationToken?: NullableStringFieldUpdateOperationsInput | string | null
+    premiumStatus?: EnumPremiumStatusFieldUpdateOperationsInput | $Enums.PremiumStatus
+    premiumExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    payments?: PaymentUpdateManyWithoutUserNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutAdAnalyticsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    nickname?: StringFieldUpdateOperationsInput | string
+    passwordHash?: StringFieldUpdateOperationsInput | string
+    isVerified?: BoolFieldUpdateOperationsInput | boolean
+    verificationToken?: NullableStringFieldUpdateOperationsInput | string | null
+    premiumStatus?: EnumPremiumStatusFieldUpdateOperationsInput | $Enums.PremiumStatus
+    premiumExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    payments?: PaymentUncheckedUpdateManyWithoutUserNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type PaymentCreateManyUserInput = {
@@ -7135,6 +9997,14 @@ export namespace Prisma {
     token: string
     expiresAt: Date | string
     createdAt?: Date | string
+  }
+
+  export type AdAnalyticsCreateManyUserInput = {
+    id?: string
+    adType: $Enums.AdType
+    action: $Enums.AdAction
+    adNetworkId: string
+    timestamp?: Date | string
   }
 
   export type PaymentUpdateWithoutUserInput = {
@@ -7186,6 +10056,30 @@ export namespace Prisma {
     token?: StringFieldUpdateOperationsInput | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdAnalyticsUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    action?: EnumAdActionFieldUpdateOperationsInput | $Enums.AdAction
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdAnalyticsUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    action?: EnumAdActionFieldUpdateOperationsInput | $Enums.AdAction
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AdAnalyticsUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    adType?: EnumAdTypeFieldUpdateOperationsInput | $Enums.AdType
+    action?: EnumAdActionFieldUpdateOperationsInput | $Enums.AdAction
+    adNetworkId?: StringFieldUpdateOperationsInput | string
+    timestamp?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
 

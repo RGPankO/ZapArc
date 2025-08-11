@@ -25,6 +25,7 @@ model User {
   
   payments      Payment[]
   sessions      Session[]
+  adAnalytics   AdAnalytics[]
   
   @@map("users")
 }
@@ -93,4 +94,41 @@ enum PaymentModel {
   SUBSCRIPTION_ONLY
   ONE_TIME_ONLY
   BOTH
+}
+
+model AdConfig {
+  id              String   @id @default(cuid())
+  adType          AdType
+  adNetworkId     String   // AdSense or other network ID
+  isActive        Boolean  @default(true)
+  displayFrequency Int     @default(1) // How often to show (every N screens)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("ad_configs")
+}
+
+model AdAnalytics {
+  id          String   @id @default(cuid())
+  userId      String?  // Optional - for tracking user-specific analytics
+  adType      AdType
+  action      AdAction
+  adNetworkId String
+  timestamp   DateTime @default(now())
+  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("ad_analytics")
+}
+
+enum AdType {
+  BANNER
+  INTERSTITIAL
+}
+
+enum AdAction {
+  IMPRESSION
+  CLICK
+  CLOSE
+  ERROR
 }

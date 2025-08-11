@@ -1,10 +1,27 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Button, Text } from 'react-native-paper';
+import { Button, Text, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { InterstitialAd } from '../src/components';
+import { useInterstitialAd } from '../src/hooks/useInterstitialAd';
+import { useAuth } from '../src/hooks/useAuth';
 
 export default function Index(): React.JSX.Element {
+  const interstitialAd = useInterstitialAd();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -12,35 +29,65 @@ export default function Index(): React.JSX.Element {
           Mobile App Skeleton
         </Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
-          Choose a section to test:
+          {isAuthenticated ? 'Welcome back!' : 'Choose a section to test:'}
         </Text>
         
         <View style={styles.buttonContainer}>
-          <Button
-            mode="contained"
-            onPress={() => router.push('/auth/welcome')}
-            style={styles.button}
-          >
-            Authentication Flow
-          </Button>
+          {!isAuthenticated ? (
+            <Button
+              mode="contained"
+              onPress={() => router.push('/auth/welcome')}
+              style={styles.button}
+            >
+              Get Started - Login/Register
+            </Button>
+          ) : (
+            <>
+              <Button
+                mode="contained"
+                onPress={() => router.push('/(main)/profile')}
+                style={styles.button}
+              >
+                My Profile
+              </Button>
+              
+              <Button
+                mode="contained"
+                onPress={() => router.push('/(main)/settings')}
+                style={styles.button}
+              >
+                Settings
+              </Button>
+            </>
+          )}
           
           <Button
-            mode="contained"
-            onPress={() => router.push('/(main)/profile')}
+            mode="outlined"
+            onPress={interstitialAd.showAd}
             style={styles.button}
           >
-            Profile Screen
+            Show Interstitial Ad
           </Button>
           
-          <Button
-            mode="contained"
-            onPress={() => router.push('/(main)/settings')}
-            style={styles.button}
-          >
-            Settings Screen
-          </Button>
+          {isAuthenticated && (
+            <Button
+              mode="outlined"
+              onPress={() => router.push('/auth/welcome')}
+              style={styles.button}
+            >
+              Authentication Flow (Test)
+            </Button>
+          )}
         </View>
       </View>
+
+      {/* Interstitial Ad */}
+      <InterstitialAd
+        visible={interstitialAd.isVisible}
+        onClose={interstitialAd.hideAd}
+        onAdLoaded={interstitialAd.onAdLoaded}
+        onAdError={interstitialAd.onAdError}
+      />
     </SafeAreaView>
   );
 }
@@ -71,5 +118,14 @@ const styles = StyleSheet.create({
   },
   button: {
     borderRadius: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#666',
   },
 });

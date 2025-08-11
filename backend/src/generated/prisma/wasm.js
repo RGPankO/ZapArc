@@ -165,6 +165,25 @@ exports.Prisma.AppConfigScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.AdConfigScalarFieldEnum = {
+  id: 'id',
+  adType: 'adType',
+  adNetworkId: 'adNetworkId',
+  isActive: 'isActive',
+  displayFrequency: 'displayFrequency',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AdAnalyticsScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  adType: 'adType',
+  action: 'action',
+  adNetworkId: 'adNetworkId',
+  timestamp: 'timestamp'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -203,6 +222,17 @@ exports.Prisma.AppConfigOrderByRelevanceFieldEnum = {
   secondaryColor: 'secondaryColor',
   logoUrl: 'logoUrl'
 };
+
+exports.Prisma.AdConfigOrderByRelevanceFieldEnum = {
+  id: 'id',
+  adNetworkId: 'adNetworkId'
+};
+
+exports.Prisma.AdAnalyticsOrderByRelevanceFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  adNetworkId: 'adNetworkId'
+};
 exports.PremiumStatus = exports.$Enums.PremiumStatus = {
   FREE: 'FREE',
   PREMIUM_SUBSCRIPTION: 'PREMIUM_SUBSCRIPTION',
@@ -227,11 +257,25 @@ exports.PaymentModel = exports.$Enums.PaymentModel = {
   BOTH: 'BOTH'
 };
 
+exports.AdType = exports.$Enums.AdType = {
+  BANNER: 'BANNER',
+  INTERSTITIAL: 'INTERSTITIAL'
+};
+
+exports.AdAction = exports.$Enums.AdAction = {
+  IMPRESSION: 'IMPRESSION',
+  CLICK: 'CLICK',
+  CLOSE: 'CLOSE',
+  ERROR: 'ERROR'
+};
+
 exports.Prisma.ModelName = {
   User: 'User',
   Payment: 'Payment',
   Session: 'Session',
-  AppConfig: 'AppConfig'
+  AppConfig: 'AppConfig',
+  AdConfig: 'AdConfig',
+  AdAnalytics: 'AdAnalytics'
 };
 
 /**

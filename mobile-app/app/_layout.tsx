@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { PaperProvider } from 'react-native-paper';
+import { initializeDeepLinking } from '../src/utils/deepLinking';
 
 export default function RootLayout(): React.JSX.Element {
+  useEffect(() => {
+    // Initialize deep linking when the app starts
+    initializeDeepLinking();
+  }, []);
+
   return (
     <PaperProvider>
       <Stack>

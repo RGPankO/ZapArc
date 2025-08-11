@@ -3,6 +3,7 @@ import { View, StyleSheet, Image } from 'react-native';
 import { Button, Text, Card } from 'react-native-paper';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BannerAd } from '../../src/components';
 
 export default function WelcomeScreen(): React.JSX.Element {
   const handleLogin = (): void => {
@@ -32,6 +33,13 @@ export default function WelcomeScreen(): React.JSX.Element {
             Your customizable mobile experience
           </Text>
         </View>
+
+        {/* Banner Advertisement */}
+        <BannerAd 
+          style={styles.bannerAd}
+          onAdLoaded={() => console.log('Banner ad loaded')}
+          onAdError={(error) => console.log('Banner ad error:', error)}
+        />
 
         {/* Action buttons */}
         <View style={styles.buttonContainer}>
@@ -126,5 +134,9 @@ const styles = StyleSheet.create({
   brandingText: {
     color: '#999',
     textAlign: 'center',
+  },
+  bannerAd: {
+    width: '100%',
+    marginBottom: 24,
   },
 });

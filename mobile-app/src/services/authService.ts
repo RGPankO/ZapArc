@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { ApiResponse, User } from '../types';
+import { NetworkConfig } from '../config/network';
 
 export interface LoginRequest {
   email: string;
@@ -14,29 +15,15 @@ export interface RegisterRequest {
 
 export interface AuthResponse {
   user: User;
-  token: string;
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+  };
 }
 
 class AuthService {
   private getBaseUrls(): string[] {
-    // Return multiple URLs to try in order
-    if (Platform.OS === 'web') {
-      return [
-        'http://localhost:3000/api',
-        'http://127.0.0.1:3000/api',
-        'http://192.168.1.5:3000/api'
-      ];
-    } else if (Platform.OS === 'android') {
-      return [
-        'http://10.0.2.2:3000/api',
-        'http://192.168.1.5:3000/api'
-      ];
-    } else {
-      return [
-        'http://localhost:3000/api',
-        'http://192.168.1.5:3000/api'
-      ];
-    }
+    return NetworkConfig.getApiBaseUrls();
   }
 
   private get baseUrl(): string {
@@ -44,75 +31,109 @@ class AuthService {
   }
 
   async login(data: LoginRequest): Promise<ApiResponse<AuthResponse>> {
-    try {
-      console.log('Starting login process...');
-      console.log('Login payload:', { email: data.email, password: '[HIDDEN]' });
+    console.log('AuthService: Starting login process...');
+    console.log('AuthService: Login payload:', { email: data.email, password: '[HIDDEN]' });
+    
+    const urls = this.getBaseUrls();
+    console.log('AuthService: Available URLs:', urls);
+    
+    // Try each URL until one works
+    for (let i = 0; i < urls.length; i++) {
+      const baseUrl = urls[i];
+      const loginUrl = `${baseUrl}/auth/login`;
       
-      const loginUrl = `${this.baseUrl}/auth/login`;
-      console.log('Making login request to:', loginUrl);
-      
-      const response = await fetch(loginUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      try {
+        console.log(`AuthService: Attempt ${i + 1}/${urls.length} - Making login request to:`, loginUrl);
 
-      console.log('Login response status:', response.status);
-      console.log('Login response ok:', response.ok);
+        const response = await fetch(loginUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
 
-      const result = await response.json();
-      console.log('Login response data:', result);
-      
-      if (!response.ok) {
+        console.log('AuthService: Login response status:', response.status);
+        console.log('AuthService: Login response ok:', response.ok);
+
+        const result = await response.json();
+        console.log('AuthService: Login response data:', result);
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: result.error || { code: 'LOGIN_FAILED', message: 'Login failed' },
+          };
+        }
+
+        console.log('✅ AuthService: Login successful with URL:', loginUrl);
         return {
-          success: false,
-          error: result.error || { code: 'LOGIN_FAILED', message: 'Login failed' },
+          success: true,
+          data: result.data,
         };
+      } catch (error) {
+        console.error(`AuthService: Login attempt ${i + 1} failed with URL ${loginUrl}:`, error);
+        
+        // If this is the last URL, return the error
+        if (i === urls.length - 1) {
+          console.error('AuthService: All login attempts failed');
+          return {
+            success: false,
+            error: {
+              code: 'NETWORK_ERROR',
+              message: 'Network error occurred - could not connect to server',
+              details: error,
+            },
+          };
+        }
+        
+        // Otherwise, continue to the next URL
+        console.log(`AuthService: Trying next URL...`);
       }
-
-      return {
-        success: true,
-        data: result.data,
-      };
-    } catch (error) {
-      console.error('Network error during login:', error);
-      return {
-        success: false,
-        error: {
-          code: 'NETWORK_ERROR',
-          message: 'Network error occurred',
-          details: error,
-        },
-      };
     }
+
+    // This should never be reached, but just in case
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: 'All connection attempts failed',
+      },
+    };
   }
 
   async testConnection(): Promise<{ success: boolean; workingUrl?: string }> {
     const urls = this.getBaseUrls();
-    
+
     for (const baseUrl of urls) {
       try {
         const healthUrl = `${baseUrl.replace('/api', '')}/health`;
         console.log('Testing connection to:', healthUrl);
-        
+
         const response = await fetch(healthUrl, {
           method: 'GET',
-          timeout: 5000, // 5 second timeout
         });
-        
+
         console.log(`Health check response for ${healthUrl}:`, response.status, response.ok);
-        
-        if (response.ok) {
-          console.log('✅ Connection successful with:', baseUrl);
-          return { success: true, workingUrl: baseUrl };
+
+        // Accept both 200 (healthy) and 503 (unhealthy but server running)
+        if (response.ok || response.status === 503) {
+          try {
+            const healthData = await response.json();
+            // Check if we got a valid health response with database connection
+            if (healthData && healthData.database && healthData.database.connected) {
+              console.log('✅ Connection successful with:', baseUrl);
+              return { success: true, workingUrl: baseUrl };
+            }
+          } catch (jsonError) {
+            console.error('Failed to parse health response:', jsonError);
+          }
         }
       } catch (error) {
         console.error(`Connection test failed for ${baseUrl}:`, error);
       }
     }
-    
+
     console.error('❌ All connection attempts failed');
     return { success: false };
   }
@@ -121,11 +142,11 @@ class AuthService {
     try {
       console.log('Starting registration process...');
       console.log('Registration payload:', data);
-      
+
       // Test connection first and get working URL
       const connectionTest = await this.testConnection();
       console.log('Connection test result:', connectionTest);
-      
+
       if (!connectionTest.success) {
         return {
           success: false,
@@ -135,11 +156,11 @@ class AuthService {
           },
         };
       }
-      
+
       const workingBaseUrl = connectionTest.workingUrl || this.baseUrl;
       const registerUrl = `${workingBaseUrl}/auth/register`;
       console.log('Making registration request to:', registerUrl);
-      
+
       const response = await fetch(registerUrl, {
         method: 'POST',
         headers: {
@@ -153,7 +174,7 @@ class AuthService {
 
       const result = await response.json();
       console.log('Response data:', result);
-      
+
       if (!response.ok) {
         return {
           success: false,
@@ -189,7 +210,7 @@ class AuthService {
       });
 
       const result = await response.json();
-      
+
       if (!response.ok) {
         return {
           success: false,
@@ -223,7 +244,7 @@ class AuthService {
       });
 
       const result = await response.json();
-      
+
       if (!response.ok) {
         return {
           success: false,

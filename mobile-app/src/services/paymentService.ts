@@ -1,23 +1,23 @@
-import { ApiResponse, User } from '../types';
+import { Platform } from 'react-native';
+import { ApiResponse, PaymentPlan } from '../types';
 import { NetworkConfig } from '../config/network';
 
-export interface UpdateProfileRequest {
-  nickname?: string;
-  email?: string;
+export interface CreatePaymentRequest {
+  planId: string;
+  type: 'subscription' | 'one-time';
+  amount: number;
+  currency: string;
+  platformId?: string;
 }
 
-export interface ChangePasswordRequest {
-  currentPassword: string;
-  newPassword: string;
+export interface PaymentStatus {
+  hasPremium: boolean;
+  premiumStatus: string;
+  premiumExpiry?: Date;
+  activePayments: any[];
 }
 
-export interface UserProfile extends User {
-  isVerified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-class UserService {
+class PaymentService {
   private getBaseUrl(): string {
     return NetworkConfig.getApiBaseUrl();
   }
@@ -49,67 +49,20 @@ class UserService {
     return headers;
   }
 
-  async getProfile(): Promise<ApiResponse<{ user: UserProfile }>> {
+  async getPaymentPlans(): Promise<ApiResponse<PaymentPlan[]>> {
     try {
-      console.log('UserService: Getting profile...');
-      console.log('UserService: Base URL:', this.baseUrl);
-      
       const headers = await this.getAuthHeaders();
-      console.log('UserService: Headers prepared, has auth token:', !!headers.Authorization);
-      
-      const profileUrl = `${this.baseUrl}/users/profile`;
-      console.log('UserService: Making request to:', profileUrl);
-      
-      const response = await fetch(profileUrl, {
+      const response = await fetch(`${this.baseUrl}/payments/plans`, {
         method: 'GET',
         headers,
       });
 
-      console.log('UserService: Response status:', response.status);
-      console.log('UserService: Response ok:', response.ok);
-
-      const result = await response.json();
-      console.log('UserService: Response data:', result);
-      
-      if (!response.ok) {
-        return {
-          success: false,
-          error: result.error || { code: 'PROFILE_FETCH_FAILED', message: 'Failed to fetch profile' },
-        };
-      }
-
-      return {
-        success: true,
-        data: result.data,
-      };
-    } catch (error) {
-      console.error('UserService: Network error:', error);
-      return {
-        success: false,
-        error: {
-          code: 'NETWORK_ERROR',
-          message: 'Network error occurred',
-          details: error,
-        },
-      };
-    }
-  }
-
-  async updateProfile(data: UpdateProfileRequest): Promise<ApiResponse<{ user: UserProfile }>> {
-    try {
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(`${this.baseUrl}/users/profile`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(data),
-      });
-
       const result = await response.json();
       
       if (!response.ok) {
         return {
           success: false,
-          error: result.error || { code: 'PROFILE_UPDATE_FAILED', message: 'Failed to update profile' },
+          error: result.error || { code: 'PLANS_FETCH_FAILED', message: 'Failed to fetch payment plans' },
         };
       }
 
@@ -129,83 +82,13 @@ class UserService {
     }
   }
 
-  async changePassword(data: ChangePasswordRequest): Promise<ApiResponse<{ message: string }>> {
+  async createPayment(data: CreatePaymentRequest): Promise<ApiResponse<{ paymentId: string }>> {
     try {
       const headers = await this.getAuthHeaders();
-      const response = await fetch(`${this.baseUrl}/users/password`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(data),
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        return {
-          success: false,
-          error: result.error || { code: 'PASSWORD_CHANGE_FAILED', message: 'Failed to change password' },
-        };
-      }
-
-      return {
-        success: true,
-        data: result.data,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          code: 'NETWORK_ERROR',
-          message: 'Network error occurred',
-          details: error,
-        },
-      };
-    }
-  }
-
-  async deleteAccount(): Promise<ApiResponse<{ message: string }>> {
-    try {
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(`${this.baseUrl}/users/account`, {
-        method: 'DELETE',
-        headers,
-      });
-
-      const result = await response.json();
-      
-      if (!response.ok) {
-        return {
-          success: false,
-          error: result.error || { code: 'ACCOUNT_DELETE_FAILED', message: 'Failed to delete account' },
-        };
-      }
-
-      return {
-        success: true,
-        data: result.data,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          code: 'NETWORK_ERROR',
-          message: 'Network error occurred',
-          details: error,
-        },
-      };
-    }
-  }
-
-  async logout(): Promise<ApiResponse<{ message: string }>> {
-    try {
-      const headers = await this.getAuthHeaders();
-      const { tokenService } = await import('./tokenService');
-      const refreshToken = await tokenService.getRefreshToken();
-      
-      const response = await fetch(`${this.baseUrl}/auth/logout`, {
+      const response = await fetch(`${this.baseUrl}/payments/create`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify(data),
       });
 
       const result = await response.json();
@@ -213,28 +96,116 @@ class UserService {
       if (!response.ok) {
         return {
           success: false,
-          error: result.error || { code: 'LOGOUT_FAILED', message: 'Failed to logout' },
+          error: result.error || { code: 'PAYMENT_CREATE_FAILED', message: 'Failed to create payment' },
         };
       }
 
-      // Clear stored tokens
-      await tokenService.clearAuth();
-      
       return {
         success: true,
         data: result.data,
       };
     } catch (error) {
-      console.error('Logout error:', error);
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network error occurred',
+          details: error,
+        },
+      };
+    }
+  }
+
+  async processSubscription(planId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.baseUrl}/payments/subscribe`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ planId }),
+      });
+
+      const result = await response.json();
       
-      // Even if the API call fails, clear local tokens
-      try {
-        const { tokenService } = await import('./tokenService');
-        await tokenService.clearAuth();
-      } catch (clearError) {
-        console.error('Error clearing tokens:', clearError);
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || { code: 'SUBSCRIPTION_FAILED', message: 'Failed to process subscription' },
+        };
       }
+
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network error occurred',
+          details: error,
+        },
+      };
+    }
+  }
+
+  async processOneTimePurchase(planId: string): Promise<ApiResponse<{ success: boolean; message: string }>> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.baseUrl}/payments/purchase`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ planId }),
+      });
+
+      const result = await response.json();
       
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || { code: 'PURCHASE_FAILED', message: 'Failed to process purchase' },
+        };
+      }
+
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network error occurred',
+          details: error,
+        },
+      };
+    }
+  }
+
+  async getPaymentStatus(): Promise<ApiResponse<PaymentStatus>> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.baseUrl}/payments/status`, {
+        method: 'GET',
+        headers,
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || { code: 'STATUS_FETCH_FAILED', message: 'Failed to fetch payment status' },
+        };
+      }
+
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
       return {
         success: false,
         error: {
@@ -247,4 +218,4 @@ class UserService {
   }
 }
 
-export const userService = new UserService();
+export const paymentService = new PaymentService();

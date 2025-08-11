@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import { router } from 'expo-router';
 import { userService, UserProfile, UpdateProfileRequest } from '../../src/services/userService';
 import { PremiumStatus } from '../../src/types';
 
@@ -49,6 +50,17 @@ export default function ProfileScreen(): React.JSX.Element {
     setError(null);
 
     try {
+      // Check if user is authenticated first
+      const { tokenService } = await import('../../src/services/tokenService');
+      const isAuth = await tokenService.isAuthenticated();
+      console.log('Profile: User authenticated:', isAuth);
+      
+      if (!isAuth) {
+        setError('Please log in to view your profile');
+        setIsLoading(false);
+        return;
+      }
+
       const result = await userService.getProfile();
       
       if (result.success && result.data) {
@@ -56,9 +68,11 @@ export default function ProfileScreen(): React.JSX.Element {
         setValue('nickname', result.data.user.nickname);
         setValue('email', result.data.user.email);
       } else {
+        console.log('Profile: Load failed:', result.error);
         setError(result.error?.message || 'Failed to load profile');
       }
     } catch (err) {
+      console.error('Profile: Unexpected error:', err);
       setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
@@ -181,6 +195,19 @@ export default function ProfileScreen(): React.JSX.Element {
                     </Chip>
                   </View>
                 </View>
+                {profile.premiumStatus === PremiumStatus.FREE && (
+                  <View style={styles.premiumButtonContainer}>
+                    <Button
+                      mode="contained"
+                      onPress={() => router.push('/(main)/premium')}
+                      style={styles.premiumButton}
+                      contentStyle={styles.buttonContent}
+                      icon="crown"
+                    >
+                      Upgrade to Premium
+                    </Button>
+                  </View>
+                )}
               </Card.Content>
             </Card>
           )}
@@ -386,5 +413,15 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontWeight: '500',
     color: '#666',
+  },
+  premiumButtonContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  premiumButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 8,
   },
 });

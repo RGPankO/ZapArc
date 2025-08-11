@@ -47,8 +47,8 @@
   - Add logout functionality with session cleanup
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 6. Implement payment system backend
-- [ ] 6.1 Create payment service architecture
+- [-] 6. Implement payment system backend
+- [x] 6.1 Create payment service architecture
   - Build payment plan configuration system
   - Implement subscription management endpoints
   - Create one-time purchase processing endpoints
@@ -62,7 +62,7 @@
   - Build premium status update logic
   - _Requirements: 4.2, 4.3, 4.4, 4.6, 4.7_
 
-- [ ] 7. Build premium purchase screens and components
+- [x] 7. Build premium purchase screens and components
   - Create Premium screen displaying available plans
   - Implement subscription purchase flow
   - Build one-time purchase flow
@@ -70,15 +70,15 @@
   - Add premium status display in user profile
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.8_
 
-- [ ] 8. Implement advertising system
-- [ ] 8.1 Create ad management backend
+- [x] 8. Implement advertising system
+- [x] 8.1 Create ad management backend
   - Build ad configuration endpoints
   - Implement ad serving logic with premium user filtering
   - Create ad analytics and tracking utilities
   - Set up error handling for ad service failures
   - _Requirements: 7.5, 7.6_
 
-- [ ] 8.2 Build advertisement components
+- [x] 8.2 Build advertisement components
   - Create BannerAd component for welcome screen
   - Implement InterstitialAd component with video playback
   - Build AdManager service for ad loading and display

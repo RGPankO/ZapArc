@@ -76,7 +76,9 @@ class EmailService {
   }
 
   async sendVerificationEmail(email: string, nickname: string, verificationToken: string): Promise<boolean> {
-    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    // Generate deep link for mobile app instead of web URL
+    const verificationUrl = `mobile-app://verify-email?token=${verificationToken}`;
+    const fallbackUrl = `${process.env.FRONTEND_URL || 'http://46.10.214.242:8081'}/verify-email?token=${verificationToken}`;
     
     const html = `
       <!DOCTYPE html>
@@ -110,10 +112,16 @@ class EmailService {
             <h2>Hi ${nickname},</h2>
             <p>Thank you for registering with us! To complete your registration, please verify your email address by clicking the button below:</p>
             <p style="text-align: center;">
-              <a href="${verificationUrl}" class="button">Verify Email Address</a>
+              <a href="${verificationUrl}" class="button">Open in Mobile App</a>
             </p>
-            <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #007bff;">${verificationUrl}</p>
+            <p>If you're not on your mobile device, you can also verify using this web link:</p>
+            <p style="text-align: center;">
+              <a href="${fallbackUrl}" style="color: #007bff; text-decoration: underline;">Verify in Browser</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">
+              Mobile app link: <span style="word-break: break-all;">${verificationUrl}</span><br>
+              Web link: <span style="word-break: break-all;">${fallbackUrl}</span>
+            </p>
             <p><strong>This verification link will expire in 24 hours.</strong></p>
             <p>If you didn't create an account with us, please ignore this email.</p>
           </div>
