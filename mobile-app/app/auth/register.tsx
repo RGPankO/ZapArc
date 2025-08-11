@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { TextInput, Button, Text, HelperText } from 'react-native-paper';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -97,16 +97,25 @@ export default function RegisterScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
-          <Text variant="headlineMedium" style={styles.title}>
-            Create Account
-          </Text>
-          <Text variant="bodyMedium" style={styles.subtitle}>
-            Join us and start your journey
-          </Text>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={styles.content}>
+            <Text variant="headlineMedium" style={styles.title}>
+              Create Account
+            </Text>
+            <Text variant="bodyMedium" style={styles.subtitle}>
+              Join us and start your journey
+            </Text>
 
-          <View style={styles.form}>
+            <View style={styles.form}>
             <Controller
               control={control}
               name="nickname"
@@ -229,9 +238,10 @@ export default function RegisterScreen(): React.JSX.Element {
                 Login
               </Button>
             </View>
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -241,11 +251,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 24,
     paddingTop: 32,
   },
@@ -260,7 +273,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   form: {
-    flex: 1,
+    marginTop: 16,
   },
   inputContainer: {
     marginBottom: 8,

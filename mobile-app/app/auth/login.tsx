@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Text, HelperText } from 'react-native-paper';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -143,8 +143,17 @@ export default function LoginScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.content}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={styles.content}>
           <Text variant="headlineMedium" style={styles.title}>
             Welcome Back
           </Text>
@@ -241,9 +250,10 @@ export default function LoginScreen(): React.JSX.Element {
                 Register
               </Button>
             </View>
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -253,11 +263,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 24,
     paddingTop: 32,
   },
@@ -284,7 +297,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   form: {
-    flex: 1,
+    marginTop: 16,
   },
   inputContainer: {
     marginBottom: 8,
