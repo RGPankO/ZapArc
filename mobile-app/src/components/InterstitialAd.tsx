@@ -82,9 +82,11 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
         await adManager.trackImpression(state.adConfig);
         onAdLoaded?.();
       } else if (state.error) {
-        onAdError?.(state.error);
+        console.log('InterstitialAd: Ad loading failed, but not showing error to user:', state.error);
+        // Don't call onAdError to avoid showing error popups
         onClose(); // Close modal if no ad to show
       } else {
+        console.log('InterstitialAd: User should not see ads (premium user)');
         onClose(); // Close modal if user shouldn't see ads
       }
     } catch (error) {

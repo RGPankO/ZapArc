@@ -1,16 +1,41 @@
-import { API_BASE_URL } from '../utils/constants';
 import { tokenService } from './tokenService';
+import { NetworkConfig } from '../config/network';
 import type { AdConfig, AdAnalyticsData, ApiResponse } from '../types';
 import { AdType } from '../types';
 
 class AdService {
-  private baseUrl = `${API_BASE_URL}/api/ads`;
+  private get baseUrl(): string {
+    return `${NetworkConfig.getApiBaseUrl()}/ads`;
+  }
+
+  // Sample ad configurations for when backend is unavailable
+  private getSampleAdConfig(adType: AdType): AdConfig {
+    const sampleAds = {
+      [AdType.BANNER]: {
+        id: 'sample-banner-001',
+        adType: AdType.BANNER,
+        adNetworkId: 'sample-network-banner',
+        displayFrequency: 1,
+      },
+      [AdType.INTERSTITIAL]: {
+        id: 'sample-interstitial-001',
+        adType: AdType.INTERSTITIAL,
+        adNetworkId: 'sample-network-interstitial',
+        displayFrequency: 1,
+      },
+    };
+
+    return sampleAds[adType];
+  }
 
   /**
    * Get ad configuration for serving
    */
   async getAd(adType: AdType): Promise<AdConfig | null> {
     try {
+      console.log('AdService: Fetching ad for type:', adType);
+      console.log('AdService: Using base URL:', this.baseUrl);
+      
       const response = await fetch(`${this.baseUrl}/serve/${adType}`, {
         method: 'GET',
         headers: {
@@ -21,14 +46,16 @@ class AdService {
       const result: ApiResponse<AdConfig> = await response.json();
 
       if (!result.success) {
-        console.error('Failed to get ad:', result.error);
-        return null;
+        console.log('AdService: Backend returned error, using sample ad:', result.error);
+        return this.getSampleAdConfig(adType);
       }
 
-      return result.data || null;
+      console.log('AdService: Successfully fetched ad from backend');
+      return result.data || this.getSampleAdConfig(adType);
     } catch (error) {
-      console.error('Error fetching ad:', error);
-      return null;
+      console.log('AdService: Backend unavailable, using sample ad:', error);
+      // Return sample ad instead of null when backend is unavailable
+      return this.getSampleAdConfig(adType);
     }
   }
 
@@ -77,7 +104,7 @@ class AdService {
       }
 
       // Get user profile to check premium status
-      const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
+      const response = await fetch(`${NetworkConfig.getApiBaseUrl()}/users/profile`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
