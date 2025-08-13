@@ -6,7 +6,6 @@ import {
   Modal,
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
 } from 'react-native';
 import { adManager, AdDisplayState } from '../services/adManager';
 import { AdType } from '../types';
@@ -130,7 +129,7 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
       <View style={styles.container}>
         {/* Always reserve space for close button to prevent layout shift */}
         <View style={styles.closeButtonPlaceholder} />
-        
+
         <View style={styles.contentArea}>
           {adState.isLoading ? (
             <View style={styles.loadingContainer}>
@@ -176,11 +175,16 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
               {/* Ad info */}
               <View style={styles.adInfo}>
                 <Text style={styles.adLabel}>Advertisement</Text>
-                {!showCloseButton && (
-                  <Text style={styles.adWaitText}>
-                    Please wait {Math.ceil((1 - videoProgress) * 5)} seconds...
-                  </Text>
-                )}
+                {/* Always reserve space for wait text to prevent layout shift */}
+                <View style={styles.waitTextContainer}>
+                  {!showCloseButton ? (
+                    <Text style={styles.adWaitText}>
+                      Please wait {Math.ceil((1 - videoProgress) * 5)} seconds...
+                    </Text>
+                  ) : (
+                    <Text style={styles.adWaitTextPlaceholder}> </Text>
+                  )}
+                </View>
               </View>
             </View>
           ) : null}
@@ -340,9 +344,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: SPACING.xs,
   },
+  waitTextContainer: {
+    minHeight: 20, // Reserve minimum height for wait text
+    justifyContent: 'center',
+  },
   adWaitText: {
     fontSize: 14,
     color: COLORS.surface,
+    textAlign: 'center',
+  },
+  adWaitTextPlaceholder: {
+    fontSize: 14,
+    color: 'transparent', // Invisible but takes up space
     textAlign: 'center',
   },
 });
