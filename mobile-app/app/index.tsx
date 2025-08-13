@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,6 +11,18 @@ export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
   const { isAuthenticated, isLoading } = useAuth();
 
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated) {
+        // Redirect authenticated users to main profile
+        router.replace('/(main)/profile');
+      } else {
+        // Redirect unauthenticated users to auth flow
+        router.replace('/auth/welcome');
+      }
+    }
+  }, [isAuthenticated, isLoading]);
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -22,6 +34,7 @@ export default function Index(): React.JSX.Element {
     );
   }
 
+  // This should not render since we redirect above, but keeping as fallback
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
