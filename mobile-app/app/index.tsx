@@ -12,14 +12,9 @@ export default function Index(): React.JSX.Element {
   const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        // Redirect authenticated users to main profile
-        router.replace('/(main)/profile');
-      } else {
-        // Redirect unauthenticated users to auth flow
-        router.replace('/auth/welcome');
-      }
+    if (!isLoading && !isAuthenticated) {
+      // Only redirect unauthenticated users to auth flow
+      router.replace('/auth/welcome');
     }
   }, [isAuthenticated, isLoading]);
 
@@ -34,7 +29,6 @@ export default function Index(): React.JSX.Element {
     );
   }
 
-  // This should not render since we redirect above, but keeping as fallback
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>

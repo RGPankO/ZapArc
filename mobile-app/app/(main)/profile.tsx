@@ -154,14 +154,30 @@ export default function ProfileScreen(): React.JSX.Element {
     );
   }
 
+  const handleLogout = async (): Promise<void> => {
+    try {
+      const { tokenService } = await import('../../src/services/tokenService');
+      await tokenService.clearAuth();
+      router.replace('/auth/welcome');
+    } catch (error) {
+      console.error('Logout error:', error);
+      router.replace('/auth/welcome');
+    }
+  };
+
   if (error && !profile) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <Button mode="contained" onPress={loadProfile} style={styles.retryButton}>
-            Retry
-          </Button>
+          <View style={styles.errorButtons}>
+            <Button mode="contained" onPress={loadProfile} style={styles.retryButton}>
+              Retry
+            </Button>
+            <Button mode="outlined" onPress={handleLogout} style={styles.logoutButton}>
+              Logout
+            </Button>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -343,8 +359,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
+  errorButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
   retryButton: {
-    marginTop: 8,
+    flex: 1,
+  },
+  logoutButton: {
+    flex: 1,
   },
   title: {
     textAlign: 'center',
