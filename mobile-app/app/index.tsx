@@ -9,9 +9,22 @@ import { useAuth } from '../src/hooks/useAuth';
 
 export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, checkAuth } = useAuth();
 
   // Remove the redirect logic to prevent sliding effect
+
+  const handleLogout = async (): Promise<void> => {
+    try {
+      const { tokenService } = await import('../src/services/tokenService');
+      await tokenService.clearAuth();
+      // Refresh auth state
+      await checkAuth();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if there's an error, try to refresh auth state
+      await checkAuth();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -83,10 +96,10 @@ export default function Index(): React.JSX.Element {
           {isAuthenticated && (
             <Button
               mode="outlined"
-              onPress={() => router.push('/auth/welcome')}
+              onPress={handleLogout}
               style={styles.button}
             >
-              Authentication Flow (Test)
+              Logout
             </Button>
           )}
         </View>
