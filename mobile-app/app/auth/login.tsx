@@ -89,8 +89,8 @@ export default function LoginScreen(): React.JSX.Element {
             {
               text: 'OK',
               onPress: () => {
-                // Navigate to main app area
-                router.replace('/(main)/profile');
+                // Navigate to welcome screen
+                router.replace('/');
               },
             },
           ]);
@@ -99,7 +99,7 @@ export default function LoginScreen(): React.JSX.Element {
           Alert.alert('Login Successful', 'Welcome back! (Note: Session may not persist)', [
             {
               text: 'OK',
-              onPress: () => router.replace('/(main)/profile'),
+              onPress: () => router.replace('/'),
             },
           ]);
         }
