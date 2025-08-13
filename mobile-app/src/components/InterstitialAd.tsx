@@ -6,7 +6,6 @@ import {
   Modal,
   ActivityIndicator,
   Pressable,
-  Dimensions,
   SafeAreaView,
 } from 'react-native';
 import { adManager, AdDisplayState } from '../services/adManager';
@@ -128,21 +127,9 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
       transparent={false}
       onRequestClose={showCloseButton ? handleClose : undefined}
     >
-      <SafeAreaView style={styles.container}>
-        {/* Close button - only show after video completes */}
-        {showCloseButton && (
-          <View style={styles.closeButtonContainer}>
-            <Pressable
-              style={styles.closeButton}
-              onPress={handleClose}
-              android_ripple={{ color: COLORS.surface + '50' }}
-            >
-              <Text style={styles.closeButtonText}>✕</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {adState.isLoading ? (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          {adState.isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
             <Text style={styles.loadingText}>Loading advertisement...</Text>
@@ -194,25 +181,35 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
             </View>
           </View>
         ) : null}
-      </SafeAreaView>
+        </SafeAreaView>
+
+        {/* Close button - positioned absolutely outside SafeAreaView */}
+        {showCloseButton && (
+          <Pressable
+            style={styles.closeButtonAbsolute}
+            onPress={handleClose}
+            android_ripple={{ color: COLORS.surface + '50' }}
+          >
+            <Text style={styles.closeButtonText}>✕</Text>
+          </Pressable>
+        )}
+      </View>
     </Modal>
   );
 };
-
-const { width, height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.text,
   },
-  closeButtonContainer: {
-    position: 'absolute',
-    top: 50,
-    right: SPACING.md,
-    zIndex: 1000,
+  safeArea: {
+    flex: 1,
   },
-  closeButton: {
+  closeButtonAbsolute: {
+    position: 'absolute',
+    top: 60,
+    right: SPACING.md,
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -224,6 +221,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    zIndex: 1000,
   },
   closeButtonText: {
     fontSize: 18,
