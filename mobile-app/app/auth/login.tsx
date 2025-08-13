@@ -85,23 +85,12 @@ export default function LoginScreen(): React.JSX.Element {
           
           console.log('✅ Tokens and user data stored successfully');
           
-          Alert.alert('Login Successful', 'Welcome back!', [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate to welcome screen
-                router.replace('/');
-              },
-            },
-          ]);
+          // Navigate directly to welcome screen
+          router.replace('/');
         } catch (tokenError) {
           console.error('Error storing tokens:', tokenError);
-          Alert.alert('Login Successful', 'Welcome back! (Note: Session may not persist)', [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/'),
-            },
-          ]);
+          // Navigate to welcome screen even if token storage had issues
+          router.replace('/');
         }
       } else {
         // Handle different error types
