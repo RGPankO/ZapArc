@@ -11,12 +11,7 @@ export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
   const { isAuthenticated, isLoading } = useAuth();
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      // Only redirect unauthenticated users to auth flow
-      router.replace('/auth/welcome');
-    }
-  }, [isAuthenticated, isLoading]);
+  // Remove the redirect logic to prevent sliding effect
 
   if (isLoading) {
     return (
@@ -41,13 +36,22 @@ export default function Index(): React.JSX.Element {
         
         <View style={styles.buttonContainer}>
           {!isAuthenticated ? (
-            <Button
-              mode="contained"
-              onPress={() => router.push('/auth/welcome')}
-              style={styles.button}
-            >
-              Get Started - Login/Register
-            </Button>
+            <>
+              <Button
+                mode="contained"
+                onPress={() => router.push('/auth/login')}
+                style={styles.button}
+              >
+                Login
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() => router.push('/auth/register')}
+                style={styles.button}
+              >
+                Register
+              </Button>
+            </>
           ) : (
             <>
               <Button
