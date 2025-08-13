@@ -128,60 +128,63 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
       onRequestClose={showCloseButton ? handleClose : undefined}
     >
       <View style={styles.container}>
-        <SafeAreaView style={styles.safeArea}>
+        {/* Always reserve space for close button to prevent layout shift */}
+        <View style={styles.closeButtonPlaceholder} />
+        
+        <View style={styles.contentArea}>
           {adState.isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Loading advertisement...</Text>
-          </View>
-        ) : adState.error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Failed to load advertisement</Text>
-            <Pressable style={styles.retryButton} onPress={loadAd}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </Pressable>
-          </View>
-        ) : adState.adConfig && adState.shouldShow ? (
-          <View style={styles.adContainer}>
-            {/* Video placeholder */}
-            <Pressable style={styles.videoContainer} onPress={handleAdPress}>
-              <View style={styles.videoPlaceholder}>
-                <Text style={styles.videoText}>🎥</Text>
-                <Text style={styles.videoTitle}>Sample Video Advertisement</Text>
-                <Text style={styles.videoSubtitle}>
-                  Network: {adState.adConfig.adNetworkId}
-                </Text>
-                <Text style={styles.tapToLearnMore}>Tap to learn more</Text>
-              </View>
-            </Pressable>
-
-            {/* Progress bar */}
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${videoProgress * 100}%` },
-                  ]}
-                />
-              </View>
-              <Text style={styles.progressText}>
-                {Math.round(videoProgress * 100)}%
-              </Text>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.loadingText}>Loading advertisement...</Text>
             </View>
-
-            {/* Ad info */}
-            <View style={styles.adInfo}>
-              <Text style={styles.adLabel}>Advertisement</Text>
-              {!showCloseButton && (
-                <Text style={styles.adWaitText}>
-                  Please wait {Math.ceil((1 - videoProgress) * 5)} seconds...
-                </Text>
-              )}
+          ) : adState.error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>Failed to load advertisement</Text>
+              <Pressable style={styles.retryButton} onPress={loadAd}>
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </Pressable>
             </View>
-          </View>
-        ) : null}
-        </SafeAreaView>
+          ) : adState.adConfig && adState.shouldShow ? (
+            <View style={styles.adContainer}>
+              {/* Video placeholder */}
+              <Pressable style={styles.videoContainer} onPress={handleAdPress}>
+                <View style={styles.videoPlaceholder}>
+                  <Text style={styles.videoText}>🎥</Text>
+                  <Text style={styles.videoTitle}>Sample Video Advertisement</Text>
+                  <Text style={styles.videoSubtitle}>
+                    Network: {adState.adConfig.adNetworkId}
+                  </Text>
+                  <Text style={styles.tapToLearnMore}>Tap to learn more</Text>
+                </View>
+              </Pressable>
+
+              {/* Progress bar */}
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${videoProgress * 100}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.progressText}>
+                  {Math.round(videoProgress * 100)}%
+                </Text>
+              </View>
+
+              {/* Ad info */}
+              <View style={styles.adInfo}>
+                <Text style={styles.adLabel}>Advertisement</Text>
+                {!showCloseButton && (
+                  <Text style={styles.adWaitText}>
+                    Please wait {Math.ceil((1 - videoProgress) * 5)} seconds...
+                  </Text>
+                )}
+              </View>
+            </View>
+          ) : null}
+        </View>
 
         {/* Close button - positioned absolutely outside SafeAreaView */}
         {showCloseButton && (
@@ -203,7 +206,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.text,
   },
-  safeArea: {
+  closeButtonPlaceholder: {
+    height: 100, // Reserve space for close button area
+    backgroundColor: 'transparent',
+  },
+  contentArea: {
     flex: 1,
   },
   closeButtonAbsolute: {
