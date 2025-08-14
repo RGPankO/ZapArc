@@ -2,11 +2,17 @@ export interface User {
   id: string;
   email: string;
   nickname: string;
-  passwordHash: string;
+  passwordHash?: string;
+  googleId?: string;
+  profilePicture?: string;
+  firstName?: string;
+  lastName?: string;
   isVerified: boolean;
+  isEmailVerified: boolean;
   verificationToken?: string;
   premiumStatus: PremiumStatus;
   premiumExpiry?: Date;
+  isPremium: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

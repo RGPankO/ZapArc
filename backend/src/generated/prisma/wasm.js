@@ -125,10 +125,16 @@ exports.Prisma.UserScalarFieldEnum = {
   email: 'email',
   nickname: 'nickname',
   passwordHash: 'passwordHash',
+  googleId: 'googleId',
+  profilePicture: 'profilePicture',
+  firstName: 'firstName',
+  lastName: 'lastName',
   isVerified: 'isVerified',
+  isEmailVerified: 'isEmailVerified',
   verificationToken: 'verificationToken',
   premiumStatus: 'premiumStatus',
   premiumExpiry: 'premiumExpiry',
+  isPremium: 'isPremium',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -148,6 +154,14 @@ exports.Prisma.SessionScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   token: 'token',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.RefreshTokenScalarFieldEnum = {
+  id: 'id',
+  token: 'token',
+  userId: 'userId',
   expiresAt: 'expiresAt',
   createdAt: 'createdAt'
 };
@@ -199,6 +213,10 @@ exports.Prisma.UserOrderByRelevanceFieldEnum = {
   email: 'email',
   nickname: 'nickname',
   passwordHash: 'passwordHash',
+  googleId: 'googleId',
+  profilePicture: 'profilePicture',
+  firstName: 'firstName',
+  lastName: 'lastName',
   verificationToken: 'verificationToken'
 };
 
@@ -213,6 +231,12 @@ exports.Prisma.SessionOrderByRelevanceFieldEnum = {
   id: 'id',
   userId: 'userId',
   token: 'token'
+};
+
+exports.Prisma.RefreshTokenOrderByRelevanceFieldEnum = {
+  id: 'id',
+  token: 'token',
+  userId: 'userId'
 };
 
 exports.Prisma.AppConfigOrderByRelevanceFieldEnum = {
@@ -273,6 +297,7 @@ exports.Prisma.ModelName = {
   User: 'User',
   Payment: 'Payment',
   Session: 'Session',
+  RefreshToken: 'RefreshToken',
   AppConfig: 'AppConfig',
   AdConfig: 'AdConfig',
   AdAnalytics: 'AdAnalytics'

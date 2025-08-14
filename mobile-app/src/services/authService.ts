@@ -267,6 +267,77 @@ class AuthService {
       };
     }
   }
+
+  async loginWithGoogle(idToken: string): Promise<ApiResponse<AuthResponse>> {
+    console.log('AuthService: Starting Google login process...');
+    
+    const urls = this.getBaseUrls();
+    console.log('AuthService: Available URLs:', urls);
+    
+    // Try each URL until one works
+    for (let i = 0; i < urls.length; i++) {
+      const baseUrl = urls[i];
+      const googleLoginUrl = `${baseUrl}/auth/google`;
+      
+      try {
+        console.log(`AuthService: Attempt ${i + 1}/${urls.length} - Making Google login request to:`, googleLoginUrl);
+
+        const response = await fetch(googleLoginUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ idToken }),
+        });
+
+        console.log('AuthService: Google login response status:', response.status);
+        console.log('AuthService: Google login response ok:', response.ok);
+
+        const result = await response.json();
+        console.log('AuthService: Google login response data:', result);
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: result.error || { code: 'GOOGLE_LOGIN_FAILED', message: 'Google login failed' },
+          };
+        }
+
+        console.log('✅ AuthService: Google login successful with URL:', googleLoginUrl);
+        return {
+          success: true,
+          data: result.data,
+        };
+      } catch (error) {
+        console.error(`AuthService: Google login attempt ${i + 1} failed with URL ${googleLoginUrl}:`, error);
+        
+        // If this is the last URL, return the error
+        if (i === urls.length - 1) {
+          console.error('AuthService: All Google login attempts failed');
+          return {
+            success: false,
+            error: {
+              code: 'NETWORK_ERROR',
+              message: 'Network error occurred - could not connect to server',
+              details: error,
+            },
+          };
+        }
+        
+        // Otherwise, continue to the next URL
+        console.log(`AuthService: Trying next URL...`);
+      }
+    }
+
+    // This should never be reached, but just in case
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: 'All connection attempts failed',
+      },
+    };
+  }
 }
 
 export const authService = new AuthService();

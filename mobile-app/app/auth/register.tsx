@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { TextInput, Button, Text, HelperText } from 'react-native-paper';
+import { TextInput, Button, Text, HelperText, Divider } from 'react-native-paper';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { authService } from '../../src/services/authService';
+import GoogleSignInButton from '../../src/components/GoogleSignInButton';
 
 interface RegisterFormData {
   nickname: string;
@@ -116,6 +117,18 @@ export default function RegisterScreen(): React.JSX.Element {
             </Text>
 
             <View style={styles.form}>
+              {/* Google Sign-In */}
+              <GoogleSignInButton 
+                mode="contained"
+                style={styles.googleButton}
+              />
+              
+              <View style={styles.dividerContainer}>
+                <Divider style={styles.divider} />
+                <Text style={styles.dividerText}>or</Text>
+                <Divider style={styles.divider} />
+              </View>
+
               <Controller
                 control={control}
                 name="nickname"
@@ -296,5 +309,21 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     marginLeft: -8,
+  },
+  googleButton: {
+    marginBottom: 16,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  divider: {
+    flex: 1,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#666',
+    fontSize: 14,
   },
 });

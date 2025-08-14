@@ -7,6 +7,7 @@ import {
   logout, 
   getProfile 
 } from '../controllers/authController';
+import { googleAuthController } from '../controllers/googleAuthController';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
@@ -24,6 +25,13 @@ router.post('/register', register);
  * @access Public
  */
 router.post('/login', login);
+
+/**
+ * @route POST /api/auth/google
+ * @desc Login with Google
+ * @access Public
+ */
+router.post('/google', googleAuthController.googleLogin);
 
 /**
  * @route POST /api/auth/verify-email

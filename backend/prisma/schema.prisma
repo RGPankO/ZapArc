@@ -15,16 +15,23 @@ model User {
   id            String   @id @default(cuid())
   email         String   @unique
   nickname      String
-  passwordHash  String
+  passwordHash  String?
+  googleId      String?  @unique
+  profilePicture String?
+  firstName     String?
+  lastName      String?
   isVerified    Boolean  @default(false)
+  isEmailVerified Boolean @default(false)
   verificationToken String?
   premiumStatus PremiumStatus @default(FREE)
   premiumExpiry DateTime?
+  isPremium     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
   payments      Payment[]
   sessions      Session[]
+  refreshTokens RefreshToken[]
   adAnalytics   AdAnalytics[]
   
   @@map("users")
@@ -55,6 +62,18 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@map("sessions")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("refresh_tokens")
 }
 
 model AppConfig {
