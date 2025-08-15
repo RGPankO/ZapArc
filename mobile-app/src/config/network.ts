@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
  * Network configuration for different environments
  * Update CURRENT_NETWORK_IP when your network changes
  */
-const CURRENT_NETWORK_IP = '10.0.0.50'; // Update this when your IP changes
+const CURRENT_NETWORK_IP = '192.168.6.199'; // Update this when your IP changes
 
 export const NetworkConfig = {
   // Current network IP (update when network changes)

@@ -17,7 +17,13 @@ This guide will help you set up Google OAuth authentication for your mobile app.
    - **Android** (if building for Android)
    - **iOS** (if building for iOS)
 
-### Step 3: Configure OAuth Consent Screen
+### Step 3: Configure Redirect URIs
+For the **Web application** client, add these authorized redirect URIs:
+- `mobile-app://auth` (for your custom app scheme)
+- `https://auth.expo.io/@your-username/mobile-app` (for Expo Go development)
+- `exp://localhost:8081/--/auth` (for local Expo development)
+
+### Step 4: Configure OAuth Consent Screen
 1. Go to "OAuth consent screen"
 2. Fill in the required information:
    - App name

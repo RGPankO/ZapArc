@@ -1,71 +1,85 @@
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
 import { ApiResponse } from '../types';
 import { authService } from './authService';
+
+// Configure WebBrowser for better OAuth handling
+WebBrowser.maybeCompleteAuthSession();
 
 interface GoogleUser {
   id: string;
   name: string | null;
   email: string;
-  photo: string | null;
-  familyName: string | null;
-  givenName: string | null;
-}
-
-interface GoogleAuthResponse {
-  user: GoogleUser;
-  idToken: string | null;
-  serverAuthCode: string | null;
+  picture: string | null;
+  given_name: string | null;
+  family_name: string | null;
 }
 
 class GoogleAuthService {
-  private isConfigured = false;
-
-  async configure(): Promise<void> {
-    if (this.isConfigured) return;
-
-    try {
-      await GoogleSignin.configure({
-        webClientId: '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com', // Replace with your web client ID
-        offlineAccess: true,
-        hostedDomain: '',
-        forceCodeForRefreshToken: true,
-      });
-      this.isConfigured = true;
-      console.log('Google Sign-In configured successfully');
-    } catch (error) {
-      console.error('Error configuring Google Sign-In:', error);
-      throw error;
-    }
-  }
+  private clientId = '925893032932-h51upcipo0iufoovp432c2tgd6ichei7.apps.googleusercontent.com';
 
   async signIn(): Promise<ApiResponse<any>> {
     try {
-      await this.configure();
-      
-      // Check if device supports Google Play Services
-      await GoogleSignin.hasPlayServices();
-      
-      // Sign in with Google
-      const userInfo = await GoogleSignin.signIn();
-      
-      if (!userInfo.idToken) {
-        return {
-          success: false,
-          error: {
-            code: 'NO_ID_TOKEN',
-            message: 'Failed to get ID token from Google'
-          }
-        };
-      }
+      // Force HTTPS redirect URI for Google OAuth compatibility
+      const redirectUri = 'https://auth.expo.io/@anonymous/mobile-app';
 
-      // Send the ID token to your backend for verification
-      const response = await authService.loginWithGoogle(userInfo.idToken);
+      console.log('🔗 Redirect URI:', redirectUri);
+
+      // Use Google's discovery document
+      const discovery = {
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+        revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+      };
       
-      return response;
-    } catch (error: any) {
-      console.error('Google Sign-In error:', error);
-      
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+      // Debug: Log the full OAuth URL
+      const authUrl = `${discovery.authorizationEndpoint}?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent('openid profile email')}&prompt=select_account`;
+      console.log('🔗 Full OAuth URL:', authUrl);
+
+      // Configure the auth request (without PKCE for now)
+      const request = new AuthSession.AuthRequest({
+        clientId: this.clientId,
+        scopes: ['openid', 'profile', 'email'],
+        responseType: AuthSession.ResponseType.Code,
+        redirectUri: redirectUri,
+        prompt: AuthSession.Prompt.SelectAccount,
+      });
+
+      // Start the auth session with explicit browser options
+      const result = await request.promptAsync(discovery, {
+        preferEphemeralSession: true,
+      });
+
+      console.log('🔍 Auth result:', result);
+
+      if (result.type === 'success') {
+        // Exchange the authorization code for tokens
+        const tokenResult = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: this.clientId,
+            code: result.params.code,
+            redirectUri: redirectUri,
+          },
+          discovery
+        );
+
+        console.log('🎫 Token result:', tokenResult);
+
+        if (tokenResult.idToken) {
+          // Send the ID token to your backend for verification
+          const response = await authService.loginWithGoogle(tokenResult.idToken);
+          return response;
+        } else {
+          return {
+            success: false,
+            error: {
+              code: 'NO_ID_TOKEN',
+              message: 'Failed to get ID token from Google'
+            }
+          };
+        }
+      } else if (result.type === 'cancel') {
         return {
           success: false,
           error: {
@@ -73,60 +87,41 @@ class GoogleAuthService {
             message: 'User cancelled the sign-in process'
           }
         };
-      } else if (error.code === statusCodes.IN_PROGRESS) {
-        return {
-          success: false,
-          error: {
-            code: 'SIGN_IN_IN_PROGRESS',
-            message: 'Sign-in is already in progress'
-          }
-        };
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        return {
-          success: false,
-          error: {
-            code: 'PLAY_SERVICES_NOT_AVAILABLE',
-            message: 'Google Play Services not available'
-          }
-        };
       } else {
+        console.log('❌ Auth failed:', result);
         return {
           success: false,
           error: {
             code: 'GOOGLE_SIGN_IN_ERROR',
-            message: error.message || 'An error occurred during Google Sign-In'
+            message: `Authentication failed: ${result.type}`
           }
         };
       }
+    } catch (error: any) {
+      console.error('Google Sign-In error:', error);
+      return {
+        success: false,
+        error: {
+          code: 'GOOGLE_SIGN_IN_ERROR',
+          message: error.message || 'An error occurred during Google Sign-In'
+        }
+      };
     }
   }
 
   async signOut(): Promise<void> {
-    try {
-      await GoogleSignin.signOut();
-      console.log('Google Sign-Out successful');
-    } catch (error) {
-      console.error('Google Sign-Out error:', error);
-    }
+    // For Expo AuthSession, we don't need to do anything special for sign out
+    console.log('Google Sign-Out completed');
   }
 
   async isSignedIn(): Promise<boolean> {
-    try {
-      return await GoogleSignin.isSignedIn();
-    } catch (error) {
-      console.error('Error checking Google sign-in status:', error);
-      return false;
-    }
+    // For Expo AuthSession, we rely on our backend token storage
+    return false;
   }
 
   async getCurrentUser(): Promise<GoogleUser | null> {
-    try {
-      const userInfo = await GoogleSignin.getCurrentUser();
-      return userInfo?.user || null;
-    } catch (error) {
-      console.error('Error getting current Google user:', error);
-      return null;
-    }
+    // For Expo AuthSession, we rely on our backend user data
+    return null;
   }
 }
 

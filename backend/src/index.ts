@@ -84,7 +84,7 @@ async function initializeApp() {
       logger.info(`Health check available at http://localhost:${PORT}/health`);
       logger.info(`API info available at http://localhost:${PORT}/api`);
       if (HOST === '0.0.0.0') {
-        logger.info(`Server also accessible on network at http://10.0.0.50:${PORT}`);
+        logger.info(`Server also accessible on network at http://192.168.6.199:${PORT}`);
       }
     });
 

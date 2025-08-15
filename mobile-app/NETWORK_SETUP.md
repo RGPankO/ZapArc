@@ -9,7 +9,7 @@ If you change networks or your IP address changes, you only need to update **one
 Edit `mobile-app/src/config/network.ts`:
 
 ```typescript
-const CURRENT_NETWORK_IP = '10.0.0.50'; // Update this line with your new IP
+const CURRENT_NETWORK_IP = '192.168.6.199'; // Update this line with your new IP
 ```
 
 ### Find Your Current IP Address
