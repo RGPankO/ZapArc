@@ -21,8 +21,8 @@ class GoogleAuthService {
 
   async signIn(): Promise<ApiResponse<any>> {
     try {
-      // Force HTTPS redirect URI for Google OAuth compatibility
-      const redirectUri = 'https://auth.expo.io/@anonymous/mobile-app';
+      // Use your actual Expo username for better redirect handling
+      const redirectUri = 'https://auth.expo.io/@feef1bg/mobile-app';
 
       console.log('🔗 Redirect URI:', redirectUri);
 
@@ -52,9 +52,13 @@ class GoogleAuthService {
       });
 
       console.log('🔍 Auth result:', result);
+      console.log('🔍 Auth result type:', result.type);
+      console.log('🔍 Auth result params:', result.params);
 
       if (result.type === 'success') {
         // Exchange the authorization code for tokens
+        console.log('🔄 Starting token exchange with code:', result.params.code);
+        
         const tokenResult = await AuthSession.exchangeCodeAsync(
           {
             clientId: this.clientId,
@@ -65,6 +69,7 @@ class GoogleAuthService {
         );
 
         console.log('🎫 Token result:', tokenResult);
+        console.log('🎫 ID Token present:', !!tokenResult.idToken);
 
         if (tokenResult.idToken) {
           // Send the ID token to your backend for verification
