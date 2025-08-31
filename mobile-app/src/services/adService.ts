@@ -36,22 +36,34 @@ class AdService {
       console.log('AdService: Fetching ad for type:', adType);
       console.log('AdService: Using base URL:', this.baseUrl);
       
-      const response = await fetch(`${this.baseUrl}/serve/${adType}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Add timeout to prevent long waits
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
 
-      const result: ApiResponse<AdConfig> = await response.json();
+      try {
+        const response = await fetch(`${this.baseUrl}/serve/${adType}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
 
-      if (!result.success) {
-        console.log('AdService: Backend returned error, using sample ad:', result.error);
-        return this.getSampleAdConfig(adType);
+        clearTimeout(timeoutId);
+
+        const result: ApiResponse<AdConfig> = await response.json();
+
+        if (!result.success) {
+          console.log('AdService: Backend returned error, using sample ad:', result.error);
+          return this.getSampleAdConfig(adType);
+        }
+
+        console.log('AdService: Successfully fetched ad from backend');
+        return result.data || this.getSampleAdConfig(adType);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
       }
-
-      console.log('AdService: Successfully fetched ad from backend');
-      return result.data || this.getSampleAdConfig(adType);
     } catch (error) {
       console.log('AdService: Backend unavailable, using sample ad:', error);
       // Return sample ad instead of null when backend is unavailable
@@ -103,41 +115,53 @@ class AdService {
         return true;
       }
 
-      // Get user profile to check premium status
-      const response = await fetch(`${NetworkConfig.getApiBaseUrl()}/users/profile`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Add timeout to prevent long waits
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
 
-      if (!response.ok) {
-        // If can't get user profile, default to showing ads
-        return true;
-      }
+      try {
+        // Get user profile to check premium status
+        const response = await fetch(`${NetworkConfig.getApiBaseUrl()}/users/profile`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
 
-      const result: ApiResponse<any> = await response.json();
-      
-      if (!result.success || !result.data) {
-        return true;
-      }
+        clearTimeout(timeoutId);
 
-      const user = result.data;
-      
-      // Premium users don't see ads
-      if (user.premiumStatus === 'PREMIUM_LIFETIME') {
-        return false;
-      }
+        if (!response.ok) {
+          // If can't get user profile, default to showing ads
+          return true;
+        }
 
-      if (user.premiumStatus === 'PREMIUM_SUBSCRIPTION') {
-        // Check if subscription is still active
-        if (user.premiumExpiry && new Date(user.premiumExpiry) > new Date()) {
+        const result: ApiResponse<any> = await response.json();
+        
+        if (!result.success || !result.data) {
+          return true;
+        }
+
+        const user = result.data;
+        
+        // Premium users don't see ads
+        if (user.premiumStatus === 'PREMIUM_LIFETIME') {
           return false;
         }
-      }
 
-      return true;
+        if (user.premiumStatus === 'PREMIUM_SUBSCRIPTION') {
+          // Check if subscription is still active
+          if (user.premiumExpiry && new Date(user.premiumExpiry) > new Date()) {
+            return false;
+          }
+        }
+
+        return true;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
+      }
     } catch (error) {
       console.error('Error checking premium status:', error);
       // Default to showing ads if there's an error

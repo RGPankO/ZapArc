@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Pressable,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
 import { adManager, AdDisplayState } from '../services/adManager';
 import { AdType } from '../types';
 import { COLORS, SPACING } from '../utils/constants';
@@ -34,10 +36,47 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
   const [videoProgress, setVideoProgress] = useState(0);
 
   useEffect(() => {
-    if (visible) {
-      loadAd();
-    }
-  }, [visible]);
+    loadAd();
+    const setNavBar = async () => {
+      // set background color
+      await NavigationBar.setBackgroundColorAsync('#000000');
+      // set style of icons (light or dark)
+      await NavigationBar.setButtonStyleAsync('light');
+    };
+
+    setNavBar();
+
+    return () => {
+      // Reset when leaving
+      NavigationBar.setBackgroundColorAsync('#ffffff');
+      NavigationBar.setButtonStyleAsync('dark');
+    };
+  }, []);
+
+  // useEffect(() => {
+  //   if (visible) {
+  //     loadAd();
+  //     // Set navigation bar to black background when ad is shown
+  //     NavigationBar.setBackgroundColorAsync('#000000').catch(() => {
+  //       console.log('NavigationBar setBackgroundColor API not available');
+  //     });
+  //     NavigationBar.setVisibilityAsync('hidden').catch(() => {
+  //       // Fallback: try to set black background if hiding fails
+  //       NavigationBar.setBackgroundColorAsync('#000000').catch(() => {
+  //         console.log('NavigationBar API not available');
+  //       });
+  //     });
+  //   } else {
+  //     // Restore navigation bar when ad is closed
+  //     NavigationBar.setVisibilityAsync('visible').catch(() => {
+  //       console.log('NavigationBar API not available');
+  //     });
+  //     // Restore original navigation bar color (you might want to adjust this)
+  //     NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {
+  //       console.log('NavigationBar setBackgroundColor API not available');
+  //     });
+  //   }
+  // }, [visible]);
 
   useEffect(() => {
     if (adState.adConfig && adState.shouldShow && visible) {
@@ -124,8 +163,11 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
       visible={visible}
       animationType="fade"
       transparent={false}
+      statusBarTranslucent={true}
       onRequestClose={showCloseButton ? handleClose : undefined}
     >
+      {/* Black status bar for fullscreen experience */}
+      <StatusBar style="light" backgroundColor="#FF3B30" translucent={true} />
       <View style={styles.container}>
         {/* Always reserve space for close button to prevent layout shift */}
         <View style={styles.closeButtonPlaceholder} />
@@ -195,7 +237,7 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
           <Pressable
             style={styles.closeButtonAbsolute}
             onPress={handleClose}
-            android_ripple={{ color: COLORS.surface + '50' }}
+            android_ripple={{ color: COLORS.surface }}
           >
             <Text style={styles.closeButtonText}>✕</Text>
           </Pressable>
@@ -209,9 +251,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.text,
+    // Ensure fullscreen by removing any padding/margin
+    paddingTop: 0,
+    paddingBottom: 0,
+    // Extend to edges including status bar and navigation bar areas
+    marginTop: 0,
+    marginBottom: 0,
+    // Ensure content extends to bottom edge with higher z-index
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9999,
   },
   closeButtonPlaceholder: {
-    height: 100, // Reserve space for close button area
+    height: 100, // Account for status bar height
     backgroundColor: 'transparent',
   },
   contentArea: {
@@ -219,12 +274,12 @@ const styles = StyleSheet.create({
   },
   closeButtonAbsolute: {
     position: 'absolute',
-    top: 60,
+    top: 60, // Account for status bar height
     right: SPACING.md,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.surface + '90',
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.text,
@@ -318,7 +373,7 @@ const styles = StyleSheet.create({
   progressBar: {
     flex: 1,
     height: 4,
-    backgroundColor: COLORS.textSecondary + '50',
+    backgroundColor: COLORS.textSecondary,
     borderRadius: 2,
     marginRight: SPACING.md,
   },

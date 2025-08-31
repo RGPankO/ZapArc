@@ -26,6 +26,26 @@ class AdManager {
     };
 
     try {
+      // For demo purposes, skip API calls and show sample ad immediately
+      console.log('AdManager: Loading sample ad immediately for demo');
+      
+      // Get sample ad configuration
+      const sampleAd = {
+        id: 'sample-interstitial-001',
+        adType: adType,
+        adNetworkId: 'sample-network-interstitial',
+        displayFrequency: 1,
+      };
+
+      return {
+        ...state,
+        isLoading: false,
+        adConfig: sampleAd,
+        shouldShow: true,
+      };
+
+      // Original code commented out for faster demo experience
+      /*
       // Check if user should see ads
       const shouldShowAds = await adService.shouldShowAds();
       
@@ -69,6 +89,7 @@ class AdManager {
         adConfig,
         shouldShow: true,
       };
+      */
     } catch (error) {
       console.error('Error loading ad:', error);
       return {
