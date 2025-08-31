@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
   const { isAuthenticated, isLoading, checkAuth } = useAuth();
 
-  // Remove the redirect logic to prevent sliding effect
+  // Show loading screen until auth check is complete to prevent flash
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -46,7 +46,7 @@ export default function Index(): React.JSX.Element {
         <Text variant="bodyMedium" style={styles.subtitle}>
           {isAuthenticated ? 'Welcome back!' : 'Choose a section to test:'}
         </Text>
-        
+
         <View style={styles.buttonContainer}>
           {!isAuthenticated ? (
             <>
@@ -74,7 +74,7 @@ export default function Index(): React.JSX.Element {
               >
                 My Profile
               </Button>
-              
+
               <Button
                 mode="contained"
                 onPress={() => router.push('/(main)/settings')}
@@ -84,7 +84,7 @@ export default function Index(): React.JSX.Element {
               </Button>
             </>
           )}
-          
+
           <Button
             mode="outlined"
             onPress={interstitialAd.showAd}
@@ -92,7 +92,7 @@ export default function Index(): React.JSX.Element {
           >
             Show Interstitial Ad
           </Button>
-          
+
           {isAuthenticated && (
             <Button
               mode="outlined"
