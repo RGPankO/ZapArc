@@ -1,0 +1,41 @@
+{
+  "name": "mobile-skeleton-app",
+  "version": "1.0.0",
+  "description": "A complete cross-platform mobile app skeleton with React Native and Node.js backend",
+  "private": true,
+  "scripts": {
+    "setup": "npm run setup:backend && npm run setup:mobile",
+    "setup:backend": "cd backend && npm install && npm run db:setup",
+    "setup:mobile": "cd mobile-app && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:mobile": "cd mobile-app && npm start",
+    "test": "npm run test:backend && npm run test:mobile",
+    "test:backend": "cd backend && npm test",
+    "test:mobile": "cd mobile-app && npm test",
+    "clean": "npm run clean:backend && npm run clean:mobile",
+    "clean:backend": "cd backend && rm -rf node_modules && rm -rf dist",
+    "clean:mobile": "cd mobile-app && rm -rf node_modules && rm -rf .expo",
+    "reset:db": "cd backend && npm run db:migrate:reset",
+    "db:studio": "cd backend && npm run db:studio"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "nodejs",
+    "express",
+    "mobile-app",
+    "skeleton",
+    "authentication",
+    "typescript"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xAleksandar/mobile-skeleton-app.git"
+  }
+}

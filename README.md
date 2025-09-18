@@ -72,19 +72,53 @@ mobile-skeleton-app/
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher)
-- **npm** or **yarn**
-- **Expo CLI**: `npm install -g @expo/cli`
-- **Database**: MySQL or SQLite
+- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
+- **npm** (comes with Node.js)
+- **Database**: MySQL (recommended) or SQLite (default)
+- **Mobile Testing**: 
+  - **Expo Go** app on your phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) | [Android](https://play.google.com/store/apps/details?id=host.exp.exponent))
+  - Or iOS Simulator (Mac) / Android Emulator
 
-### 1. Clone the Repository
+### 🚀 Automated Setup (Recommended)
+
+**Option 1: One-Command Setup**
 
 ```bash
-git clone git@github.com:xAleksandar/mobile-skeleton-app.git
+# Clone and setup everything automatically
+git clone https://github.com/xAleksandar/mobile-skeleton-app.git
+cd mobile-skeleton-app
+
+# For macOS/Linux:
+./setup.sh
+
+# For Windows:
+setup.bat
+```
+
+This script will:
+- ✅ Install all dependencies
+- ✅ Setup database with sample data
+- ✅ Configure network settings
+- ✅ Create environment files
+
+### 📋 Manual Setup (Alternative)
+
+If you prefer manual setup or the automated script doesn't work:
+
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/xAleksandar/mobile-skeleton-app.git
 cd mobile-skeleton-app
 ```
 
-### 2. Backend Setup
+#### 2. Install Expo CLI
+
+```bash
+npm install -g @expo/cli
+```
+
+#### 3. Backend Setup
 
 ```bash
 cd backend
@@ -96,7 +130,7 @@ npm install
 cp .env.example .env
 # Edit .env with your database credentials and JWT secrets
 
-# Set up database
+# Set up database with sample data
 npm run db:setup
 
 # Start development server
@@ -105,7 +139,7 @@ npm run dev
 
 The backend will be available at `http://localhost:3000`
 
-### 3. Mobile App Setup
+#### 4. Mobile App Setup
 
 ```bash
 cd mobile-app
@@ -113,15 +147,39 @@ cd mobile-app
 # Install dependencies
 npm install
 
+# Update network configuration
+# Edit src/config/network.ts and update CURRENT_NETWORK_IP with your local IP
+
 # Start Expo development server
 npm start
 ```
 
-Choose your platform:
+#### 5. Choose Your Platform
+
 - Press `w` for **web browser** (easiest for testing)
 - Press `i` for **iOS simulator** (Mac only)
 - Press `a` for **Android emulator**
 - Scan QR code with **Expo Go** app on your phone
+
+### 🔧 Network Configuration
+
+For **physical device testing**, you need to update the network IP:
+
+1. Find your local IP address:
+   ```bash
+   # macOS/Linux
+   ifconfig | grep "inet " | grep -v 127.0.0.1
+   
+   # Windows
+   ipconfig | findstr "IPv4"
+   ```
+
+2. Update `mobile-app/src/config/network.ts`:
+   ```typescript
+   const CURRENT_NETWORK_IP = 'YOUR_LOCAL_IP_HERE'; // e.g., '192.168.1.100'
+   ```
+
+3. Restart the mobile app
 
 ## 🧪 Testing the App
 
@@ -201,6 +259,73 @@ npm run type-check   # Run TypeScript type checking
 - **iOS** (via Expo)
 - **Android** (via Expo)
 - **Web** (via Expo Web)
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### Backend Issues
+
+**Database Connection Failed**
+```bash
+# Check if MySQL is running (if using MySQL)
+# For SQLite, ensure the database file is created
+npm run db:setup
+```
+
+**Port 3000 Already in Use**
+```bash
+# Kill process using port 3000
+lsof -ti:3000 | xargs kill -9  # macOS/Linux
+netstat -ano | findstr :3000   # Windows (then kill the PID)
+```
+
+**Prisma Client Issues**
+```bash
+cd backend
+npm run db:generate  # Regenerate Prisma client
+```
+
+#### Mobile App Issues
+
+**Metro Bundler Issues**
+```bash
+cd mobile-app
+npx expo start --clear  # Clear cache and restart
+```
+
+**Network Connection Failed**
+- Ensure backend is running on `http://localhost:3000`
+- For physical devices, update `CURRENT_NETWORK_IP` in `mobile-app/src/config/network.ts`
+- Ensure your device and computer are on the same WiFi network
+
+**Expo Go App Not Loading**
+- Make sure Expo Go app is updated to the latest version
+- Try restarting the Expo development server
+- Check if your firewall is blocking the connection
+
+#### Database Issues
+
+**Reset Database**
+```bash
+cd backend
+npm run db:migrate:reset  # This will reset and reseed the database
+```
+
+**View Database**
+```bash
+cd backend
+npm run db:studio  # Opens Prisma Studio in browser
+```
+
+### Getting Help
+
+1. Check the [Issues](https://github.com/xAleksandar/mobile-skeleton-app/issues) page
+2. Create a new issue with:
+   - Your operating system
+   - Node.js version (`node --version`)
+   - Error messages
+   - Steps to reproduce
 
 ## 🤝 Contributing
 
