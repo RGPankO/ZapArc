@@ -11,9 +11,10 @@ export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
   const { isAuthenticated, isLoading, checkAuth } = useAuth();
 
-  // Redirect to welcome page if not authenticated
+  // Redirect to welcome page if not authenticated (without animation)
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
+      // Use replace with no animation to prevent slide effect
       router.replace('/auth/welcome');
     }
   }, [isAuthenticated, isLoading]);
