@@ -35,7 +35,7 @@ export default function WelcomeScreen(): React.JSX.Element {
         </View>
 
         {/* Banner Advertisement */}
-        <BannerAd 
+        <BannerAd
           style={styles.bannerAd}
           onAdLoaded={() => console.log('Banner ad loaded')}
           onAdError={(error) => console.log('Banner ad error:', error)}
@@ -51,7 +51,7 @@ export default function WelcomeScreen(): React.JSX.Element {
           >
             Login
           </Button>
-          
+
           <Button
             mode="outlined"
             onPress={handleRegister}
@@ -76,7 +76,6 @@ export default function WelcomeScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'green',
   },
   content: {
     flex: 1,

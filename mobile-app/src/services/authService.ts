@@ -139,64 +139,75 @@ class AuthService {
   }
 
   async register(data: RegisterRequest): Promise<ApiResponse<{ message: string }>> {
-    try {
-      console.log('Starting registration process...');
-      console.log('Registration payload:', data);
+    console.log('AuthService: Starting registration process...');
+    console.log('AuthService: Registration payload:', { ...data, password: '[HIDDEN]' });
+    
+    const urls = this.getBaseUrls();
+    console.log('AuthService: Available URLs:', urls);
+    
+    // Try each URL until one works
+    for (let i = 0; i < urls.length; i++) {
+      const baseUrl = urls[i];
+      const registerUrl = `${baseUrl}/auth/register`;
+      
+      try {
+        console.log(`AuthService: Attempt ${i + 1}/${urls.length} - Making registration request to:`, registerUrl);
 
-      // Test connection first and get working URL
-      const connectionTest = await this.testConnection();
-      console.log('Connection test result:', connectionTest);
-
-      if (!connectionTest.success) {
-        return {
-          success: false,
-          error: {
-            code: 'CONNECTION_FAILED',
-            message: 'Cannot connect to server. Please check if the backend is running.',
+        const response = await fetch(registerUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        };
-      }
+          body: JSON.stringify(data),
+        });
 
-      const workingBaseUrl = connectionTest.workingUrl || this.baseUrl;
-      const registerUrl = `${workingBaseUrl}/auth/register`;
-      console.log('Making registration request to:', registerUrl);
+        console.log('AuthService: Registration response status:', response.status);
+        console.log('AuthService: Registration response ok:', response.ok);
 
-      const response = await fetch(registerUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+        const result = await response.json();
+        console.log('AuthService: Registration response data:', result);
 
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
+        if (!response.ok) {
+          return {
+            success: false,
+            error: result.error || { code: 'REGISTER_FAILED', message: 'Registration failed' },
+          };
+        }
 
-      const result = await response.json();
-      console.log('Response data:', result);
-
-      if (!response.ok) {
+        console.log('✅ AuthService: Registration successful with URL:', registerUrl);
         return {
-          success: false,
-          error: result.error || { code: 'REGISTER_FAILED', message: 'Registration failed' },
+          success: true,
+          data: result.data,
         };
+      } catch (error) {
+        console.error(`AuthService: Registration attempt ${i + 1} failed with URL ${registerUrl}:`, error);
+        
+        // If this is the last URL, return the error
+        if (i === urls.length - 1) {
+          console.error('AuthService: All registration attempts failed');
+          return {
+            success: false,
+            error: {
+              code: 'NETWORK_ERROR',
+              message: 'Network error occurred - could not connect to server',
+              details: error,
+            },
+          };
+        }
+        
+        // Otherwise, continue to the next URL
+        console.log(`AuthService: Trying next URL...`);
       }
-
-      return {
-        success: true,
-        data: result.data,
-      };
-    } catch (error) {
-      console.error('Network error during registration:', error);
-      return {
-        success: false,
-        error: {
-          code: 'NETWORK_ERROR',
-          message: 'Network error occurred',
-          details: error,
-        },
-      };
     }
+
+    // This should never be reached, but just in case
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: 'All connection attempts failed',
+      },
+    };
   }
 
   async resendVerificationEmail(email: string): Promise<ApiResponse<{ message: string }>> {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,12 @@ export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
   const { isAuthenticated, isLoading, checkAuth } = useAuth();
 
-  // Show loading screen until auth check is complete to prevent flash
+  // Redirect to welcome page if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/auth/welcome');
+    }
+  }, [isAuthenticated, isLoading]);
 
   const handleLogout = async (): Promise<void> => {
     try {
@@ -37,6 +42,19 @@ export default function Index(): React.JSX.Element {
     );
   }
 
+  // If not authenticated, show nothing while redirecting
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Only show the main app if authenticated
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -44,46 +62,25 @@ export default function Index(): React.JSX.Element {
           Mobile App Skeleton
         </Text>
         <Text variant="bodyMedium" style={styles.subtitle}>
-          {isAuthenticated ? 'Welcome back!' : 'Choose a section to test:'}
+          Welcome back!
         </Text>
 
         <View style={styles.buttonContainer}>
-          {!isAuthenticated ? (
-            <>
-              <Button
-                mode="contained"
-                onPress={() => router.push('/auth/login')}
-                style={styles.button}
-              >
-                Login
-              </Button>
-              <Button
-                mode="outlined"
-                onPress={() => router.push('/auth/register')}
-                style={styles.button}
-              >
-                Register
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                mode="contained"
-                onPress={() => router.push('/(main)/profile')}
-                style={styles.button}
-              >
-                My Profile
-              </Button>
+          <Button
+            mode="contained"
+            onPress={() => router.push('/(main)/profile')}
+            style={styles.button}
+          >
+            My Profile
+          </Button>
 
-              <Button
-                mode="contained"
-                onPress={() => router.push('/(main)/settings')}
-                style={styles.button}
-              >
-                Settings
-              </Button>
-            </>
-          )}
+          <Button
+            mode="contained"
+            onPress={() => router.push('/(main)/settings')}
+            style={styles.button}
+          >
+            Settings
+          </Button>
 
           <Button
             mode="outlined"
@@ -93,15 +90,13 @@ export default function Index(): React.JSX.Element {
             Show Interstitial Ad
           </Button>
 
-          {isAuthenticated && (
-            <Button
-              mode="outlined"
-              onPress={handleLogout}
-              style={styles.button}
-            >
-              Logout
-            </Button>
-          )}
+          <Button
+            mode="outlined"
+            onPress={handleLogout}
+            style={styles.button}
+          >
+            Logout
+          </Button>
         </View>
       </View>
 

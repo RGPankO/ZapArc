@@ -56,17 +56,42 @@ class UserService {
       
       const headers = await this.getAuthHeaders();
       console.log('UserService: Headers prepared, has auth token:', !!headers.Authorization);
+      console.log('UserService: Auth token preview:', headers.Authorization ? headers.Authorization.substring(0, 20) + '...' : 'None');
       
       const profileUrl = `${this.baseUrl}/users/profile`;
       console.log('UserService: Making request to:', profileUrl);
       
+      // Test basic connectivity first
+      try {
+        console.log('UserService: Testing connectivity...');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const healthCheck = await fetch(`${this.baseUrl.replace('/api', '')}/health`, {
+          method: 'GET',
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        console.log('UserService: Health check status:', healthCheck.status);
+      } catch (healthError) {
+        console.log('UserService: Health check failed:', healthError.message);
+      }
+      
+      console.log('UserService: Making profile request...');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const response = await fetch(profileUrl, {
         method: 'GET',
         headers,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       console.log('UserService: Response status:', response.status);
       console.log('UserService: Response ok:', response.ok);
+      console.log('UserService: Response headers:', response.headers);
 
       const result = await response.json();
       console.log('UserService: Response data:', result);
@@ -74,7 +99,7 @@ class UserService {
       if (!response.ok) {
         return {
           success: false,
-          error: result.error || { code: 'PROFILE_FETCH_FAILED', message: 'Failed to fetch profile' },
+          error: result.error || { code: 'PROFILE_FETCH_FAILED', message: `Failed to fetch profile (${response.status})` },
         };
       }
 
@@ -84,11 +109,13 @@ class UserService {
       };
     } catch (error) {
       console.error('UserService: Network error:', error);
+      console.error('UserService: Error type:', error.constructor.name);
+      console.error('UserService: Error message:', error.message);
       return {
         success: false,
         error: {
           code: 'NETWORK_ERROR',
-          message: 'Network error occurred',
+          message: `Network error: ${error.message}`,
           details: error,
         },
       };

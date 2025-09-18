@@ -17,7 +17,7 @@ import paymentRoutes from './routes/payments';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Middleware
 app.use(helmet());
@@ -84,7 +84,24 @@ async function initializeApp() {
       logger.info(`Health check available at http://localhost:${PORT}/health`);
       logger.info(`API info available at http://localhost:${PORT}/api`);
       if (HOST === '0.0.0.0') {
-        logger.info(`Server also accessible on network at http://192.168.6.199:${PORT}`);
+        // Get the actual network IP dynamically
+        import('os').then((os) => {
+          const networkInterfaces = os.networkInterfaces();
+          let networkIP = '10.0.0.184'; // fallback
+          
+          // Find the actual network IP
+          for (const interfaceName in networkInterfaces) {
+            const addresses = networkInterfaces[interfaceName];
+            for (const address of addresses || []) {
+              if (address.family === 'IPv4' && !address.internal && address.address.startsWith('192.168.')) {
+                networkIP = address.address;
+                break;
+              }
+            }
+          }
+          
+          logger.info(`Server also accessible on network at http://${networkIP}:${PORT}`);
+        });
       }
     });
 
