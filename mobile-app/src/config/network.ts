@@ -15,22 +15,28 @@ export const NetworkConfig = {
 
   // Get base URLs for API calls based on platform
   getApiBaseUrls(): string[] {
-    const urls = Platform.OS === 'web' ? [
-      'http://localhost:3000/api',
-      'http://127.0.0.1:3000/api',
-      `http://${CURRENT_NETWORK_IP}:3000/api`
-    ] : Platform.OS === 'android' ? [
-      'http://10.0.2.2:3000/api', // Android emulator localhost
-      `http://${CURRENT_NETWORK_IP}:3000/api`
-    ] : [
-      // iOS simulator and physical devices - prioritize network IP
+    if (Platform.OS === 'web') {
+      return [
+        'http://localhost:3000/api',
+        'http://127.0.0.1:3000/api',
+        `http://${CURRENT_NETWORK_IP}:3000/api`
+      ];
+    }
+    
+    if (Platform.OS === 'android') {
+      // For Android, prioritize network IP for physical devices
+      // Only use emulator IP as fallback
+      return [
+        `http://${CURRENT_NETWORK_IP}:3000/api`, // Network IP first (works for physical devices)
+        'http://10.0.2.2:3000/api', // Android emulator localhost as fallback
+      ];
+    }
+    
+    // iOS simulator and physical devices - prioritize network IP
+    return [
       `http://${CURRENT_NETWORK_IP}:3000/api`,
       'http://localhost:3000/api'
     ];
-
-    console.log('NetworkConfig: Platform:', Platform.OS);
-    console.log('NetworkConfig: Available URLs:', urls);
-    return urls;
   },
 
   // Get single API base URL (first preference)

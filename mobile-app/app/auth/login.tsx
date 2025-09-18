@@ -45,20 +45,6 @@ export default function LoginScreen(): React.JSX.Element {
     try {
       console.log('Login: Starting login with data:', data);
       
-      // Test network connectivity first
-      const { testNetworkConnectivity } = await import('../../src/utils/networkTest');
-      console.log('Login: Testing network connectivity...');
-      const connectivityResult = await testNetworkConnectivity();
-      console.log('Login: Connectivity test results:', connectivityResult);
-      
-      if (!connectivityResult.workingUrl) {
-        setLoginError('Cannot connect to server. Please check your network connection.');
-        setIsLoading(false);
-        return;
-      }
-      
-      console.log('Login: Using working URL:', connectivityResult.workingUrl);
-      
       const result = await authService.login({
         email: data.email,
         password: data.password,

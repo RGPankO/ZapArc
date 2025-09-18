@@ -22,11 +22,16 @@ export async function testNetworkConnectivity(): Promise<{
     try {
       console.log(`NetworkTest: Testing ${healthUrl}...`);
       
+      // Use AbortController for proper timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      
       const response = await fetch(healthUrl, {
         method: 'GET',
-        timeout: 5000, // 5 second timeout
+        signal: controller.signal,
       });
       
+      clearTimeout(timeoutId);
       const responseTime = Date.now() - startTime;
       const success = response.ok || response.status === 503; // Accept both healthy and unhealthy but running
       
@@ -39,6 +44,8 @@ export async function testNetworkConnectivity(): Promise<{
       if (success && !workingUrl) {
         workingUrl = baseUrl;
         console.log(`✅ NetworkTest: Found working URL: ${baseUrl}`);
+        // Break early when we find a working URL to speed things up
+        break;
       }
       
       console.log(`NetworkTest: ${healthUrl} - Status: ${response.status}, Time: ${responseTime}ms`);
