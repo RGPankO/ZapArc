@@ -1,0 +1,37 @@
+{
+  "name": "lightning-tipping-extension",
+  "version": "1.0.0",
+  "description": "Lightning Network Tipping Browser Extension with Breez SDK Spark",
+  "main": "dist/background.js",
+  "scripts": {
+    "build": "webpack --mode=production",
+    "dev": "webpack --mode=development --watch",
+    "clean": "rimraf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.246",
+    "@types/node": "^20.0.0",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.8.1",
+    "html-webpack-plugin": "^5.5.3",
+    "mini-css-extract-plugin": "^2.7.6",
+    "rimraf": "^5.0.5",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.2.2",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@breeztech/breez-sdk-spark": "^0.1.9"
+  },
+  "keywords": [
+    "lightning-network",
+    "bitcoin",
+    "tipping",
+    "chrome-extension",
+    "breez-sdk"
+  ],
+  "author": "Lightning Tipping Extension",
+  "license": "MIT"
+}

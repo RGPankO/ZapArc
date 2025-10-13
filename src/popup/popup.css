@@ -1,0 +1,79 @@
+/* Popup styles for Lightning Tipping Extension */
+
+body {
+    width: 300px;
+    height: 400px;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f5f5f5;
+}
+
+#app {
+    padding: 16px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+}
+
+#wallet-section {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#balance-display {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+#balance {
+    font-size: 24px;
+    font-weight: bold;
+    color: #f7931a;
+}
+
+#wallet-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#wallet-actions button {
+    flex: 1;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background-color: #f7931a;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#wallet-actions button:hover {
+    background-color: #e8850f;
+}
+
+#settings-section {
+    text-align: center;
+}
+
+#settings-btn {
+    padding: 8px 24px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-size: 14px;
+}

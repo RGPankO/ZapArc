@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lightning Tipping Extension - Settings</title>
+    <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Lightning Tipping Settings</h1>
+        </header>
+        
+        <main>
+            <section id="wallet-settings">
+                <h2>Wallet Configuration</h2>
+                <div class="setting-group">
+                    <label>
+                        <input type="radio" name="wallet-type" value="builtin" checked>
+                        Use Built-in Wallet (Breez SDK)
+                    </label>
+                    <label>
+                        <input type="radio" name="wallet-type" value="custom">
+                        Use Custom LNURL
+                    </label>
+                    <input type="text" id="custom-lnurl" placeholder="Enter your LNURL" disabled>
+                </div>
+            </section>
+            
+            <section id="amount-settings">
+                <h2>Default Amounts</h2>
+                <div class="setting-group">
+                    <h3>Posting Amounts (sats)</h3>
+                    <div class="amount-inputs">
+                        <input type="number" id="post-amount-1" placeholder="100" min="1">
+                        <input type="number" id="post-amount-2" placeholder="500" min="1">
+                        <input type="number" id="post-amount-3" placeholder="1000" min="1">
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <h3>Tipping Amounts (sats)</h3>
+                    <div class="amount-inputs">
+                        <input type="number" id="tip-amount-1" placeholder="100" min="1">
+                        <input type="number" id="tip-amount-2" placeholder="500" min="1">
+                        <input type="number" id="tip-amount-3" placeholder="1000" min="1">
+                    </div>
+                </div>
+            </section>
+            
+            <section id="ui-settings">
+                <h2>Interface Settings</h2>
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="floating-menu-enabled" checked>
+                        Enable Floating Action Menu
+                    </label>
+                    <label>
+                        Auto-lock timeout:
+                        <select id="autolock-timeout">
+                            <option value="900">15 minutes</option>
+                            <option value="1800">30 minutes</option>
+                            <option value="3600">1 hour</option>
+                            <option value="0">Never</option>
+                        </select>
+                    </label>
+                </div>
+            </section>
+            
+            <div id="actions">
+                <button id="save-settings">Save Settings</button>
+                <button id="reset-settings">Reset to Defaults</button>
+            </div>
+        </main>
+    </div>
+    
+    <script src="settings.js"></script>
+</body>
+</html>
