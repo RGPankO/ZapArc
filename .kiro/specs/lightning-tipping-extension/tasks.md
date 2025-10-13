@@ -42,15 +42,22 @@
     - Support custom LNURL configuration for posting
     - _Requirements: 2.4, 11.1_
 
-- [ ] 3. Create tip detection and parsing system
-  - [ ] 3.1 Implement universal tip detection in content scripts
+- [x] 3. Create tip detection and parsing system
+
+
+
+  - [x] 3.1 Implement universal tip detection in content scripts
+
+
     - Create regex pattern matching for standardized tip format [lntip:lnurl:...]
     - Implement HTML metadata scanning for tip information
     - Add throttled DOM scanning with MutationObserver for performance
     - Create tip request data structure and validation
     - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-  - [ ] 3.2 Build LNURL blacklist management system
+  - [x] 3.2 Build LNURL blacklist management system
+
+
     - Implement blacklist storage and checking logic
     - Create blacklist UI components for blocking/unblocking LNURLs
     - Add blacklist detection indicators in floating menu

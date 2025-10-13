@@ -124,6 +124,28 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         sendResponse({ success: true, lnurl: extractedLnurl });
         break;
 
+      case 'ADD_TO_BLACKLIST':
+        const blacklistArray = await storageManager.getBlacklist();
+        if (!blacklistArray.lnurls.includes(message.lnurl)) {
+          blacklistArray.lnurls.push(message.lnurl);
+          blacklistArray.lastUpdated = Date.now();
+          await storageManager.saveBlacklist(blacklistArray.lnurls);
+        }
+        sendResponse({ success: true });
+        break;
+
+      case 'REMOVE_FROM_BLACKLIST':
+        const currentBlacklist = await storageManager.getBlacklist();
+        const filteredLnurls = currentBlacklist.lnurls.filter(lnurl => lnurl !== message.lnurl);
+        await storageManager.saveBlacklist(filteredLnurls);
+        sendResponse({ success: true });
+        break;
+
+      case 'CLEAR_BLACKLIST':
+        await storageManager.saveBlacklist([]);
+        sendResponse({ success: true });
+        break;
+
       case 'SAVE_WALLET':
         await storageManager.saveEncryptedWallet(message.walletData, message.pin);
         sendResponse({ success: true });

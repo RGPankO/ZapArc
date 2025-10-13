@@ -333,4 +333,33 @@ export class ExtensionMessaging {
       input
     });
   }
+
+  /**
+   * Add LNURL to blacklist
+   */
+  static async addToBlacklist(lnurl: string): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'ADD_TO_BLACKLIST',
+      lnurl
+    });
+  }
+
+  /**
+   * Remove LNURL from blacklist
+   */
+  static async removeFromBlacklist(lnurl: string): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'REMOVE_FROM_BLACKLIST',
+      lnurl
+    });
+  }
+
+  /**
+   * Clear entire blacklist
+   */
+  static async clearBlacklist(): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'CLEAR_BLACKLIST'
+    });
+  }
 }
