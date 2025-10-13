@@ -33,10 +33,6 @@ module.exports = (env, argv) => {
       ]
     },
     
-    resolve: {
-      extensions: ['.tsx', '.ts', '.js']
-    },
-    
     plugins: [
       new MiniCssExtractPlugin({
         filename: '[name].css'
@@ -70,7 +66,18 @@ module.exports = (env, argv) => {
     },
     
     experiments: {
-      asyncWebAssembly: true
+      asyncWebAssembly: true,
+      topLevelAwait: true
+    },
+    
+    resolve: {
+      extensions: ['.tsx', '.ts', '.js', '.wasm'],
+      fallback: {
+        "crypto": false,
+        "stream": false,
+        "util": false,
+        "buffer": false
+      }
     }
   };
 };

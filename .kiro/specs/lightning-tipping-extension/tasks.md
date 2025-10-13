@@ -12,21 +12,30 @@
   - Create basic directory structure (src/, popup/, content/, background/)
   - _Requirements: 1.1, 2.1, 5.1_
 
-- [ ] 2. Implement Breez SDK Spark integration and wallet core
-  - [ ] 2.1 Initialize Breez SDK Spark with WASM support in background service worker
+- [x] 2. Implement Breez SDK Spark integration and wallet core
+
+
+
+  - [x] 2.1 Initialize Breez SDK Spark with WASM support in background service worker
+
+
     - Import and configure @breeztech/breez-sdk-spark package
     - Implement wallet initialization with mnemonic seed support
     - Set up secure storage for encrypted wallet data using Chrome Storage API
     - _Requirements: 1.1, 1.2, 1.3_
 
-  - [ ] 2.2 Implement core wallet operations using Breez SDK methods
+  - [x] 2.2 Implement core wallet operations using Breez SDK methods
+
+
     - Create receivePayment() wrapper for invoice generation
     - Implement sendPayment() for Lightning Network transactions
     - Add listPayments() for transaction history
     - Implement balance checking and wallet status monitoring
     - _Requirements: 1.4, 1.5, 1.6_
 
-  - [ ] 2.3 Add LNURL support using Breez SDK Spark LNURL methods
+  - [x] 2.3 Add LNURL support using Breez SDK Spark LNURL methods
+
+
     - Implement parseLnurl() for LNURL parsing and validation
     - Create payLnurl() wrapper for LNURL-pay operations
     - Add receiveLnurlPay() for generating user's LNURL addresses
