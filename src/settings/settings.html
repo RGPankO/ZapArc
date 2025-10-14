@@ -20,13 +20,21 @@
                         <input type="radio" id="builtin-wallet" name="wallet-type" value="builtin" checked>
                         Use Built-in Wallet (Breez SDK)
                     </label>
+                    <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 12px;">
+                        Recommended for most users. Provides full wallet functionality with automatic LNURL generation.
+                    </div>
+                    
                     <label>
                         <input type="radio" id="custom-wallet" name="wallet-type" value="custom">
                         Use Custom LNURL for Receiving Tips
                     </label>
-                    <input type="text" id="custom-lnurl" placeholder="lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns" disabled style="width: 100%; margin-top: 8px; padding: 8px; font-family: monospace; font-size: 12px;">
+                    <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 8px;">
+                        For advanced users who want to use their own Lightning wallet or service.
+                    </div>
+                    
+                    <input type="text" id="custom-lnurl" placeholder="lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns" disabled style="width: 100%; margin-top: 8px; padding: 8px; font-family: monospace; font-size: 12px;" maxlength="200">
                     <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                        Enter your LNURL to receive tips directly to your external wallet
+                        Enter your LNURL-pay address to receive tips directly to your external wallet. Must start with "lnurl" and contain valid bech32 characters.
                     </div>
                 </div>
             </section>
@@ -35,19 +43,31 @@
                 <h2>Default Amounts</h2>
                 <div class="setting-group">
                     <h3>Posting Amounts (sats)</h3>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                        Default amounts included in your tip requests when posting content. These will be suggested to people who want to tip you.
+                    </div>
                     <div class="amount-inputs">
-                        <input type="number" id="post-amount-1" placeholder="100" min="1">
-                        <input type="number" id="post-amount-2" placeholder="500" min="1">
-                        <input type="number" id="post-amount-3" placeholder="1000" min="1">
+                        <input type="number" id="post-amount-1" placeholder="100" min="1" max="100000000" step="1" required>
+                        <input type="number" id="post-amount-2" placeholder="500" min="1" max="100000000" step="1" required>
+                        <input type="number" id="post-amount-3" placeholder="1000" min="1" max="100000000" step="1" required>
+                    </div>
+                    <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                        Tip: Use ascending amounts (e.g., 100, 500, 1000) for better user experience
                     </div>
                 </div>
                 
                 <div class="setting-group">
                     <h3>Tipping Amounts (sats)</h3>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                        Your preferred amounts when tipping others. These appear alongside the content creator's suggested amounts.
+                    </div>
                     <div class="amount-inputs">
-                        <input type="number" id="tip-amount-1" placeholder="100" min="1">
-                        <input type="number" id="tip-amount-2" placeholder="500" min="1">
-                        <input type="number" id="tip-amount-3" placeholder="1000" min="1">
+                        <input type="number" id="tip-amount-1" placeholder="100" min="1" max="100000000" step="1" required>
+                        <input type="number" id="tip-amount-2" placeholder="500" min="1" max="100000000" step="1" required>
+                        <input type="number" id="tip-amount-3" placeholder="1000" min="1" max="100000000" step="1" required>
+                    </div>
+                    <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                        Maximum: 100,000,000 sats (1 BTC). All amounts must be unique.
                     </div>
                 </div>
             </section>
@@ -59,21 +79,31 @@
                         <input type="checkbox" id="floating-menu-enabled" checked>
                         Enable Floating Action Menu
                     </label>
+                    <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 12px;">
+                        Shows a floating menu on websites for quick access to wallet functions and domain management.
+                    </div>
+                    
                     <label>
                         Auto-lock timeout:
-                        <select id="autolock-timeout">
+                        <select id="autolock-timeout" required>
+                            <option value="300">5 minutes</option>
                             <option value="900">15 minutes</option>
                             <option value="1800">30 minutes</option>
                             <option value="3600">1 hour</option>
-                            <option value="0">Never</option>
+                            <option value="7200">2 hours</option>
+                            <option value="0">Never (not recommended)</option>
                         </select>
                     </label>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                        Automatically locks your wallet after inactivity for security. "Never" is not recommended for security reasons.
+                    </div>
                 </div>
             </section>
             
             <div id="actions">
                 <button id="save-settings">Save Settings</button>
                 <button id="reset-settings">Reset to Defaults</button>
+                <button id="help-button" type="button">Help</button>
             </div>
         </main>
     </div>

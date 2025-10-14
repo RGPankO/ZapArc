@@ -135,6 +135,34 @@ section h2 {
     background: #5a6268;
 }
 
+#help-button {
+    background: #17a2b8;
+    color: white;
+}
+
+#help-button:hover {
+    background: #138496;
+}
+
+/* Amount display formatting */
+.amount-display {
+    font-size: 11px;
+    color: #666;
+    margin-left: 8px;
+    font-style: italic;
+}
+
+/* Improved input styling */
+.amount-inputs input:focus {
+    transform: scale(1.02);
+    transition: transform 0.1s ease;
+}
+
+/* Better spacing for descriptions */
+.setting-group > div[style*="color: #666"] {
+    line-height: 1.4;
+}
+
 .settings-message {
     position: fixed;
     top: 20px;
@@ -144,4 +172,75 @@ section h2 {
     color: white;
     font-weight: bold;
     z-index: 1000;
+}
+
+/* Error state styles */
+.setting-group input.error,
+.setting-group select.error {
+    border-color: #f44336;
+    background-color: #ffebee;
+    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2);
+}
+
+.setting-group input.error:focus,
+.setting-group select.error:focus {
+    outline: none;
+    border-color: #f44336;
+    box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
+}
+
+/* Validation feedback */
+.validation-feedback {
+    font-size: 12px;
+    color: #f44336;
+    margin-top: 4px;
+    display: block;
+}
+
+.validation-feedback.success {
+    color: #4CAF50;
+}
+
+/* Enhanced form styling */
+.setting-group input:focus,
+.setting-group select:focus {
+    outline: none;
+    border-color: #f7931a;
+    box-shadow: 0 0 0 2px rgba(247, 147, 26, 0.2);
+}
+
+.setting-group input:valid {
+    border-color: #4CAF50;
+}
+
+/* Loading state for save button */
+#save-settings:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+#save-settings.loading {
+    position: relative;
+}
+
+#save-settings.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin: auto;
+    border: 2px solid transparent;
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }

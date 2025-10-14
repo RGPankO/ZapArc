@@ -521,8 +521,9 @@ function showInfo(message: string) {
     console.log(message);
     // TODO: Implement proper info UI
     alert(message);
-}// Enh
-anced Deposit Interface
+}
+
+// Enhanced Deposit Interface
 function showDepositInterface() {
     const modal = createModal('deposit-modal', 'Deposit Funds');
     
@@ -751,15 +752,18 @@ function startPaymentMonitoring(invoice: string) {
 
 async function checkPaymentStatus(invoice: string) {
     try {
-        const statusResponse = await ExtensionMessaging.checkPaymentStatus(invoice);
-        if (statusResponse.success && statusResponse.data) {
-            const status = statusResponse.data.status;
+        // Check payment status by looking at recent payments
+        const paymentsResponse = await ExtensionMessaging.listPayments(true);
+        if (paymentsResponse.success && paymentsResponse.data) {
+            // Find payment matching this invoice
+            const payment = paymentsResponse.data.find(p => 
+                p.type === 'receive' && p.description?.includes(invoice.substring(0, 20))
+            );
             
-            if (status === 'paid') {
+            if (payment && payment.status === 'completed') {
                 handlePaymentReceived();
-            } else if (status === 'expired') {
-                handlePaymentExpired();
             }
+            // Note: We don't have expiration detection in this simple implementation
         }
     } catch (error) {
         console.error('Payment status check error:', error);
@@ -962,7 +966,7 @@ async function previewPayment() {
         const input = paymentInput.value.trim();
         const amount = amountInput ? parseInt(amountInput.value) || 0 : 0;
         
-        const previewResponse = await ExtensionMessaging.previewPayment(input, amount);
+        const previewResponse = await ExtensionMessaging.parseLnurl(input);
         
         if (previewResponse.success && previewResponse.data) {
             displayPaymentPreview(previewResponse.data);
@@ -1026,7 +1030,7 @@ async function sendPayment() {
         const amount = amountInput ? parseInt(amountInput.value) || 0 : 0;
         const comment = commentInput ? commentInput.value : '';
         
-        const paymentResponse = await ExtensionMessaging.sendPayment(input, amount, comment);
+        const paymentResponse = await ExtensionMessaging.sendPayment(input);
         
         if (paymentResponse.success) {
             if (statusText) {
@@ -1093,7 +1097,7 @@ function lockWallet() {
     ExtensionMessaging.lockWallet();
     
     // Show unlock interface
-    showInterface('unlock-interface');
+    showUnlockPrompt();
     
     showInfo('Wallet locked due to inactivity');
 }
