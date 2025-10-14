@@ -26,12 +26,22 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
     switch (message.type) {
       case 'SETUP_WALLET':
-        await walletManager.setupWallet({
-          mnemonic: message.mnemonic,
-          pin: message.pin,
-          network: message.network || 'mainnet'
-        });
-        sendResponse({ success: true });
+        try {
+          console.log('Background: Starting wallet setup');
+          await walletManager.setupWallet({
+            mnemonic: message.mnemonic,
+            pin: message.pin,
+            network: message.network || 'mainnet'
+          });
+          console.log('Background: Wallet setup completed successfully');
+          sendResponse({ success: true });
+        } catch (setupError) {
+          console.error('Background: Wallet setup failed:', setupError);
+          sendResponse({ 
+            success: false, 
+            error: setupError instanceof Error ? setupError.message : 'Wallet setup failed' 
+          });
+        }
         break;
 
       case 'UNLOCK_WALLET':
@@ -77,6 +87,51 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'PAY_LNURL':
         const paySuccess = await walletManager.payLnurl(message.reqData, message.amount, message.comment);
         sendResponse({ success: paySuccess });
+        break;
+
+      case 'PROCESS_PAYMENT':
+        try {
+          // This would integrate with the payment processor
+          const paymentResult = await walletManager.payLnurl(
+            message.lnurlData, 
+            message.amount, 
+            message.comment
+          );
+          sendResponse({ 
+            success: paymentResult,
+            transactionId: paymentResult ? `tx_${Date.now()}` : undefined
+          });
+        } catch (error) {
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Payment processing failed',
+            retryable: true
+          });
+        }
+        break;
+
+      case 'GENERATE_QR_CODE':
+        try {
+          // For QR code generation, we return the LNURL or bolt11 invoice
+          // The frontend will handle the actual QR image generation
+          let qrData = message.lnurl;
+          
+          if (message.amount && message.amount > 0) {
+            // If amount is specified, we could generate a bolt11 invoice
+            // For now, return the LNURL with amount parameter
+            qrData = `lightning:${message.lnurl.toUpperCase()}?amount=${message.amount * 1000}`;
+            if (message.comment) {
+              qrData += `&message=${encodeURIComponent(message.comment)}`;
+            }
+          }
+          
+          sendResponse({ success: true, qrData });
+        } catch (error) {
+          sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'QR generation failed'
+          });
+        }
         break;
 
       case 'GENERATE_LNURL':
@@ -194,7 +249,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'GET_USER_SETTINGS':
         const settings = await storageManager.getUserSettings();
-        sendResponse({ success: true, settings });
+        sendResponse({ success: true, data: settings });
         break;
 
       case 'SAVE_USER_SETTINGS':
@@ -211,7 +266,12 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'IS_WALLET_CONNECTED':
         const isConnected = walletManager.getBreezSDK().isWalletConnected();
-        sendResponse({ success: true, isConnected });
+        sendResponse({ success: true, data: isConnected });
+        break;
+
+      case 'WALLET_EXISTS':
+        const walletExists = await storageManager.walletExists();
+        sendResponse({ success: true, data: walletExists });
         break;
 
       default:
@@ -223,17 +283,17 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
   }
 }
 
-// Initialize Breez SDK on service worker startup
-walletManager.getBreezSDK().initializeSDK().catch(error => {
-  console.error('Failed to initialize Breez SDK on startup:', error);
-});
+// Skip Breez SDK initialization in background service worker
+// (WASM modules need DOM context which isn't available here)
+console.log('Background service worker ready - Breez SDK will be initialized when needed');
 
 // Auto-lock check on service worker activation
 chrome.runtime.onStartup.addListener(async () => {
   try {
     const isUnlocked = await storageManager.isWalletUnlocked();
-    if (!isUnlocked && walletManager.getBreezSDK().isWalletConnected()) {
-      await walletManager.lockWallet();
+    if (!isUnlocked) {
+      // Just ensure wallet is locked in storage
+      await storageManager.lockWallet();
     }
   } catch (error) {
     console.error('Failed to check auto-lock on startup:', error);

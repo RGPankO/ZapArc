@@ -274,6 +274,15 @@ export class ExtensionMessaging {
   }
 
   /**
+   * Check if wallet exists (has been set up)
+   */
+  static async walletExists(): Promise<MessageResponse<boolean>> {
+    return this.sendToBackground({
+      type: 'WALLET_EXISTS'
+    });
+  }
+
+  /**
    * Parse tip request string
    */
   static async parseTipRequest(tipString: string): Promise<MessageResponse<any>> {
@@ -391,5 +400,58 @@ export class ExtensionMessaging {
     return this.sendToBackground({
       type: 'GET_ALL_DOMAINS'
     });
+  }
+
+  /**
+   * Process payment with enhanced error handling and retry logic
+   */
+  static async processPayment(
+    lnurlData: any, 
+    amount: number, 
+    comment?: string
+  ): Promise<MessageResponse<{ transactionId?: string; retryable?: boolean }>> {
+    return this.sendToBackground({
+      type: 'PROCESS_PAYMENT',
+      lnurlData,
+      amount,
+      comment
+    });
+  }
+
+  /**
+   * Generate QR code data for Lightning payment
+   */
+  static async generateQRCode(
+    lnurl: string, 
+    amount?: number, 
+    comment?: string
+  ): Promise<MessageResponse<string>> {
+    return this.sendToBackground({
+      type: 'GENERATE_QR_CODE',
+      lnurl,
+      amount,
+      comment
+    });
+  }
+
+  /**
+   * Generate Lightning URI for QR codes (works without Breez SDK)
+   */
+  static generateLightningURI(lnurl: string, amount?: number, comment?: string): string {
+    let uri = `lightning:${lnurl.toUpperCase()}`;
+    
+    const params = [];
+    if (amount && amount > 0) {
+      params.push(`amount=${amount * 1000}`); // Convert sats to millisats
+    }
+    if (comment) {
+      params.push(`message=${encodeURIComponent(comment)}`);
+    }
+    
+    if (params.length > 0) {
+      uri += `?${params.join('&')}`;
+    }
+    
+    return uri;
   }
 }

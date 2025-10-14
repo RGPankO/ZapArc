@@ -126,7 +126,17 @@ export class ChromeStorageManager {
   async getUserSettings(): Promise<UserSettings> {
     try {
       const result = await chrome.storage.local.get(['userSettings']);
-      return result.userSettings || this.getDefaultSettings();
+      const defaults = this.getDefaultSettings();
+      
+      // Merge stored settings with defaults to ensure all fields are present
+      if (result.userSettings) {
+        return {
+          ...defaults,
+          ...result.userSettings
+        };
+      }
+      
+      return defaults;
     } catch (error) {
       console.error('Failed to get user settings:', error);
       return this.getDefaultSettings();
@@ -142,6 +152,19 @@ export class ChromeStorageManager {
     } catch (error) {
       console.error('Failed to save user settings:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Check if a wallet exists (has been set up)
+   */
+  async walletExists(): Promise<boolean> {
+    try {
+      const result = await chrome.storage.local.get(['encryptedWallet']);
+      return !!result.encryptedWallet;
+    } catch (error) {
+      console.error('Failed to check wallet existence:', error);
+      return false;
     }
   }
 
@@ -248,7 +271,8 @@ export class ChromeStorageManager {
       defaultTippingAmounts: [100, 500, 1000],
       useBuiltInWallet: true,
       floatingMenuEnabled: true,
-      autoLockTimeout: 900 // 15 minutes
+      autoLockTimeout: 900, // 15 minutes
+      customLNURL: undefined
     };
   }
 }

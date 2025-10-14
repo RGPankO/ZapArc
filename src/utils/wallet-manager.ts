@@ -36,60 +36,69 @@ export class WalletManager {
   }
 
   /**
-   * Initialize wallet with setup options
+   * Initialize wallet with setup options (Basic version without Breez SDK)
    */
   async setupWallet(options: WalletSetupOptions): Promise<void> {
     try {
-      // Connect to Breez SDK
-      const config: BreezConfig = {
-        network: options.network || 'mainnet'
-      };
-
-      await this.breezSDK.connectWallet(options.mnemonic, config);
-
-      // Get wallet data for storage
-      const nodeInfo = await this.breezSDK.getNodeInfo();
-      const balance = await this.breezSDK.getBalance();
-
-      // Generate LNURL for receiving if using built-in wallet
-      const settings = await this.storage.getUserSettings();
-      let lnurl: string | undefined;
+      console.log('WalletManager: Starting basic wallet setup (no Breez SDK)');
       
-      if (settings.useBuiltInWallet) {
-        try {
-          lnurl = await this.breezSDK.receiveLnurlPay();
-        } catch (error) {
-          console.warn('Failed to generate LNURL, will retry later:', error);
-        }
-      }
+      // Get user settings
+      const settings = await this.storage.getUserSettings();
+      console.log('WalletManager: Got user settings:', settings);
 
-      // Create wallet data
+      // Generate a basic mnemonic if none provided
+      const mnemonic = options.mnemonic || this.generateBasicMnemonic();
+      console.log('WalletManager: Using mnemonic (length):', mnemonic.split(' ').length);
+
+      // Create basic wallet data
       const walletData: WalletData = {
-        mnemonic: options.mnemonic || '', // Empty if random seed was used
-        balance,
-        lnurl,
+        mnemonic: mnemonic,
+        balance: 0, // Start with 0 balance
+        lnurl: undefined, // Will be set later when Breez SDK is working
         customLNURL: settings.customLNURL,
         transactions: []
       };
 
+      console.log('WalletManager: Saving encrypted wallet data with PIN');
+      
       // Save encrypted wallet data
       await this.storage.saveEncryptedWallet(walletData, options.pin);
+      console.log('WalletManager: Wallet data encrypted and saved');
+      
       await this.storage.unlockWallet();
+      console.log('WalletManager: Wallet unlocked');
 
-      // Update status
+      // Update status for basic functionality
       this.walletStatus = {
-        isConnected: true,
+        isConnected: false, // Breez SDK not connected yet
         isUnlocked: true,
-        balance,
-        nodeId: nodeInfo.id,
+        balance: 0,
         lastSync: Date.now()
       };
 
-      console.log('Wallet setup completed successfully');
+      console.log('WalletManager: Basic wallet setup completed successfully');
     } catch (error) {
-      console.error('Wallet setup failed:', error);
+      console.error('WalletManager: Wallet setup failed:', error);
       throw new Error(`Wallet setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Generate a basic mnemonic for testing (12 words)
+   */
+  private generateBasicMnemonic(): string {
+    const words = [
+      'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract',
+      'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid'
+    ];
+    
+    // Generate 12 random words for a basic mnemonic
+    const mnemonic = [];
+    for (let i = 0; i < 12; i++) {
+      mnemonic.push(words[Math.floor(Math.random() * words.length)]);
+    }
+    
+    return mnemonic.join(' ');
   }
 
   /**

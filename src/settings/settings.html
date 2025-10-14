@@ -17,14 +17,17 @@
                 <h2>Wallet Configuration</h2>
                 <div class="setting-group">
                     <label>
-                        <input type="radio" name="wallet-type" value="builtin" checked>
+                        <input type="radio" id="builtin-wallet" name="wallet-type" value="builtin" checked>
                         Use Built-in Wallet (Breez SDK)
                     </label>
                     <label>
-                        <input type="radio" name="wallet-type" value="custom">
-                        Use Custom LNURL
+                        <input type="radio" id="custom-wallet" name="wallet-type" value="custom">
+                        Use Custom LNURL for Receiving Tips
                     </label>
-                    <input type="text" id="custom-lnurl" placeholder="Enter your LNURL" disabled>
+                    <input type="text" id="custom-lnurl" placeholder="lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns" disabled style="width: 100%; margin-top: 8px; padding: 8px; font-family: monospace; font-size: 12px;">
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                        Enter your LNURL to receive tips directly to your external wallet
+                    </div>
                 </div>
             </section>
             

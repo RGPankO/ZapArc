@@ -7,6 +7,8 @@ import { BlacklistManager } from '../utils/blacklist-manager';
 import { DomainManager } from '../utils/domain-manager';
 import { PostingDetector } from '../utils/posting-detector';
 import { FacebookManager } from '../utils/facebook-manager';
+import { TippingUI } from '../utils/tipping-ui';
+import FloatingMenu from '../utils/floating-menu';
 
 console.log('Lightning Tipping Extension content script loaded');
 
@@ -628,12 +630,37 @@ class TipDetector {
   }
 
   /**
-   * Show tip prompt UI
+   * Show enhanced tip prompt UI
    */
-  private showTipPrompt(tip: TipRequest): void {
+  private async showTipPrompt(tip: TipRequest): Promise<void> {
     try {
-      // Create tip prompt element
-      const promptElement = this.createTipPrompt(tip);
+      // Get user settings for default amounts
+      const settingsResponse = await ExtensionMessaging.getUserSettings();
+      const userSettings = settingsResponse.success && settingsResponse.data ? settingsResponse.data : {
+        defaultTippingAmounts: [100, 500, 1000] as [number, number, number],
+        defaultPostingAmounts: [100, 500, 1000] as [number, number, number],
+        useBuiltInWallet: true,
+        floatingMenuEnabled: true,
+        autoLockTimeout: 900
+      };
+
+      // Create enhanced tip prompt
+      const promptElement = TippingUI.createEnhancedTipPrompt({
+        tip,
+        userSettings,
+        onPayment: async (amount: number, comment?: string) => {
+          await this.handleTipPayment(tip, amount, comment);
+        },
+        onQRCode: (amount: number, comment?: string) => {
+          this.handleShowQR(tip, amount, comment);
+        },
+        onBlock: async () => {
+          await this.handleBlockLnurl(tip);
+        },
+        onClose: () => {
+          // Prompt will be removed by animation
+        }
+      });
       
       // Position near the detected content
       if (tip.element) {
@@ -643,148 +670,13 @@ class TipDetector {
       // Add to page
       document.body.appendChild(promptElement);
 
-      console.log('Tip prompt shown for:', tip.lnurl);
+      console.log('Enhanced tip prompt shown for:', tip.lnurl);
     } catch (error) {
       console.error('Failed to show tip prompt:', error);
     }
   }
 
-  /**
-   * Create tip prompt UI element
-   */
-  private createTipPrompt(tip: TipRequest): HTMLElement {
-    const prompt = document.createElement('div');
-    prompt.className = 'lightning-tip-prompt';
-    prompt.style.cssText = `
-      position: absolute;
-      background: white;
-      border: 2px solid #f7931a;
-      border-radius: 8px;
-      padding: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      z-index: 10000;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 14px;
-      max-width: 300px;
-      min-width: 250px;
-    `;
 
-    prompt.innerHTML = `
-      <div style="display: flex; align-items: center; margin-bottom: 8px;">
-        <span style="color: #f7931a; font-weight: bold; margin-right: 8px;">⚡</span>
-        <span style="font-weight: bold;">Lightning Tip Available</span>
-        <button class="close-btn" style="margin-left: auto; background: none; border: none; font-size: 16px; cursor: pointer;">×</button>
-      </div>
-      
-      <div style="margin-bottom: 12px; color: #666;">
-        Choose an amount to tip:
-      </div>
-      
-      <div class="tip-amounts" style="display: flex; gap: 8px; margin-bottom: 12px;">
-        ${tip.suggestedAmounts.map(amount => 
-          `<button class="tip-amount-btn" data-amount="${amount}" style="
-            flex: 1;
-            padding: 8px 4px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: white;
-            cursor: pointer;
-            font-size: 12px;
-          ">${amount.toLocaleString()} sats</button>`
-        ).join('')}
-      </div>
-      
-      <div style="display: flex; gap: 8px;">
-        <button class="custom-amount-btn" style="
-          flex: 1;
-          padding: 6px 12px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          background: white;
-          cursor: pointer;
-          font-size: 12px;
-        ">Custom Amount</button>
-        
-        <button class="qr-code-btn" style="
-          flex: 1;
-          padding: 6px 12px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          background: white;
-          cursor: pointer;
-          font-size: 12px;
-        ">Show QR</button>
-        
-        <button class="block-btn" style="
-          padding: 6px 12px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          background: white;
-          cursor: pointer;
-          font-size: 12px;
-          color: #666;
-        ">Block</button>
-      </div>
-    `;
-
-    // Add event listeners
-    this.setupPromptEventListeners(prompt, tip);
-
-    return prompt;
-  }
-
-  /**
-   * Set up event listeners for tip prompt
-   */
-  private setupPromptEventListeners(prompt: HTMLElement, tip: TipRequest): void {
-    // Close button
-    const closeBtn = prompt.querySelector('.close-btn');
-    closeBtn?.addEventListener('click', () => {
-      prompt.remove();
-    });
-
-    // Amount buttons
-    const amountBtns = prompt.querySelectorAll('.tip-amount-btn');
-    amountBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const amount = parseInt(btn.getAttribute('data-amount') || '0');
-        this.handleTipPayment(tip, amount);
-        prompt.remove();
-      });
-    });
-
-    // Custom amount button
-    const customBtn = prompt.querySelector('.custom-amount-btn');
-    customBtn?.addEventListener('click', () => {
-      this.handleCustomAmount(tip);
-      prompt.remove();
-    });
-
-    // QR code button
-    const qrBtn = prompt.querySelector('.qr-code-btn');
-    qrBtn?.addEventListener('click', () => {
-      this.handleShowQR(tip);
-      prompt.remove();
-    });
-
-    // Block button
-    const blockBtn = prompt.querySelector('.block-btn');
-    blockBtn?.addEventListener('click', () => {
-      this.handleBlockLnurl(tip);
-      prompt.remove();
-    });
-
-    // Click outside to close
-    setTimeout(() => {
-      const clickOutsideHandler = (event: Event) => {
-        if (!prompt.contains(event.target as Node)) {
-          prompt.remove();
-          document.removeEventListener('click', clickOutsideHandler);
-        }
-      };
-      document.addEventListener('click', clickOutsideHandler);
-    }, 100);
-  }
 
   /**
    * Position prompt near the detected element
@@ -820,67 +712,117 @@ class TipDetector {
   }
 
   /**
-   * Handle tip payment
+   * Handle tip payment with enhanced processing and status tracking
    */
-  private async handleTipPayment(tip: TipRequest, amount: number): Promise<void> {
+  private async handleTipPayment(tip: TipRequest, amount: number, comment?: string): Promise<void> {
     try {
-      console.log(`Processing tip payment: ${amount} sats to ${tip.lnurl}`);
+      console.log(`Processing tip payment: ${amount} sats to ${tip.lnurl}${comment ? ` with comment: "${comment}"` : ''}`);
       
-      // Check if wallet is connected
-      const walletResponse = await ExtensionMessaging.isWalletConnected();
-      if (!walletResponse.success || !walletResponse.data) {
-        this.showMessage('Please set up your wallet first', 'error');
-        return;
-      }
-
-      // Check sufficient balance
-      const balanceResponse = await ExtensionMessaging.checkSufficientBalance(amount);
-      if (!balanceResponse.success || !balanceResponse.data) {
-        this.showMessage('Insufficient balance. Please deposit funds.', 'error');
-        return;
-      }
-
-      // Parse LNURL and pay
+      // Show processing indicator
+      this.showPaymentProcessing(amount);
+      
+      // Parse LNURL first
       const parseResponse = await ExtensionMessaging.parseLnurl(tip.lnurl);
       if (!parseResponse.success) {
-        this.showMessage('Invalid LNURL', 'error');
-        return;
+        throw new Error('Invalid LNURL or service unavailable');
       }
 
-      const payResponse = await ExtensionMessaging.payLnurl(parseResponse.data, amount);
+      // Execute payment with enhanced error handling
+      const payResponse = await ExtensionMessaging.processPayment(parseResponse.data, amount, comment);
+      
       if (payResponse.success) {
-        this.showMessage(`Successfully tipped ${amount} sats!`, 'success');
+        this.showPaymentSuccess(amount, comment);
+        
+        // Update transaction history (if needed)
+        console.log('Payment successful, transaction ID:', payResponse.data?.transactionId);
       } else {
-        this.showMessage('Payment failed. Please try again.', 'error');
+        const error = payResponse.error || 'Payment failed';
+        const isRetryable = payResponse.data?.retryable || false;
+        
+        this.showPaymentError(error, isRetryable, () => {
+          // Retry callback
+          this.handleTipPayment(tip, amount, comment);
+        });
       }
     } catch (error) {
       console.error('Tip payment failed:', error);
-      this.showMessage('Payment failed. Please try again.', 'error');
+      this.showPaymentError(
+        error instanceof Error ? error.message : 'Payment processing failed',
+        true,
+        () => this.handleTipPayment(tip, amount, comment)
+      );
     }
   }
 
   /**
-   * Handle custom amount input
+   * Show payment processing indicator
    */
-  private handleCustomAmount(tip: TipRequest): void {
-    const amount = prompt('Enter custom tip amount (sats):');
-    if (amount) {
-      const amountNum = parseInt(amount);
-      if (!isNaN(amountNum) && amountNum > 0) {
-        this.handleTipPayment(tip, amountNum);
-      } else {
-        this.showMessage('Please enter a valid amount', 'error');
-      }
+  private showPaymentProcessing(amount: number): void {
+    // Remove any existing processing indicator
+    const existing = document.querySelector('.lightning-payment-processing');
+    if (existing) {
+      existing.remove();
     }
+
+    const processingEl = document.createElement('div');
+    processingEl.className = 'lightning-payment-processing';
+    processingEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 20px;
+      border-radius: 8px;
+      background: #ff9800;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 10003;
+      max-width: 320px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: translateX(100%);
+      transition: all 0.3s ease;
+    `;
+
+    processingEl.innerHTML = `
+      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 20px; margin-right: 8px; animation: spin 1s linear infinite;">⚡</span>
+        <strong>Processing Payment...</strong>
+      </div>
+      <div style="font-size: 13px; opacity: 0.9;">
+        Sending ${amount.toLocaleString()} sats via Lightning Network
+      </div>
+      <style>
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      </style>
+    `;
+    
+    document.body.appendChild(processingEl);
+    
+    // Animate in
+    setTimeout(() => {
+      processingEl.style.opacity = '1';
+      processingEl.style.transform = 'translateX(0)';
+    }, 10);
   }
 
+
+
   /**
-   * Handle show QR code
+   * Handle show QR code with enhanced generation
    */
-  private handleShowQR(tip: TipRequest): void {
-    // TODO: Implement QR code display
-    console.log('Show QR for:', tip.lnurl);
-    this.showMessage('QR code feature coming soon!', 'info');
+  private async handleShowQR(tip: TipRequest, amount: number, comment?: string): Promise<void> {
+    try {
+      // Use the enhanced QR code generation
+      await TippingUI.showEnhancedQRCode(tip.lnurl, amount, comment);
+      console.log(`Showing enhanced QR for ${amount} sats to ${tip.lnurl}`);
+    } catch (error) {
+      console.error('Failed to show QR code:', error);
+      this.showMessage('Failed to generate QR code', 'error');
+    }
   }
 
   /**
@@ -923,6 +865,167 @@ class TipDetector {
     setTimeout(() => {
       indicator.remove();
     }, 10000);
+  }
+
+  /**
+   * Show payment success message with enhanced feedback
+   */
+  private showPaymentSuccess(amount: number, comment?: string): void {
+    // Remove processing indicator
+    const processing = document.querySelector('.lightning-payment-processing');
+    if (processing) {
+      processing.remove();
+    }
+
+    const successEl = document.createElement('div');
+    successEl.className = 'lightning-payment-success';
+    successEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 20px;
+      border-radius: 8px;
+      background: #4CAF50;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 10003;
+      max-width: 320px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: translateX(100%);
+      transition: all 0.3s ease;
+    `;
+
+    successEl.innerHTML = `
+      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 20px; margin-right: 8px;">✅</span>
+        <strong>Payment Successful!</strong>
+      </div>
+      <div style="font-size: 13px; opacity: 0.9;">
+        Successfully sent ${amount.toLocaleString()} sats via Lightning Network
+        ${comment ? `<br><em>"${comment}"</em>` : ''}
+      </div>
+    `;
+    
+    document.body.appendChild(successEl);
+    
+    // Animate in
+    setTimeout(() => {
+      successEl.style.opacity = '1';
+      successEl.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Remove after 4 seconds
+    setTimeout(() => {
+      successEl.style.opacity = '0';
+      successEl.style.transform = 'translateX(100%)';
+      setTimeout(() => successEl.remove(), 300);
+    }, 4000);
+  }
+
+  /**
+   * Show payment error message with retry option
+   */
+  private showPaymentError(message: string, isRetryable: boolean = false, retryCallback?: () => void): void {
+    // Remove processing indicator
+    const processing = document.querySelector('.lightning-payment-processing');
+    if (processing) {
+      processing.remove();
+    }
+
+    const errorEl = document.createElement('div');
+    errorEl.className = 'lightning-payment-error';
+    errorEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 20px;
+      border-radius: 8px;
+      background: #f44336;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 10003;
+      max-width: 320px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: translateX(100%);
+      transition: all 0.3s ease;
+    `;
+
+    errorEl.innerHTML = `
+      <div style="display: flex; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 20px; margin-right: 8px;">❌</span>
+        <strong>Payment Failed</strong>
+      </div>
+      <div style="font-size: 13px; opacity: 0.9; margin-bottom: ${isRetryable ? '12px' : '0'};">
+        ${message}
+      </div>
+      ${isRetryable && retryCallback ? `
+        <div style="display: flex; gap: 8px;">
+          <button class="retry-payment" style="
+            flex: 1;
+            padding: 6px 12px;
+            border: 1px solid white;
+            border-radius: 4px;
+            background: white;
+            color: #f44336;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+          ">Try Again</button>
+          <button class="dismiss-error" style="
+            padding: 6px 12px;
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 4px;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+          ">Dismiss</button>
+        </div>
+      ` : ''}
+    `;
+    
+    document.body.appendChild(errorEl);
+
+    // Add event listeners for retry functionality
+    if (isRetryable && retryCallback) {
+      const retryBtn = errorEl.querySelector('.retry-payment');
+      const dismissBtn = errorEl.querySelector('.dismiss-error');
+      
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+          errorEl.remove();
+          retryCallback();
+        });
+      }
+      
+      if (dismissBtn) {
+        dismissBtn.addEventListener('click', () => {
+          errorEl.style.opacity = '0';
+          errorEl.style.transform = 'translateX(100%)';
+          setTimeout(() => errorEl.remove(), 300);
+        });
+      }
+    }
+    
+    // Animate in
+    setTimeout(() => {
+      errorEl.style.opacity = '1';
+      errorEl.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Auto-remove after longer duration if retryable, shorter if not
+    const duration = isRetryable ? 10000 : 5000;
+    setTimeout(() => {
+      if (errorEl.parentNode) {
+        errorEl.style.opacity = '0';
+        errorEl.style.transform = 'translateX(100%)';
+        setTimeout(() => errorEl.remove(), 300);
+      }
+    }, duration);
   }
 
   /**

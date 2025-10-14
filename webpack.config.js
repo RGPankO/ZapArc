@@ -10,7 +10,8 @@ module.exports = (env, argv) => {
     entry: {
       background: './src/background/background.ts',
       content: './src/content/content.ts',
-      popup: './src/popup/popup.ts'
+      popup: './src/popup/popup.ts',
+      settings: './src/settings/settings.ts'
     },
     
     output: {
@@ -42,6 +43,12 @@ module.exports = (env, argv) => {
         template: './src/popup/popup.html',
         filename: 'popup.html',
         chunks: ['popup']
+      }),
+      
+      new HtmlWebpackPlugin({
+        template: './src/settings/settings.html',
+        filename: 'settings.html',
+        chunks: ['settings']
       }),
       
       new CopyWebpackPlugin({
