@@ -274,6 +274,53 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         sendResponse({ success: true, data: walletExists });
         break;
 
+      case 'OPEN_POPUP':
+        // Open extension popup
+        try {
+          await chrome.action.openPopup();
+          sendResponse({ success: true });
+        } catch (error) {
+          // Fallback: open popup in new tab if openPopup fails
+          const popupUrl = chrome.runtime.getURL('popup.html');
+          await chrome.tabs.create({ url: popupUrl });
+          sendResponse({ success: true });
+        }
+        break;
+
+      case 'OPEN_POPUP_DEPOSIT':
+        // Open extension popup with deposit focus
+        try {
+          await chrome.action.openPopup();
+          // Send message to popup to focus on deposit
+          setTimeout(() => {
+            chrome.runtime.sendMessage({ type: 'FOCUS_DEPOSIT' });
+          }, 100);
+          sendResponse({ success: true });
+        } catch (error) {
+          // Fallback: open popup in new tab
+          const popupUrl = chrome.runtime.getURL('popup.html?action=deposit');
+          await chrome.tabs.create({ url: popupUrl });
+          sendResponse({ success: true });
+        }
+        break;
+
+      case 'OPEN_POPUP_WITHDRAW':
+        // Open extension popup with withdraw focus
+        try {
+          await chrome.action.openPopup();
+          // Send message to popup to focus on withdraw
+          setTimeout(() => {
+            chrome.runtime.sendMessage({ type: 'FOCUS_WITHDRAW' });
+          }, 100);
+          sendResponse({ success: true });
+        } catch (error) {
+          // Fallback: open popup in new tab
+          const popupUrl = chrome.runtime.getURL('popup.html?action=withdraw');
+          await chrome.tabs.create({ url: popupUrl });
+          sendResponse({ success: true });
+        }
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown message type' });
     }

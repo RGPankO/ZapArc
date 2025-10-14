@@ -10,7 +10,11 @@ import { FacebookManager } from '../utils/facebook-manager';
 import { TippingUI } from '../utils/tipping-ui';
 import FloatingMenu from '../utils/floating-menu';
 
-console.log('Lightning Tipping Extension content script loaded');
+console.log('🔵 [ContentScript] LIGHTNING TIPPING EXTENSION LOADED', {
+  timestamp: new Date().toISOString(),
+  location: window.location.href,
+  documentReadyState: document.readyState
+});
 
 // Tip detection system
 class TipDetector {
@@ -1068,6 +1072,10 @@ class TipDetector {
 
 // Initialize tip detector when content script loads
 const tipDetector = new TipDetector();
+
+// Initialize floating menu
+console.log('🔵 [ContentScript] INITIALIZING FLOATING MENU', { timestamp: new Date().toISOString() });
+const floatingMenu = new FloatingMenu();
 
 // Debug helper - expose to window for testing
 (window as any).lightningDebug = {

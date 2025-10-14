@@ -130,10 +130,16 @@ export class ChromeStorageManager {
       
       // Merge stored settings with defaults to ensure all fields are present
       if (result.userSettings) {
-        return {
-          ...defaults,
-          ...result.userSettings
+        // Properly merge settings, preserving 0 values (like autoLockTimeout: 0 for "Never")
+        const merged: UserSettings = {
+          defaultPostingAmounts: result.userSettings.defaultPostingAmounts || defaults.defaultPostingAmounts,
+          defaultTippingAmounts: result.userSettings.defaultTippingAmounts || defaults.defaultTippingAmounts,
+          useBuiltInWallet: result.userSettings.useBuiltInWallet !== undefined ? result.userSettings.useBuiltInWallet : defaults.useBuiltInWallet,
+          floatingMenuEnabled: result.userSettings.floatingMenuEnabled !== undefined ? result.userSettings.floatingMenuEnabled : defaults.floatingMenuEnabled,
+          autoLockTimeout: result.userSettings.autoLockTimeout !== undefined ? result.userSettings.autoLockTimeout : defaults.autoLockTimeout,
+          customLNURL: result.userSettings.customLNURL !== undefined ? result.userSettings.customLNURL : defaults.customLNURL
         };
+        return merged;
       }
       
       return defaults;

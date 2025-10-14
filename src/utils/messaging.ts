@@ -14,14 +14,30 @@ export class ExtensionMessaging {
    * Send message to background script
    */
   static async sendToBackground<T = any>(message: any): Promise<MessageResponse<T>> {
+    console.log('🔵 [ExtensionMessaging] SENDING MESSAGE', {
+      messageType: message.type,
+      message: message,
+      timestamp: new Date().toISOString()
+    });
+    
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) {
+          console.error('❌ [ExtensionMessaging] CHROME RUNTIME ERROR', {
+            error: chrome.runtime.lastError.message,
+            messageType: message.type,
+            timestamp: new Date().toISOString()
+          });
           resolve({
             success: false,
             error: chrome.runtime.lastError.message
           });
         } else {
+          console.log('🟢 [ExtensionMessaging] MESSAGE RESPONSE', {
+            messageType: message.type,
+            response: response,
+            timestamp: new Date().toISOString()
+          });
           resolve(response || { success: false, error: 'No response' });
         }
       });

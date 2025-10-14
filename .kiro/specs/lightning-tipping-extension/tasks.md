@@ -122,7 +122,11 @@
     - Handle payment errors with retry mechanisms and user guidance
     - _Requirements: 4.4, 4.5, 4.6, 4.7_
 
-- [ ] 6. Develop floating action menu
+- [x] 6. Develop floating action menu
+
+
+
+
   - [x] 6.1 Create persistent floating menu interface
 
 
@@ -133,7 +137,9 @@
     - Create blacklist detection notifications
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9_
 
-  - [ ] 6.2 Integrate floating menu with core functionality
+  - [x] 6.2 Integrate floating menu with core functionality
+
+
     - Connect deposit/withdraw actions to wallet operations
     - Implement tip string copying to clipboard
     - Add domain enable/disable controls
