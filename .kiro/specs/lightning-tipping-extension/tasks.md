@@ -146,15 +146,24 @@
     - Create blacklist management access from floating menu
     - _Requirements: 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16_
 
-- [ ] 7. Build popup wallet interface
-  - [ ] 7.1 Create wallet dashboard and onboarding
+- [x] 7. Build popup wallet interface
+
+
+
+
+
+  - [x] 7.1 Create wallet dashboard and onboarding
+
+
     - Design optional onboarding wizard for wallet setup
     - Build balance display with refresh capability
     - Create transaction history interface
     - Implement mnemonic backup confirmation flow
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-  - [ ] 7.2 Add deposit and withdrawal interfaces
+  - [x] 7.2 Add deposit and withdrawal interfaces
+
+
     - Create QR code generator for Lightning Network deposits
     - Build withdrawal interface for Lightning and on-chain payments
     - Add transaction status monitoring and notifications

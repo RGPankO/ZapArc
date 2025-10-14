@@ -8,26 +8,179 @@
 </head>
 <body>
     <div id="app">
-        <header>
-            <h1>Lightning Tipping</h1>
-        </header>
-        
-        <main>
-            <div id="wallet-section">
-                <div id="balance-display">
-                    <span id="balance">-- sats</span>
+        <!-- Onboarding Wizard (hidden by default) -->
+        <div id="onboarding-wizard" class="hidden">
+            <div class="wizard-step" id="welcome-step">
+                <div class="wizard-header">
+                    <h2>⚡ Welcome to Lightning Tipping</h2>
+                    <p>Set up your Lightning wallet to start tipping and receiving tips</p>
+                </div>
+                <div class="wizard-content">
+                    <div class="feature-list">
+                        <div class="feature-item">
+                            <span class="feature-icon">🔒</span>
+                            <span>Non-custodial wallet - you control your keys</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">⚡</span>
+                            <span>Instant Lightning Network payments</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🌐</span>
+                            <span>Works on any website</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="wizard-actions">
+                    <button id="start-setup-btn" class="btn-primary">Set Up Wallet</button>
+                    <button id="skip-setup-btn" class="btn-secondary">Skip Setup</button>
+                </div>
+            </div>
+
+            <div class="wizard-step hidden" id="mnemonic-step">
+                <div class="wizard-header">
+                    <h2>🔑 Your Recovery Phrase</h2>
+                    <p>Write down these 12 words in order. You'll need them to recover your wallet.</p>
+                </div>
+                <div class="wizard-content">
+                    <div id="mnemonic-display" class="mnemonic-grid"></div>
+                    <div class="warning-box">
+                        <strong>⚠️ Important:</strong> Store this phrase safely offline. Anyone with these words can access your funds.
+                    </div>
+                </div>
+                <div class="wizard-actions">
+                    <button id="mnemonic-back-btn" class="btn-secondary">Back</button>
+                    <button id="mnemonic-continue-btn" class="btn-primary">I've Written It Down</button>
+                </div>
+            </div>
+
+            <div class="wizard-step hidden" id="confirm-step">
+                <div class="wizard-header">
+                    <h2>✅ Confirm Your Recovery Phrase</h2>
+                    <p>Select the words in the correct order to confirm you've backed up your phrase</p>
+                </div>
+                <div class="wizard-content">
+                    <div id="confirmation-display">
+                        <div id="selected-words" class="selected-words"></div>
+                        <div id="word-options" class="word-options"></div>
+                    </div>
+                </div>
+                <div class="wizard-actions">
+                    <button id="confirm-back-btn" class="btn-secondary">Back</button>
+                    <button id="confirm-continue-btn" class="btn-primary" disabled>Continue</button>
+                </div>
+            </div>
+
+            <div class="wizard-step hidden" id="pin-step">
+                <div class="wizard-header">
+                    <h2>🔐 Create Your PIN</h2>
+                    <p>Create a 6+ digit PIN to secure your wallet</p>
+                </div>
+                <div class="wizard-content">
+                    <div class="pin-input-group">
+                        <input type="password" id="pin-input" placeholder="Enter PIN (6+ digits)" maxlength="20">
+                        <input type="password" id="pin-confirm" placeholder="Confirm PIN" maxlength="20">
+                    </div>
+                    <div class="pin-strength" id="pin-strength"></div>
+                </div>
+                <div class="wizard-actions">
+                    <button id="pin-back-btn" class="btn-secondary">Back</button>
+                    <button id="pin-continue-btn" class="btn-primary" disabled>Create Wallet</button>
+                </div>
+            </div>
+
+            <div class="wizard-step hidden" id="setup-complete-step">
+                <div class="wizard-header">
+                    <h2>🎉 Wallet Created Successfully!</h2>
+                    <p>Your Lightning wallet is ready to use</p>
+                </div>
+                <div class="wizard-content">
+                    <div class="success-message">
+                        <div class="checkmark">✓</div>
+                        <p>You can now send and receive Lightning payments securely</p>
+                    </div>
+                </div>
+                <div class="wizard-actions">
+                    <button id="complete-setup-btn" class="btn-primary">Start Using Wallet</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Wallet Interface -->
+        <div id="main-interface">
+            <header>
+                <h1>Lightning Tipping</h1>
+                <button id="refresh-btn" class="refresh-btn" title="Refresh Balance">🔄</button>
+            </header>
+            
+            <main>
+                <div id="wallet-section">
+                    <div id="balance-display">
+                        <div class="balance-label">Balance</div>
+                        <div id="balance" class="balance-amount">-- sats</div>
+                        <div id="balance-loading" class="balance-loading hidden">Updating...</div>
+                    </div>
+                    
+                    <div id="wallet-actions">
+                        <button id="deposit-btn" class="wallet-btn">
+                            <span class="btn-icon">📥</span>
+                            Deposit
+                        </button>
+                        <button id="withdraw-btn" class="wallet-btn">
+                            <span class="btn-icon">📤</span>
+                            Withdraw
+                        </button>
+                    </div>
+                </div>
+
+                <div id="transaction-section">
+                    <div class="section-header">
+                        <h3>Recent Transactions</h3>
+                        <button id="view-all-btn" class="view-all-btn">View All</button>
+                    </div>
+                    <div id="transaction-list" class="transaction-list">
+                        <div class="no-transactions">No transactions yet</div>
+                    </div>
                 </div>
                 
-                <div id="wallet-actions">
-                    <button id="deposit-btn">Deposit</button>
-                    <button id="withdraw-btn">Withdraw</button>
+                <div id="settings-section">
+                    <button id="settings-btn" class="settings-btn">⚙️ Settings</button>
                 </div>
+            </main>
+        </div>
+
+        <!-- Unlock Interface -->
+        <div id="unlock-interface" class="hidden">
+            <div class="unlock-container">
+                <h2>🔒 Wallet Locked</h2>
+                <p>Enter your PIN to unlock your wallet</p>
+                <div class="pin-input-container">
+                    <input type="password" id="unlock-pin" placeholder="Enter PIN" maxlength="20">
+                    <button id="unlock-btn" class="btn-primary">Unlock</button>
+                </div>
+                <div id="unlock-error" class="error-message hidden"></div>
             </div>
+        </div>
+
+        <!-- QR Only Interface -->
+        <div id="qr-only-interface" class="hidden">
+            <header>
+                <h1>⚡ Lightning Tipping</h1>
+                <p class="mode-indicator">External Wallet Mode</p>
+            </header>
             
-            <div id="settings-section">
-                <button id="settings-btn">Settings</button>
-            </div>
-        </main>
+            <main>
+                <div class="info-box">
+                    <h3>External Wallet Mode</h3>
+                    <p>Tip detection is active. QR codes will be generated for your external Lightning wallet.</p>
+                </div>
+                
+                <div class="qr-actions">
+                    <button id="setup-wallet-later" class="btn-outline">Set Up Wallet</button>
+                    <button id="settings-btn-qr" class="btn-outline">Settings</button>
+                </div>
+            </main>
+        </div>
     </div>
     
     <script src="popup.js"></script>
