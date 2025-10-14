@@ -4,6 +4,9 @@
 import { TipRequest, PostingContext } from '../types';
 import { ExtensionMessaging } from '../utils/messaging';
 import { BlacklistManager } from '../utils/blacklist-manager';
+import { DomainManager } from '../utils/domain-manager';
+import { PostingDetector } from '../utils/posting-detector';
+import { FacebookManager } from '../utils/facebook-manager';
 
 console.log('Lightning Tipping Extension content script loaded');
 
@@ -16,11 +19,374 @@ class TipDetector {
   private lastScanTime = 0;
   private detectedTips = new Set<string>();
   private observer: MutationObserver | null = null;
-  private blacklistManager: BlacklistManager;
+  public blacklistManager: BlacklistManager;
+  public domainManager: DomainManager;
+  private postingDetector: PostingDetector;
+  private facebookManager: FacebookManager;
 
   constructor() {
     this.blacklistManager = new BlacklistManager();
-    this.initializeDetection();
+    this.domainManager = new DomainManager();
+    this.postingDetector = new PostingDetector();
+    this.facebookManager = new FacebookManager();
+    this.initializeExtension();
+  }
+
+  /**
+   * Initialize extension with proper async handling
+   */
+  private async initializeExtension(): Promise<void> {
+    try {
+      // Wait a bit for managers to initialize
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      this.initializeDetection();
+      this.initializeDomainIndicator();
+      this.initializePostingDetection();
+    } catch (error) {
+      console.error('Failed to initialize extension:', error);
+    }
+  }
+
+  /**
+   * Initialize domain indicator
+   */
+  private initializeDomainIndicator(): void {
+    try {
+      // Wait for domain manager to load settings, then show indicator
+      setTimeout(() => {
+        this.showDomainIndicator();
+      }, 200);
+    } catch (error) {
+      console.error('Failed to initialize domain indicator:', error);
+    }
+  }
+
+  /**
+   * Show domain indicator
+   */
+  private showDomainIndicator(): void {
+    try {
+      // Remove existing indicator
+      const existing = document.querySelector('.lightning-domain-indicator');
+      if (existing) {
+        existing.remove();
+      }
+
+      // Show domain status indicator
+      const indicator = this.domainManager.createDomainStatusIndicator();
+      document.body.appendChild(indicator);
+
+      // Auto-hide after 5 seconds unless hovered
+      let hideTimeout = setTimeout(() => {
+        indicator.style.opacity = '0.3';
+      }, 5000);
+
+      indicator.addEventListener('mouseenter', () => {
+        clearTimeout(hideTimeout);
+        indicator.style.opacity = '1';
+      });
+
+      indicator.addEventListener('mouseleave', () => {
+        hideTimeout = setTimeout(() => {
+          indicator.style.opacity = '0.3';
+        }, 2000);
+      });
+    } catch (error) {
+      console.error('Failed to show domain indicator:', error);
+    }
+  }
+
+  /**
+   * Initialize posting detection system
+   */
+  private initializePostingDetection(): void {
+    try {
+      // Check if domain allows auto-appending
+      if (!this.domainManager.shouldAutoAppendTips()) {
+        console.log('Auto-appending disabled for this domain');
+        return;
+      }
+
+      // Set up posting context monitoring
+      this.monitorPostingContexts();
+      
+      console.log('Posting detection system initialized');
+    } catch (error) {
+      console.error('Failed to initialize posting detection:', error);
+    }
+  }
+
+  /**
+   * Monitor for posting contexts
+   */
+  private monitorPostingContexts(): void {
+    // Initial check
+    this.checkForPostingContext();
+
+    // Monitor for new posting contexts
+    const checkInterval = setInterval(() => {
+      this.checkForPostingContext();
+    }, 2000);
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+      clearInterval(checkInterval);
+    });
+  }
+
+  /**
+   * Check for posting context and auto-append if needed
+   */
+  private async checkForPostingContext(): Promise<void> {
+    try {
+      const context = this.postingDetector.detectPostingContext();
+      
+      if (context && context.element) {
+        // Check if we've already processed this element
+        const elementId = this.getElementId(context.element);
+        if (context.element.dataset.lightningProcessed === 'true') {
+          return;
+        }
+
+        // Mark as processed
+        context.element.dataset.lightningProcessed = 'true';
+
+        // Auto-append tip request
+        await this.autoAppendTipRequest(context);
+      }
+    } catch (error) {
+      console.error('Failed to check posting context:', error);
+    }
+  }
+
+  /**
+   * Auto-append tip request to posting context
+   */
+  private async autoAppendTipRequest(context: PostingContext): Promise<void> {
+    try {
+      // Check Facebook group restrictions
+      if (context.platform === 'facebook') {
+        const isAllowed = this.facebookManager.isPostingAllowed();
+        
+        if (!isAllowed) {
+          // Show permission prompt if needed
+          if (this.facebookManager.shouldShowPermissionPrompt()) {
+            const granted = await this.facebookManager.showGroupPermissionPrompt();
+            if (!granted) {
+              console.log('Facebook group posting not allowed');
+              return;
+            }
+          } else {
+            console.log('Facebook group posting not allowed');
+            return;
+          }
+        }
+      }
+
+      // Generate user's tip request string
+      const response = await ExtensionMessaging.generateUserTipRequest();
+      
+      if (!response.success || !response.data) {
+        console.log('No tip request available - wallet not set up or no LNURL configured');
+        this.showSetupPrompt();
+        return;
+      }
+
+      const tipRequest = response.data;
+
+      // Append to the element
+      this.appendTipToElement(context.element, tipRequest);
+
+      console.log(`Auto-appended tip request to ${context.platform} ${context.type}`);
+    } catch (error) {
+      console.error('Failed to auto-append tip request:', error);
+    }
+  }
+
+  /**
+   * Append tip request to element
+   */
+  private appendTipToElement(element: HTMLElement, tipRequest: string): void {
+    try {
+      const currentContent = this.getElementContent(element);
+      
+      // Don't append if tip request already exists
+      if (currentContent.includes('[lntip:')) {
+        return;
+      }
+
+      // Append tip request with newline
+      const newContent = currentContent + (currentContent ? '\n' : '') + tipRequest;
+      this.setElementContent(element, newContent);
+
+      // Show visual feedback
+      this.showAppendFeedback(element);
+    } catch (error) {
+      console.error('Failed to append tip to element:', error);
+    }
+  }
+
+  /**
+   * Get element content (works for both textarea and contenteditable)
+   */
+  private getElementContent(element: HTMLElement): string {
+    if (element.tagName === 'TEXTAREA') {
+      return (element as HTMLTextAreaElement).value;
+    } else if (element.contentEditable === 'true') {
+      return element.textContent || '';
+    }
+    return '';
+  }
+
+  /**
+   * Set element content (works for both textarea and contenteditable)
+   */
+  private setElementContent(element: HTMLElement, content: string): void {
+    if (element.tagName === 'TEXTAREA') {
+      (element as HTMLTextAreaElement).value = content;
+      // Trigger input event
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (element.contentEditable === 'true') {
+      element.textContent = content;
+      // Trigger input event
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
+  /**
+   * Show visual feedback for auto-append
+   */
+  private showAppendFeedback(element: HTMLElement): void {
+    const feedback = document.createElement('div');
+    feedback.style.cssText = `
+      position: absolute;
+      background: #4CAF50;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      z-index: 10000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    `;
+    feedback.textContent = '⚡ Tip request added';
+
+    // Position near the element
+    const rect = element.getBoundingClientRect();
+    feedback.style.top = `${rect.bottom + window.scrollY + 5}px`;
+    feedback.style.left = `${rect.left + window.scrollX}px`;
+
+    document.body.appendChild(feedback);
+
+    // Animate in
+    setTimeout(() => {
+      feedback.style.opacity = '1';
+    }, 10);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+      feedback.style.opacity = '0';
+      setTimeout(() => {
+        feedback.remove();
+      }, 300);
+    }, 2000);
+  }
+
+  /**
+   * Show setup prompt when wallet is not configured
+   */
+  private showSetupPrompt(): void {
+    // Don't show multiple prompts
+    if (document.querySelector('.lightning-setup-prompt')) {
+      return;
+    }
+
+    const prompt = document.createElement('div');
+    prompt.className = 'lightning-setup-prompt';
+    prompt.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #2196F3;
+      color: white;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      z-index: 10000;
+      max-width: 300px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    `;
+
+    prompt.innerHTML = `
+      <div style="display: flex; align-items: center; margin-bottom: 12px;">
+        <span style="font-size: 20px; margin-right: 8px;">⚡</span>
+        <strong>Lightning Tipping Setup</strong>
+        <button class="close-setup" style="margin-left: auto; background: none; border: none; color: white; font-size: 16px; cursor: pointer;">×</button>
+      </div>
+      
+      <div style="margin-bottom: 12px; font-size: 13px; opacity: 0.9;">
+        Set up your wallet to automatically add tip requests to your posts.
+      </div>
+      
+      <div style="display: flex; gap: 8px;">
+        <button class="setup-wallet-btn" style="
+          flex: 1;
+          padding: 8px 12px;
+          border: 1px solid white;
+          border-radius: 4px;
+          background: white;
+          color: #2196F3;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: bold;
+        ">Setup Wallet</button>
+        
+        <button class="maybe-later-btn" style="
+          padding: 8px 12px;
+          border: 1px solid rgba(255,255,255,0.5);
+          border-radius: 4px;
+          background: transparent;
+          color: white;
+          cursor: pointer;
+          font-size: 12px;
+        ">Later</button>
+      </div>
+    `;
+
+    // Add event listeners
+    prompt.querySelector('.close-setup')?.addEventListener('click', () => {
+      prompt.remove();
+    });
+
+    prompt.querySelector('.setup-wallet-btn')?.addEventListener('click', () => {
+      // Open extension popup
+      chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
+      prompt.remove();
+    });
+
+    prompt.querySelector('.maybe-later-btn')?.addEventListener('click', () => {
+      prompt.remove();
+    });
+
+    document.body.appendChild(prompt);
+
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+      if (prompt.parentNode) {
+        prompt.remove();
+      }
+    }, 10000);
+  }
+
+  /**
+   * Get unique element identifier
+   */
+  private getElementId(element: HTMLElement): string {
+    return `${element.tagName}-${element.className}-${element.getBoundingClientRect().top}`;
   }
 
   /**
@@ -524,6 +890,15 @@ class TipDetector {
     try {
       await this.blacklistManager.addToBlacklist(tip.lnurl, 'Blocked by user');
       this.showMessage('LNURL blocked successfully', 'success');
+      
+      // Remove any existing prompts for this LNURL
+      const existingPrompts = document.querySelectorAll('.lightning-tip-prompt');
+      existingPrompts.forEach(prompt => {
+        // Check if this prompt is for the same LNURL (simplified check)
+        if (prompt.textContent?.includes('Lightning Tip Available')) {
+          prompt.remove();
+        }
+      });
     } catch (error) {
       console.error('Failed to block LNURL:', error);
       this.showMessage('Failed to block LNURL', 'error');
@@ -590,6 +965,13 @@ class TipDetector {
 
 // Initialize tip detector when content script loads
 const tipDetector = new TipDetector();
+
+// Debug helper - expose to window for testing
+(window as any).lightningDebug = {
+  getDomainStatus: () => tipDetector.domainManager.getDomainStatus(),
+  getBlacklist: () => tipDetector.blacklistManager.getBlacklistedLnurls(),
+  refreshIndicator: () => tipDetector.domainManager.updateDomainIndicator()
+};
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {

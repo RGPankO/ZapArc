@@ -53,6 +53,9 @@ export interface PostingContext {
   element: HTMLElement;
   platform: string;
   type: 'post' | 'comment' | 'reply';
+  confidence?: number;
+  groupId?: string;
+  subreddit?: string;
 }
 
 // Chrome Storage Schema

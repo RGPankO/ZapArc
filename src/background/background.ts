@@ -146,6 +146,22 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         sendResponse({ success: true });
         break;
 
+      case 'SET_DOMAIN_STATUS':
+        await storageManager.saveDomainSettings(message.domain, message.status);
+        sendResponse({ success: true });
+        break;
+
+      case 'GET_DOMAIN_STATUS':
+        const currentDomainSettings = await storageManager.getDomainSettings();
+        const domainStatus = currentDomainSettings[message.domain] || 'unmanaged';
+        sendResponse({ success: true, status: domainStatus });
+        break;
+
+      case 'GET_ALL_DOMAINS':
+        const allDomainSettings = await storageManager.getDomainSettings();
+        sendResponse({ success: true, domains: allDomainSettings });
+        break;
+
       case 'SAVE_WALLET':
         await storageManager.saveEncryptedWallet(message.walletData, message.pin);
         sendResponse({ success: true });

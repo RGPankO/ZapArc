@@ -362,4 +362,34 @@ export class ExtensionMessaging {
       type: 'CLEAR_BLACKLIST'
     });
   }
+
+  /**
+   * Set domain status
+   */
+  static async setDomainStatus(domain: string, status: string): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'SET_DOMAIN_STATUS',
+      domain,
+      status
+    });
+  }
+
+  /**
+   * Get domain status
+   */
+  static async getDomainStatus(domain: string): Promise<MessageResponse<string>> {
+    return this.sendToBackground({
+      type: 'GET_DOMAIN_STATUS',
+      domain
+    });
+  }
+
+  /**
+   * Get all domain settings
+   */
+  static async getAllDomains(): Promise<MessageResponse<any>> {
+    return this.sendToBackground({
+      type: 'GET_ALL_DOMAINS'
+    });
+  }
 }

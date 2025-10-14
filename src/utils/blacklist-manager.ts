@@ -25,7 +25,14 @@ export class BlacklistManager {
 
   constructor() {
     this.storage = new ChromeStorageManager();
-    this.loadBlacklist();
+    this.initializeBlacklistManager();
+  }
+
+  /**
+   * Initialize blacklist manager
+   */
+  private async initializeBlacklistManager(): Promise<void> {
+    await this.loadBlacklist();
   }
 
   /**
