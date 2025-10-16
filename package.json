@@ -25,7 +25,12 @@
   },
   "dependencies": {
     "@breeztech/breez-sdk-spark": "^0.1.9",
-    "qrcode": "^1.5.4"
+    "bip39": "^3.1.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "process": "^0.11.10",
+    "qrcode": "^1.5.4",
+    "stream-browserify": "^3.0.0"
   },
   "keywords": [
     "lightning-network",

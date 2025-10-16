@@ -2,6 +2,7 @@
 // Handles wallet initialization, payments, and LNURL operations
 
 import { Transaction } from '../types';
+import * as bip39 from 'bip39';
 
 export interface BreezConfig {
   network: 'mainnet' | 'testnet';
@@ -59,23 +60,21 @@ export class BreezSDKWrapper {
 
     try {
       const { connect, defaultConfig } = await import('@breeztech/breez-sdk-spark');
-      
+
       // Configure Breez SDK
       const breezConfig = defaultConfig(config.network);
       if (config.apiKey) {
         breezConfig.apiKey = config.apiKey;
       }
-      
-      // Set up seed
-      const seed = mnemonic ? 
-        { type: 'mnemonic' as const, mnemonic } : 
-        { type: 'random' as const };
 
-      // Connect to Breez SDK
-      this.sdk = await connect({ 
-        config: breezConfig, 
-        seed, 
-        storageDir: 'breez_lightning_data' 
+      // Generate mnemonic if not provided
+      const walletMnemonic = mnemonic || bip39.generateMnemonic();
+
+      // Connect to Breez SDK - mnemonic is a direct string parameter
+      this.sdk = await connect({
+        config: breezConfig,
+        mnemonic: walletMnemonic,  // Direct string parameter, not seed object
+        storageDir: 'breez_lightning_data'
       });
 
       this.isConnected = true;

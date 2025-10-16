@@ -23,6 +23,10 @@ export interface UserSettings {
   useBuiltInWallet: boolean;
   floatingMenuEnabled: boolean;
   autoLockTimeout: number;
+  // Facebook group management settings
+  facebookPostingMode: 'global' | 'selective';
+  allowedFacebookGroups: string[];
+  deniedFacebookGroups: string[];
 }
 
 export interface DomainSettings {

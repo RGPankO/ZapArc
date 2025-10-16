@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
@@ -35,22 +36,27 @@ module.exports = (env, argv) => {
     },
     
     plugins: [
+      new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+        process: 'process/browser'
+      }),
+
       new MiniCssExtractPlugin({
         filename: '[name].css'
       }),
-      
+
       new HtmlWebpackPlugin({
         template: './src/popup/popup.html',
         filename: 'popup.html',
         chunks: ['popup']
       }),
-      
+
       new HtmlWebpackPlugin({
         template: './src/settings/settings.html',
         filename: 'settings.html',
         chunks: ['settings']
       }),
-      
+
       new CopyWebpackPlugin({
         patterns: [
           {
@@ -80,10 +86,10 @@ module.exports = (env, argv) => {
     resolve: {
       extensions: ['.tsx', '.ts', '.js', '.wasm'],
       fallback: {
-        "crypto": false,
-        "stream": false,
-        "util": false,
-        "buffer": false
+        "crypto": require.resolve("crypto-browserify"),
+        "stream": require.resolve("stream-browserify"),
+        "buffer": require.resolve("buffer/"),
+        "process": require.resolve("process/browser")
       }
     }
   };

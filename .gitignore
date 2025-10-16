@@ -44,3 +44,5 @@ coverage/
 # Temporary folders
 tmp/
 temp/
+
+*/settings.local.json
