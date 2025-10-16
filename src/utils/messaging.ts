@@ -63,6 +63,15 @@ export class ExtensionMessaging {
   }
 
   /**
+   * Generate a new mnemonic phrase
+   */
+  static async generateMnemonic(): Promise<MessageResponse<string>> {
+    return this.sendToBackground({
+      type: 'GENERATE_MNEMONIC'
+    });
+  }
+
+  /**
    * Setup new wallet with mnemonic and PIN
    */
   static async setupWallet(mnemonic: string | undefined, pin: string, network: 'mainnet' | 'testnet' = 'mainnet'): Promise<MessageResponse> {
@@ -469,5 +478,98 @@ export class ExtensionMessaging {
     }
     
     return uri;
+  }
+
+  // Facebook Group Management Functions
+
+  /**
+   * Add Facebook group to allowed list
+   */
+  static async addFacebookGroup(groupId: string): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'ADD_FACEBOOK_GROUP',
+      groupId
+    });
+  }
+
+  /**
+   * Remove Facebook group from allowed list
+   */
+  static async removeFacebookGroup(groupId: string): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'REMOVE_FACEBOOK_GROUP',
+      groupId
+    });
+  }
+
+  /**
+   * Get Facebook group settings
+   */
+  static async getFacebookGroupSettings(): Promise<MessageResponse<{
+    postingMode: 'global' | 'selective';
+    allowedGroups: string[];
+    deniedGroups: string[];
+  }>> {
+    return this.sendToBackground({
+      type: 'GET_FACEBOOK_GROUP_SETTINGS'
+    });
+  }
+
+  /**
+   * Set Facebook posting mode
+   */
+  static async setFacebookPostingMode(mode: 'global' | 'selective'): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'SET_FACEBOOK_POSTING_MODE',
+      mode
+    });
+  }
+
+  /**
+   * Check if Facebook group is allowed for posting
+   */
+  static async isFacebookGroupAllowed(groupId: string): Promise<MessageResponse<boolean>> {
+    return this.sendToBackground({
+      type: 'IS_FACEBOOK_GROUP_ALLOWED',
+      groupId
+    });
+  }
+
+  /**
+   * Add Facebook group to denied list (when user clicks "No" on prompt)
+   */
+  static async denyFacebookGroup(groupId: string): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'DENY_FACEBOOK_GROUP',
+      groupId
+    });
+  }
+
+  /**
+   * Clear all Facebook groups (both allowed and denied)
+   */
+  static async clearAllFacebookGroups(): Promise<MessageResponse> {
+    return this.sendToBackground({
+      type: 'CLEAR_ALL_FACEBOOK_GROUPS'
+    });
+  }
+
+  /**
+   * Detect Facebook group ID from current page
+   */
+  static async detectFacebookGroupId(): Promise<MessageResponse<string | null>> {
+    return this.sendToBackground({
+      type: 'DETECT_FACEBOOK_GROUP_ID'
+    });
+  }
+
+  /**
+   * Show Facebook group prompt for new group
+   */
+  static async showFacebookGroupPrompt(groupId: string): Promise<MessageResponse<'allow' | 'deny' | 'cancel'>> {
+    return this.sendToBackground({
+      type: 'SHOW_FACEBOOK_GROUP_PROMPT',
+      groupId
+    });
   }
 }

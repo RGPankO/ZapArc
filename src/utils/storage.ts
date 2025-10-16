@@ -11,27 +11,59 @@ export class ChromeStorageManager {
    * Encrypt and save wallet data using user PIN
    */
   async saveEncryptedWallet(data: WalletData, pin: string): Promise<void> {
+    console.log('🔵 [Storage] SAVE_ENCRYPTED_WALLET ENTRY', {
+      timestamp: new Date().toISOString(),
+      pinLength: pin.length,
+      dataKeys: Object.keys(data),
+      hasMnemonic: !!data.mnemonic,
+      mnemonicWordCount: data.mnemonic ? data.mnemonic.split(' ').length : 0
+    });
+
     try {
       const key = await this.deriveKey(pin);
+      console.log('🔍 [Storage] Encryption key derived successfully');
+
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const encodedData = new TextEncoder().encode(JSON.stringify(data));
-      
+      console.log('🔍 [Storage] Data encoded', {
+        encodedSize: encodedData.length,
+        ivLength: iv.length
+      });
+
       const encrypted = await crypto.subtle.encrypt(
         { name: 'AES-GCM', iv },
         key,
         encodedData
       );
+      console.log('🔍 [Storage] Data encrypted', {
+        encryptedSize: encrypted.byteLength
+      });
 
       const encryptedData = {
         data: Array.from(new Uint8Array(encrypted)),
         iv: Array.from(iv)
       };
 
-      await chrome.storage.local.set({ 
-        encryptedWallet: JSON.stringify(encryptedData) 
+      await chrome.storage.local.set({
+        encryptedWallet: JSON.stringify(encryptedData)
+      });
+      console.log('✅ [Storage] SAVE_ENCRYPTED_WALLET SUCCESS', {
+        timestamp: new Date().toISOString(),
+        savedDataSize: JSON.stringify(encryptedData).length
+      });
+
+      // Verify immediately that it was saved
+      const verification = await chrome.storage.local.get(['encryptedWallet']);
+      console.log('🔍 [Storage] Save verification', {
+        walletExists: !!verification.encryptedWallet,
+        savedSize: verification.encryptedWallet?.length
       });
     } catch (error) {
-      console.error('Failed to save encrypted wallet:', error);
+      console.error('❌ [Storage] SAVE_ENCRYPTED_WALLET FAILED', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      });
       throw new Error('Wallet encryption failed');
     }
   }
@@ -40,25 +72,61 @@ export class ChromeStorageManager {
    * Load and decrypt wallet data using user PIN
    */
   async loadEncryptedWallet(pin: string): Promise<WalletData | null> {
+    console.log('🔵 [Storage] LOAD_ENCRYPTED_WALLET ENTRY', {
+      timestamp: new Date().toISOString(),
+      pinLength: pin.length
+    });
+
     try {
       const result = await chrome.storage.local.get(['encryptedWallet']);
+      console.log('🔍 [Storage] Retrieved from storage', {
+        walletExists: !!result.encryptedWallet,
+        storageSize: result.encryptedWallet?.length
+      });
+
       if (!result.encryptedWallet) {
+        console.warn('⚠️ [Storage] No encrypted wallet found in storage');
         return null;
       }
 
       const encryptedData = JSON.parse(result.encryptedWallet);
+      console.log('🔍 [Storage] Parsed encrypted data', {
+        hasData: !!encryptedData.data,
+        hasIv: !!encryptedData.iv,
+        dataLength: encryptedData.data?.length,
+        ivLength: encryptedData.iv?.length
+      });
+
       const key = await this.deriveKey(pin);
+      console.log('🔍 [Storage] Decryption key derived successfully');
 
       const decrypted = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: new Uint8Array(encryptedData.iv) },
         key,
         new Uint8Array(encryptedData.data)
       );
+      console.log('🔍 [Storage] Data decrypted', {
+        decryptedSize: decrypted.byteLength
+      });
 
       const decoder = new TextDecoder();
-      return JSON.parse(decoder.decode(decrypted));
+      const walletData = JSON.parse(decoder.decode(decrypted));
+      console.log('✅ [Storage] LOAD_ENCRYPTED_WALLET SUCCESS', {
+        timestamp: new Date().toISOString(),
+        hasMnemonic: !!walletData.mnemonic,
+        mnemonicWordCount: walletData.mnemonic ? walletData.mnemonic.split(' ').length : 0,
+        balance: walletData.balance
+      });
+
+      return walletData;
     } catch (error) {
-      console.error('Failed to load encrypted wallet:', error);
+      console.error('❌ [Storage] LOAD_ENCRYPTED_WALLET FAILED', {
+        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : undefined,
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        likelyPinMismatch: error instanceof Error && error.name === 'OperationError'
+      });
       return null;
     }
   }
@@ -137,7 +205,10 @@ export class ChromeStorageManager {
           useBuiltInWallet: result.userSettings.useBuiltInWallet !== undefined ? result.userSettings.useBuiltInWallet : defaults.useBuiltInWallet,
           floatingMenuEnabled: result.userSettings.floatingMenuEnabled !== undefined ? result.userSettings.floatingMenuEnabled : defaults.floatingMenuEnabled,
           autoLockTimeout: result.userSettings.autoLockTimeout !== undefined ? result.userSettings.autoLockTimeout : defaults.autoLockTimeout,
-          customLNURL: result.userSettings.customLNURL !== undefined ? result.userSettings.customLNURL : defaults.customLNURL
+          customLNURL: result.userSettings.customLNURL !== undefined ? result.userSettings.customLNURL : defaults.customLNURL,
+          facebookPostingMode: result.userSettings.facebookPostingMode || defaults.facebookPostingMode,
+          allowedFacebookGroups: result.userSettings.allowedFacebookGroups || defaults.allowedFacebookGroups,
+          deniedFacebookGroups: result.userSettings.deniedFacebookGroups || defaults.deniedFacebookGroups
         };
         return merged;
       }
@@ -278,7 +349,10 @@ export class ChromeStorageManager {
       useBuiltInWallet: true,
       floatingMenuEnabled: true,
       autoLockTimeout: 900, // 15 minutes
-      customLNURL: undefined
+      customLNURL: undefined,
+      facebookPostingMode: 'global',
+      allowedFacebookGroups: [],
+      deniedFacebookGroups: []
     };
   }
 }

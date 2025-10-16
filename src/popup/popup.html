@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
+    <div id="notification-container"></div>
     <div id="app">
         <!-- Onboarding Wizard (hidden by default) -->
         <div id="onboarding-wizard" class="hidden">
@@ -34,6 +35,47 @@
                 <div class="wizard-actions">
                     <button id="start-setup-btn" class="btn-primary">Set Up Wallet</button>
                     <button id="skip-setup-btn" class="btn-secondary">Skip Setup</button>
+                </div>
+            </div>
+
+            <!-- New: Choose wallet setup type -->
+            <div class="wizard-step hidden" id="setup-choice-step">
+                <div class="wizard-header">
+                    <h2>Set Up Your Wallet</h2>
+                    <p>Choose how you want to set up your wallet</p>
+                </div>
+                <div class="wizard-content">
+                    <div class="choice-buttons">
+                        <button id="create-new-wallet-btn" class="choice-btn">
+                            <span class="choice-icon">✨</span>
+                            <span class="choice-title">Create New Wallet</span>
+                            <span class="choice-description">Generate a new 12-word recovery phrase</span>
+                        </button>
+                        <button id="import-wallet-btn" class="choice-btn">
+                            <span class="choice-icon">📥</span>
+                            <span class="choice-title">Import Existing Wallet</span>
+                            <span class="choice-description">Enter your 12-word recovery phrase</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="wizard-actions">
+                    <button id="choice-back-btn" class="btn-secondary">Back</button>
+                </div>
+            </div>
+
+            <!-- New: Import wallet step -->
+            <div class="wizard-step hidden" id="import-wallet-step">
+                <div class="wizard-header">
+                    <h2>Import Wallet</h2>
+                    <p>Enter your 12-word recovery phrase</p>
+                </div>
+                <div class="wizard-content">
+                    <div id="import-words-container" class="import-words-grid"></div>
+                    <div id="word-suggestions" class="word-suggestions"></div>
+                </div>
+                <div class="wizard-actions">
+                    <button id="import-back-btn" class="btn-secondary">Back</button>
+                    <button id="import-confirm-btn" class="btn-primary" disabled>Continue</button>
                 </div>
             </div>
 
@@ -107,7 +149,7 @@
         </div>
 
         <!-- Main Wallet Interface -->
-        <div id="main-interface">
+        <div id="main-interface" class="hidden">
             <header>
                 <h1>Lightning Tipping</h1>
                 <button id="refresh-btn" class="refresh-btn" title="Refresh Balance">🔄</button>
@@ -159,6 +201,7 @@
                     <button id="unlock-btn" class="btn-primary">Unlock</button>
                 </div>
                 <div id="unlock-error" class="error-message hidden"></div>
+                <a href="#" id="forgot-pin-link" style="display: block; text-align: center; margin-top: 12px; font-size: 12px; color: #666; text-decoration: underline; cursor: pointer;">Forgot PIN?</a>
             </div>
         </div>
 
