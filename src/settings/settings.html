@@ -72,6 +72,51 @@
                 </div>
             </section>
             
+            <section id="facebook-settings">
+                <h2>Facebook Group Management</h2>
+                <div class="setting-group">
+                    <h3>Posting Mode</h3>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 12px;">
+                        Control how tip requests are added to Facebook posts and comments.
+                    </div>
+                    
+                    <label>
+                        <input type="radio" id="facebook-global" name="facebook-mode" value="global" checked>
+                        Global Facebook Posting
+                    </label>
+                    <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 12px;">
+                        Enable tip request appending on all Facebook groups and pages.
+                    </div>
+                    
+                    <label>
+                        <input type="radio" id="facebook-selective" name="facebook-mode" value="selective">
+                        Selective Group Posting
+                    </label>
+                    <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 12px;">
+                        Only enable tip request appending in specific Facebook groups that you choose.
+                    </div>
+                </div>
+                
+                <div class="setting-group" id="facebook-group-management" style="display: none;">
+                    <h3>Allowed Facebook Groups</h3>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 12px;">
+                        Manage which Facebook groups allow tip request appending. Groups are automatically detected when you visit them, or you can add them manually.
+                    </div>
+                    
+                    <div class="facebook-group-input">
+                        <input type="text" id="facebook-group-id" placeholder="Enter Facebook group ID or URL" style="flex: 1; margin-right: 8px;">
+                        <button type="button" id="add-facebook-group">Add Group</button>
+                    </div>
+                    <div style="font-size: 11px; color: #999; margin-top: 4px;">
+                        You can enter a group ID (numbers only) or paste a Facebook group URL like facebook.com/groups/123456789
+                    </div>
+                    
+                    <div id="facebook-groups-list" class="facebook-groups-container">
+                        <!-- Groups will be populated here -->
+                    </div>
+                </div>
+            </section>
+            
             <section id="ui-settings">
                 <h2>Interface Settings</h2>
                 <div class="setting-group">

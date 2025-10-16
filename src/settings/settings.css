@@ -244,3 +244,169 @@ section h2 {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* Facebook Group Management Styles */
+.facebook-group-input {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.facebook-group-input input {
+    flex: 1;
+    margin-right: 8px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.facebook-group-input button {
+    padding: 8px 16px;
+    background: #1877f2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.facebook-group-input button:hover {
+    background: #166fe5;
+}
+
+.facebook-group-input button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.facebook-groups-container {
+    margin-top: 16px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.facebook-group-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+    background: white;
+}
+
+.facebook-group-item:last-child {
+    border-bottom: none;
+}
+
+.facebook-group-item:hover {
+    background: #f8f9fa;
+}
+
+.facebook-group-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.facebook-group-id {
+    font-family: monospace;
+    font-size: 13px;
+    color: #333;
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.facebook-group-url {
+    font-size: 11px;
+    color: #666;
+    word-break: break-all;
+}
+
+.facebook-group-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 12px;
+}
+
+.facebook-group-actions button {
+    padding: 4px 8px;
+    font-size: 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.remove-group-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.remove-group-btn:hover {
+    background: #c82333;
+}
+
+.facebook-groups-empty {
+    padding: 24px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+}
+
+.facebook-groups-empty .empty-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+
+/* Facebook group validation states */
+.facebook-group-input input.error {
+    border-color: #f44336;
+    background-color: #ffebee;
+}
+
+.facebook-group-input input.success {
+    border-color: #4CAF50;
+    background-color: #f1f8e9;
+}
+
+/* Group counter */
+.facebook-groups-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.facebook-groups-count {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* Bulk actions */
+.facebook-bulk-actions {
+    padding: 8px 16px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.facebook-bulk-actions button {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    background: #6c757d;
+    color: white;
+}
+
+.facebook-bulk-actions button:hover {
+    background: #5a6268;
+}

@@ -1,5 +1,6 @@
 // Settings page for Lightning Network Tipping Extension
 
+import './settings.css';
 import { UserSettings } from '../types';
 import { ExtensionMessaging } from '../utils/messaging';
 
@@ -39,7 +40,10 @@ function getDefaultSettings(): UserSettings {
         useBuiltInWallet: true,
         floatingMenuEnabled: true,
         autoLockTimeout: 900,
-        customLNURL: undefined
+        customLNURL: undefined,
+        facebookPostingMode: 'global',
+        allowedFacebookGroups: [],
+        deniedFacebookGroups: []
     };
 }
 
@@ -71,9 +75,174 @@ function populateForm(): void {
     (document.getElementById('tip-amount-2') as HTMLInputElement).value = currentSettings.defaultTippingAmounts[1].toString();
     (document.getElementById('tip-amount-3') as HTMLInputElement).value = currentSettings.defaultTippingAmounts[2].toString();
     
+    // Facebook settings
+    const globalRadio = document.getElementById('facebook-global') as HTMLInputElement;
+    const selectiveRadio = document.getElementById('facebook-selective') as HTMLInputElement;
+    
+    if (currentSettings.facebookPostingMode === 'global') {
+        globalRadio.checked = true;
+    } else {
+        selectiveRadio.checked = true;
+    }
+    
+    updateFacebookGroupManagementVisibility();
+    populateFacebookGroupsList();
+    
     // UI settings
     (document.getElementById('floating-menu-enabled') as HTMLInputElement).checked = currentSettings.floatingMenuEnabled;
     (document.getElementById('autolock-timeout') as HTMLSelectElement).value = currentSettings.autoLockTimeout.toString();
+}
+
+function updateFacebookGroupManagementVisibility(): void {
+    const selectiveRadio = document.getElementById('facebook-selective') as HTMLInputElement;
+    const groupManagement = document.getElementById('facebook-group-management') as HTMLElement;
+    
+    if (selectiveRadio.checked) {
+        groupManagement.style.display = 'block';
+    } else {
+        groupManagement.style.display = 'none';
+    }
+}
+
+function populateFacebookGroupsList(): void {
+    const container = document.getElementById('facebook-groups-list') as HTMLElement;
+    const groups = currentSettings.allowedFacebookGroups || [];
+    
+    if (groups.length === 0) {
+        container.innerHTML = `
+            <div class="facebook-groups-empty">
+                <div class="empty-icon">👥</div>
+                <div>No Facebook groups configured</div>
+                <div style="font-size: 11px; margin-top: 4px;">Add groups manually or visit Facebook groups to be prompted automatically</div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Add header with count and bulk actions
+    const headerHtml = `
+        <div class="facebook-bulk-actions">
+            <span class="facebook-groups-count">${groups.length} group${groups.length !== 1 ? 's' : ''} configured</span>
+            <button type="button" id="clear-all-groups">Clear All</button>
+        </div>
+    `;
+    
+    const groupsHtml = groups.map(groupId => `
+        <div class="facebook-group-item" data-group-id="${groupId}">
+            <div class="facebook-group-info">
+                <div class="facebook-group-id">${groupId}</div>
+                <div class="facebook-group-url">facebook.com/groups/${groupId}</div>
+            </div>
+            <div class="facebook-group-actions">
+                <button type="button" class="remove-group-btn" data-group-id="${groupId}">Remove</button>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = headerHtml + groupsHtml;
+    
+    // Add event listeners for remove buttons
+    container.querySelectorAll('.remove-group-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const groupId = (e.target as HTMLElement).getAttribute('data-group-id');
+            if (groupId) {
+                removeFacebookGroup(groupId);
+            }
+        });
+    });
+    
+    // Add event listener for clear all button
+    const clearAllBtn = container.querySelector('#clear-all-groups');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', clearAllFacebookGroups);
+    }
+}
+
+function addFacebookGroup(): void {
+    const input = document.getElementById('facebook-group-id') as HTMLInputElement;
+    const value = input.value.trim();
+    
+    if (!value) {
+        showFieldError('facebook-group-id', 'Please enter a Facebook group ID or URL');
+        return;
+    }
+    
+    const groupId = extractFacebookGroupId(value);
+    if (!groupId) {
+        showFieldError('facebook-group-id', 'Invalid Facebook group ID or URL format');
+        return;
+    }
+    
+    // Check if group already exists
+    if (currentSettings.allowedFacebookGroups.includes(groupId)) {
+        showFieldError('facebook-group-id', 'This group is already in your list');
+        return;
+    }
+    
+    // Add group to settings
+    currentSettings.allowedFacebookGroups.push(groupId);
+    
+    // Clear input and refresh list
+    input.value = '';
+    input.classList.remove('error', 'success');
+    populateFacebookGroupsList();
+    
+    // Show success feedback
+    input.classList.add('success');
+    setTimeout(() => {
+        input.classList.remove('success');
+    }, 2000);
+    
+    showSuccess(`Facebook group ${groupId} added successfully`);
+}
+
+function removeFacebookGroup(groupId: string): void {
+    const index = currentSettings.allowedFacebookGroups.indexOf(groupId);
+    if (index > -1) {
+        currentSettings.allowedFacebookGroups.splice(index, 1);
+        populateFacebookGroupsList();
+        showSuccess(`Facebook group ${groupId} removed`);
+    }
+}
+
+function clearAllFacebookGroups(): void {
+    if (confirm('Remove all Facebook groups from the allowed list?')) {
+        currentSettings.allowedFacebookGroups = [];
+        populateFacebookGroupsList();
+        showSuccess('All Facebook groups cleared');
+    }
+}
+
+function extractFacebookGroupId(input: string): string | null {
+    // Remove whitespace
+    const trimmed = input.trim();
+    
+    // If it's just numbers, assume it's a group ID
+    if (/^\d+$/.test(trimmed)) {
+        return trimmed;
+    }
+    
+    // Try to extract from Facebook URL patterns
+    const urlPatterns = [
+        /facebook\.com\/groups\/(\d+)/i,
+        /fb\.com\/groups\/(\d+)/i,
+        /m\.facebook\.com\/groups\/(\d+)/i,
+        /www\.facebook\.com\/groups\/(\d+)/i
+    ];
+    
+    for (const pattern of urlPatterns) {
+        const match = trimmed.match(pattern);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    
+    return null;
+}
+
+function validateFacebookGroupId(groupId: string): boolean {
+    // Facebook group IDs are typically 15-16 digit numbers
+    return /^\d{10,20}$/.test(groupId);
 }
 
 function setupEventListeners(): void {
@@ -139,6 +308,47 @@ function setupEventListeners(): void {
     // Help button
     const helpBtn = document.getElementById('help-button') as HTMLButtonElement;
     helpBtn.addEventListener('click', showSettingsHelp);
+    
+    // Facebook group management
+    const globalRadio = document.getElementById('facebook-global') as HTMLInputElement;
+    const selectiveRadio = document.getElementById('facebook-selective') as HTMLInputElement;
+    const addGroupBtn = document.getElementById('add-facebook-group') as HTMLButtonElement;
+    const groupIdInput = document.getElementById('facebook-group-id') as HTMLInputElement;
+    
+    globalRadio.addEventListener('change', updateFacebookGroupManagementVisibility);
+    selectiveRadio.addEventListener('change', updateFacebookGroupManagementVisibility);
+    
+    addGroupBtn.addEventListener('click', addFacebookGroup);
+    
+    groupIdInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addFacebookGroup();
+        }
+    });
+    
+    groupIdInput.addEventListener('input', () => {
+        const value = groupIdInput.value.trim();
+        groupIdInput.classList.remove('error', 'success');
+        
+        if (value) {
+            const groupId = extractFacebookGroupId(value);
+            if (groupId && validateFacebookGroupId(groupId)) {
+                if (!currentSettings.allowedFacebookGroups.includes(groupId)) {
+                    groupIdInput.classList.add('success');
+                    groupIdInput.title = `Valid group ID: ${groupId}`;
+                } else {
+                    groupIdInput.classList.add('error');
+                    groupIdInput.title = 'This group is already in your list';
+                }
+            } else if (value.length > 5) {
+                groupIdInput.classList.add('error');
+                groupIdInput.title = 'Invalid Facebook group ID or URL format';
+            }
+        } else {
+            groupIdInput.title = '';
+        }
+    });
     
     // Auto-save on certain changes (optional)
     const autoSaveElements = [
@@ -240,6 +450,9 @@ async function saveSettings(): Promise<void> {
             return;
         }
         
+        // Get Facebook settings
+        const facebookGlobalRadio = document.getElementById('facebook-global') as HTMLInputElement;
+        
         // Collect settings
         const newSettings: UserSettings = {
             useBuiltInWallet: builtinRadio.checked,
@@ -247,7 +460,10 @@ async function saveSettings(): Promise<void> {
             defaultPostingAmounts: postingAmounts.amounts!,
             defaultTippingAmounts: tippingAmounts.amounts!,
             floatingMenuEnabled: (document.getElementById('floating-menu-enabled') as HTMLInputElement).checked,
-            autoLockTimeout: autoLockTimeout.timeout!
+            autoLockTimeout: autoLockTimeout.timeout!,
+            facebookPostingMode: facebookGlobalRadio.checked ? 'global' : 'selective',
+            allowedFacebookGroups: [...currentSettings.allowedFacebookGroups],
+            deniedFacebookGroups: [...currentSettings.deniedFacebookGroups]
         };
         
         // Save settings
