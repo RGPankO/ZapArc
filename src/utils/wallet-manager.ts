@@ -1,6 +1,7 @@
 // Wallet Manager - High-level wallet operations and state management
 // Combines Breez SDK operations with local storage and state management
 
+import * as bip39 from 'bip39';
 import { BreezSDKWrapper, BreezConfig } from './breez-sdk';
 import { ChromeStorageManager } from './storage';
 import { WalletData, Transaction, UserSettings } from '../types';
@@ -18,6 +19,7 @@ export interface WalletSetupOptions {
   mnemonic?: string;
   pin: string;
   network?: 'mainnet' | 'testnet';
+  apiKey?: string;
 }
 
 export class WalletManager {
@@ -36,47 +38,88 @@ export class WalletManager {
   }
 
   /**
-   * Initialize wallet with setup options (Basic version without Breez SDK)
+   * Initialize wallet with setup options and connect Breez SDK
    */
   async setupWallet(options: WalletSetupOptions): Promise<void> {
     try {
-      console.log('WalletManager: Starting basic wallet setup (no Breez SDK)');
-      
+      console.log('WalletManager: Starting wallet setup with Breez SDK');
+
       // Get user settings
       const settings = await this.storage.getUserSettings();
       console.log('WalletManager: Got user settings:', settings);
 
-      // Generate a basic mnemonic if none provided
-      const mnemonic = options.mnemonic || this.generateBasicMnemonic();
+      // Generate a proper BIP39 mnemonic if none provided
+      const mnemonic = options.mnemonic || this.generateMnemonic();
       console.log('WalletManager: Using mnemonic (length):', mnemonic.split(' ').length);
 
-      // Create basic wallet data
+      // Validate mnemonic
+      if (!bip39.validateMnemonic(mnemonic)) {
+        throw new Error('Invalid mnemonic phrase');
+      }
+
+      // Initialize Breez SDK
+      console.log('WalletManager: Initializing Breez SDK...');
+      await this.breezSDK.initializeSDK();
+      console.log('WalletManager: Breez SDK initialized');
+
+      // Prepare Breez SDK configuration
+      const breezConfig: BreezConfig = {
+        network: options.network || 'mainnet',
+        apiKey: options.apiKey || undefined
+      };
+
+      // Connect wallet with mnemonic
+      console.log('WalletManager: Connecting wallet to Breez SDK...');
+      await this.breezSDK.connectWallet(mnemonic, breezConfig);
+      console.log('WalletManager: Wallet connected to Breez SDK');
+
+      // Get real balance from Breez SDK
+      let balance = 0;
+      try {
+        balance = await this.breezSDK.getBalance();
+        console.log('WalletManager: Retrieved balance:', balance, 'sats');
+      } catch (balanceError) {
+        console.warn('WalletManager: Could not retrieve balance (new wallet):', balanceError);
+        // This is expected for new wallets - balance will be 0
+      }
+
+      // Generate LNURL for receiving payments
+      let lnurl: string | undefined = undefined;
+      try {
+        lnurl = await this.breezSDK.receiveLnurlPay();
+        console.log('WalletManager: Generated receive LNURL:', lnurl);
+      } catch (lnurlError) {
+        console.warn('WalletManager: Could not generate LNURL (new wallet):', lnurlError);
+        // This may fail for new wallets without channels
+      }
+
+      // Create wallet data with real values from Breez SDK
       const walletData: WalletData = {
         mnemonic: mnemonic,
-        balance: 0, // Start with 0 balance
-        lnurl: undefined, // Will be set later when Breez SDK is working
+        balance: balance,
+        lnurl: lnurl,
         customLNURL: settings.customLNURL,
         transactions: []
       };
 
       console.log('WalletManager: Saving encrypted wallet data with PIN');
-      
+
       // Save encrypted wallet data
       await this.storage.saveEncryptedWallet(walletData, options.pin);
       console.log('WalletManager: Wallet data encrypted and saved');
-      
+
       await this.storage.unlockWallet();
       console.log('WalletManager: Wallet unlocked');
 
-      // Update status for basic functionality
+      // Update status with real connection info
       this.walletStatus = {
-        isConnected: false, // Breez SDK not connected yet
+        isConnected: true,
         isUnlocked: true,
-        balance: 0,
+        balance: balance,
         lastSync: Date.now()
       };
 
-      console.log('WalletManager: Basic wallet setup completed successfully');
+      console.log('WalletManager: Wallet setup completed successfully with Breez SDK connected');
     } catch (error) {
       console.error('WalletManager: Wallet setup failed:', error);
       throw new Error(`Wallet setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -84,27 +127,16 @@ export class WalletManager {
   }
 
   /**
-   * Generate a basic mnemonic for testing (12 words)
+   * Generate a proper BIP39 mnemonic (12 words)
    */
-  private generateBasicMnemonic(): string {
-    const words = [
-      'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract',
-      'absurd', 'abuse', 'access', 'accident', 'account', 'accuse', 'achieve', 'acid'
-    ];
-    
-    // Generate 12 random words for a basic mnemonic
-    const mnemonic = [];
-    for (let i = 0; i < 12; i++) {
-      mnemonic.push(words[Math.floor(Math.random() * words.length)]);
-    }
-    
-    return mnemonic.join(' ');
+  private generateMnemonic(): string {
+    return bip39.generateMnemonic();
   }
 
   /**
-   * Unlock existing wallet with PIN
+   * Unlock existing wallet with PIN and optional API key
    */
-  async unlockWallet(pin: string): Promise<void> {
+  async unlockWallet(pin: string, apiKey?: string): Promise<void> {
     try {
       // Load encrypted wallet data
       const walletData = await this.storage.loadEncryptedWallet(pin);
@@ -114,7 +146,11 @@ export class WalletManager {
 
       // Connect to Breez SDK with stored mnemonic
       if (walletData.mnemonic) {
-        await this.breezSDK.connectWallet(walletData.mnemonic);
+        const breezConfig: BreezConfig = {
+          network: 'mainnet',
+          apiKey: apiKey
+        };
+        await this.breezSDK.connectWallet(walletData.mnemonic, breezConfig);
       } else {
         throw new Error('No mnemonic found in wallet data');
       }

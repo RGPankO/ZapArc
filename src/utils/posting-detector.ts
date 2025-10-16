@@ -54,7 +54,12 @@ export class PostingDetector {
       // Fall back to heuristic detection
       const heuristicContext = this.detectHeuristic();
       if (heuristicContext) {
-        console.log('Detected posting context via heuristics:', heuristicContext);
+        // Only log once per element to avoid spam
+        const element = heuristicContext.element as any;
+        if (!element._postingDetectionLogged) {
+          console.log('Detected posting context via heuristics:', heuristicContext);
+          element._postingDetectionLogged = true;
+        }
         return heuristicContext;
       }
 

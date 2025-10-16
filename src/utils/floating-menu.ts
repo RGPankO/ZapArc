@@ -13,13 +13,18 @@ interface FloatingMenuOptions {
 class FloatingMenu {
   private static readonly MENU_ID = 'lightning-floating-menu';
   private static readonly STORAGE_KEY = 'floatingMenuState';
-  
+
   private menuElement: HTMLElement | null = null;
   private isDragging = false;
   private dragOffset = { x: 0, y: 0 };
   private isMinimized = false;
   private domainManager: DomainManager;
   private currentPosition = { x: 20, y: 20 }; // Will be updated in loadState()
+
+  // Blacklist caching
+  private cachedBlacklist: string[] = [];
+  private lastBlacklistFetch: number = 0;
+  private readonly BLACKLIST_CACHE_TTL = 60000; // 1 minute cache
 
   constructor() {
     console.log('🔵 [FloatingMenu] CONSTRUCTOR ENTRY', {
@@ -112,31 +117,33 @@ class FloatingMenu {
    * Initialize blacklist detection
    */
   private initializeBlacklistDetection(): void {
-    // Scan for blocked tips periodically
-    const scanForBlocked = async () => {
+    // Initial scan only - no continuous polling
+    setTimeout(async () => {
       try {
         const blockedTips = await this.scanForBlockedTips();
         this.updateBlacklistIndicator(blockedTips.length);
       } catch (error) {
         console.error('Failed to scan for blocked tips:', error);
       }
-    };
+    }, 1000);
 
-    // Initial scan
-    setTimeout(scanForBlocked, 1000);
+    // Remove setInterval - no continuous polling needed
+    // Remove MutationObserver - too aggressive, causes spam
+  }
 
-    // Periodic scanning
-    setInterval(scanForBlocked, 5000);
-
-    // Scan when DOM changes
-    const observer = new MutationObserver(() => {
-      setTimeout(scanForBlocked, 500);
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+  /**
+   * Get blacklist with caching (1 minute TTL)
+   */
+  private async getBlacklistCached(): Promise<string[]> {
+    const now = Date.now();
+    if (this.cachedBlacklist.length === 0 || (now - this.lastBlacklistFetch) > this.BLACKLIST_CACHE_TTL) {
+      const response = await ExtensionMessaging.getBlacklist();
+      if (response.success) {
+        this.cachedBlacklist = response.data?.lnurls || [];
+        this.lastBlacklistFetch = now;
+      }
+    }
+    return this.cachedBlacklist;
   }
 
   /**
@@ -1519,6 +1526,9 @@ class FloatingMenu {
         if (lnurl) {
           try {
             await ExtensionMessaging.removeFromBlacklist(lnurl);
+            // Refresh blacklist after unblocking
+            this.cachedBlacklist = [];
+            await this.getBlacklistCached();
             this.showToast('LNURL unblocked', 'success');
             backdrop.remove();
             modal.remove();
@@ -1536,6 +1546,9 @@ class FloatingMenu {
     modal.querySelector('.clear-all-btn')?.addEventListener('click', async () => {
       try {
         await ExtensionMessaging.clearBlacklist();
+        // Refresh blacklist after clearing
+        this.cachedBlacklist = [];
+        await this.getBlacklistCached();
         this.showToast('Blacklist cleared', 'success');
         backdrop.remove();
         modal.remove();
@@ -1565,12 +1578,7 @@ class FloatingMenu {
    */
   private async scanForBlockedTips(): Promise<string[]> {
     try {
-      const blacklistResponse = await ExtensionMessaging.getBlacklist();
-      if (!blacklistResponse.success) {
-        return [];
-      }
-
-      const blacklistedLnurls = blacklistResponse.data?.lnurls || [];
+      const blacklistedLnurls = await this.getBlacklistCached();
       const blockedTips: string[] = [];
 
       // Scan text content for tip requests
@@ -1720,6 +1728,9 @@ class FloatingMenu {
         if (lnurl) {
           try {
             await ExtensionMessaging.removeFromBlacklist(lnurl);
+            // Refresh blacklist after unblocking
+            this.cachedBlacklist = [];
+            await this.getBlacklistCached();
             this.showToast('LNURL unblocked - page will refresh', 'success');
             backdrop.remove();
             modal.remove();

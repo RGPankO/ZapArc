@@ -645,7 +645,11 @@ class TipDetector {
         defaultPostingAmounts: [100, 500, 1000] as [number, number, number],
         useBuiltInWallet: true,
         floatingMenuEnabled: true,
-        autoLockTimeout: 900
+        autoLockTimeout: 900,
+        customLNURL: undefined,
+        facebookPostingMode: 'global' as const,
+        allowedFacebookGroups: [],
+        deniedFacebookGroups: []
       };
 
       // Create enhanced tip prompt
