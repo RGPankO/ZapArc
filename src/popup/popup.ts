@@ -179,16 +179,30 @@ async function initializePopup() {
         isWalletUnlocked = isUnlockedInStorage;
 
         if (isWalletUnlocked) {
-            // Check if wallet is connected
-            const connectedResponse = await ExtensionMessaging.isWalletConnected();
-            const isConnected = connectedResponse.success && connectedResponse.data;
+            console.log('✅ [Popup Init] Wallet already unlocked - proceeding to restore UI and load data');
 
-            if (isConnected) {
-                await loadWalletData();
+            // Hide unlock interface if visible
+            const unlockInterface = document.getElementById('unlock-interface');
+            if (unlockInterface) {
+                unlockInterface.classList.add('hidden');
+                console.log('🔍 [Popup Init] Hidden unlock interface');
             } else {
-                // Wallet exists and is unlocked but not connected, try to reconnect
-                showWalletReconnectPrompt();
+                console.log('⚠️ [Popup Init] unlock-interface element not found');
             }
+
+            // Show main interface (this will make wallet UI visible)
+            restoreMainInterface();
+            console.log('🔍 [Popup Init] Restored main interface');
+
+            // Now load wallet data and connect SDK
+            // Note: We need the mnemonic to connect SDK, which requires the PIN to decrypt
+            // Since wallet is already unlocked, we need to show a quick unlock to get mnemonic
+            // OR store mnemonic in session when first unlocked
+            // For now, we'll fetch balance from cached value and prompt SDK connection when needed
+            console.log('🔍 [Popup Init] Loading cached wallet data...');
+            await loadWalletData(); // This will load cached balance
+            await loadTransactionHistory(); // This will try to load transactions (may need SDK)
+            console.log('✅ [Popup Init] Wallet data loaded');
         } else {
             // Wallet exists but is locked, show unlock prompt
             showUnlockPrompt();

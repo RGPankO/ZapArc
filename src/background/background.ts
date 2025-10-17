@@ -341,7 +341,8 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'IS_WALLET_UNLOCKED':
         const isUnlocked = await storageManager.isWalletUnlocked();
-        sendResponse({ success: true, isUnlocked });
+        // Return 'data' to match popup expectation (popup.ts:158)
+        sendResponse({ success: true, data: isUnlocked });
         break;
 
 
