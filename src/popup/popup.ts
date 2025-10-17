@@ -178,34 +178,20 @@ async function initializePopup() {
 
         isWalletUnlocked = isUnlockedInStorage;
 
+        // Both locked and unlocked states need PIN to connect SDK
+        // The existing showUnlockPrompt() handles everything:
+        // - Shows PIN input
+        // - Decrypts mnemonic
+        // - Connects SDK
+        // - Loads balance and transactions
+        // - Shows main interface
+        console.log(`🔑 [Popup Init] Showing unlock prompt (wallet ${isWalletUnlocked ? 'unlocked but SDK disconnected' : 'locked'})`);
+        showUnlockPrompt();
+
         if (isWalletUnlocked) {
-            console.log('✅ [Popup Init] Wallet already unlocked - proceeding to restore UI and load data');
-
-            // Hide unlock interface if visible
-            const unlockInterface = document.getElementById('unlock-interface');
-            if (unlockInterface) {
-                unlockInterface.classList.add('hidden');
-                console.log('🔍 [Popup Init] Hidden unlock interface');
-            } else {
-                console.log('⚠️ [Popup Init] unlock-interface element not found');
-            }
-
-            // Show main interface (this will make wallet UI visible)
-            restoreMainInterface();
-            console.log('🔍 [Popup Init] Restored main interface');
-
-            // Now load wallet data and connect SDK
-            // Note: We need the mnemonic to connect SDK, which requires the PIN to decrypt
-            // Since wallet is already unlocked, we need to show a quick unlock to get mnemonic
-            // OR store mnemonic in session when first unlocked
-            // For now, we'll fetch balance from cached value and prompt SDK connection when needed
-            console.log('🔍 [Popup Init] Loading cached wallet data...');
-            await loadWalletData(); // This will load cached balance
-            await loadTransactionHistory(); // This will try to load transactions (may need SDK)
-            console.log('✅ [Popup Init] Wallet data loaded');
-        } else {
-            // Wallet exists but is locked, show unlock prompt
-            showUnlockPrompt();
+            // Restart auto-lock alarm since wallet is still unlocked
+            await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
+            await chrome.storage.local.set({ lastActivity: Date.now() });
         }
     } catch (error) {
         console.error('Failed to initialize popup:', error);
@@ -241,6 +227,7 @@ function setupEventListeners() {
     if (depositBtn) depositBtn.addEventListener('click', handleDeposit);
     if (withdrawBtn) withdrawBtn.addEventListener('click', handleWithdraw);
     if (settingsBtn) settingsBtn.addEventListener('click', handleSettings);
+    document.getElementById('delete-wallet-btn')?.addEventListener('click', showForgotPinModal);
 }
 
 function updateBalance(balance: number) {
@@ -1211,7 +1198,7 @@ function showUnlockPrompt() {
     console.log('✅ [Unlock] Unlock form elements found, setting up listeners');
 
     // Set up unlock button listener
-    unlockBtn.addEventListener('click', async () => {
+    unlockBtn.onclick = async () => {
         const pin = pinInput.value;
         console.log('🔑 [Unlock] PIN ENTERED:', {
             pinLength: pin.length,
@@ -1316,22 +1303,22 @@ function showUnlockPrompt() {
             unlockBtn.disabled = false;
             unlockBtn.textContent = 'Unlock';
         }
-    });
+    };
 
     // Allow Enter key to unlock
-    pinInput.addEventListener('keypress', (e) => {
+    pinInput.onkeypress = (e) => {
         if (e.key === 'Enter') {
             unlockBtn.click();
         }
-    });
+    };
 
     // Add forgot PIN link handler
     const forgotPinLink = document.getElementById('forgot-pin-link');
     if (forgotPinLink) {
-        forgotPinLink.addEventListener('click', (e) => {
+        forgotPinLink.onclick = (e) => {
             e.preventDefault();
             showForgotPinModal();
-        });
+        };
     }
 }
 

@@ -580,6 +580,24 @@ header h1 {
     background-color: #f8f8f8;
 }
 
+.delete-wallet-btn {
+    padding: 8px 24px;
+    border: 1px solid #dc3545;
+    border-radius: 4px;
+    background-color: white;
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 14px;
+    width: 100%;
+    margin-top: 8px;
+    transition: all 0.2s;
+}
+
+.delete-wallet-btn:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
 /* Unlock Interface */
 #unlock-interface {
     height: 100%;
