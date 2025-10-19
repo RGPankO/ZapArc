@@ -28,8 +28,10 @@
 import './popup.css';
 import { ExtensionMessaging } from '../utils/messaging';
 import * as QRCode from 'qrcode';
-import init, { connect, defaultConfig, type BreezSdk, type Config, type ConnectRequest } from '@breeztech/breez-sdk-spark/web';
+import init, { connect, defaultConfig, type BreezSdk, type Config, type ConnectRequest, type EventListener, type SdkEvent } from '@breeztech/breez-sdk-spark/web';
 import * as bip39 from 'bip39';
+import type { WalletMetadata } from '../types';
+import { ChromeStorageManager } from '../utils/storage';
 
 console.log('Lightning Tipping Extension popup loaded');
 
@@ -43,6 +45,11 @@ let settingsBtn: HTMLButtonElement | null = null;
 let currentBalance = 0;
 let isWalletUnlocked = false;
 let preparedPayment: any = null; // Store prepared payment for sending
+
+// Multi-wallet state
+let currentWallets: WalletMetadata[] = [];
+let activeWalletId: string | null = null;
+let isWalletSelectorOpen = false;
 
 // Breez SDK state
 let breezSDK: BreezSdk | null = null;
@@ -58,9 +65,43 @@ let generatedMnemonic: string = '';
 let mnemonicWords: string[] = [];
 let selectedWords: string[] = [];
 let userPin: string = '';
+let sessionPin: string | null = null; // Stored PIN during active session - cleared on lock
+let isAddingWallet: boolean = false; // Track if we're adding a wallet (not initial setup)
+let isImportingWallet: boolean = false; // Track if import flow vs create flow
 
 // BIP39 wordlist
 const BIP39_WORDS: string[] = bip39.wordlists.english;
+
+// SessionStorage keys for persistent flags across popup reloads
+const SESSION_KEY_IS_ADDING_WALLET = 'tipmaster_isAddingWallet';
+const SESSION_KEY_IS_IMPORTING_WALLET = 'tipmaster_isImportingWallet';
+
+// Helper functions to manage persistent flags in sessionStorage
+function getIsAddingWallet(): boolean {
+    return sessionStorage.getItem(SESSION_KEY_IS_ADDING_WALLET) === 'true';
+}
+
+function setIsAddingWallet(value: boolean): void {
+    if (value) {
+        sessionStorage.setItem(SESSION_KEY_IS_ADDING_WALLET, 'true');
+    } else {
+        sessionStorage.removeItem(SESSION_KEY_IS_ADDING_WALLET);
+    }
+    isAddingWallet = value;
+}
+
+function getIsImportingWallet(): boolean {
+    return sessionStorage.getItem(SESSION_KEY_IS_IMPORTING_WALLET) === 'true';
+}
+
+function setIsImportingWallet(value: boolean): void {
+    if (value) {
+        sessionStorage.setItem(SESSION_KEY_IS_IMPORTING_WALLET, 'true');
+    } else {
+        sessionStorage.removeItem(SESSION_KEY_IS_IMPORTING_WALLET);
+    }
+    isImportingWallet = value;
+}
 
 // Breez SDK initialization helpers
 async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
@@ -105,6 +146,43 @@ async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
             sdkConnected: !!sdk
         });
 
+        // Set up event listener for SDK events (sync, payments, etc.)
+        console.log('🔔 [Breez-SDK] Setting up event listener for sync and payment events');
+        sdk.addEventListener({
+            onEvent: (event: SdkEvent) => {
+                console.log('🔔 [Breez-SDK] Event received:', event.type);
+
+                if (event.type === 'synced') {
+                    console.log('✅ [Breez-SDK] Wallet synced with Lightning Network');
+
+                    // Hide loading indicators now that sync is complete
+                    const balanceLoading = document.getElementById('balance-loading');
+                    if (balanceLoading) {
+                        balanceLoading.classList.add('hidden');
+                        console.log('✅ [Breez-SDK] Hiding balance loading indicator');
+                    }
+
+                    // Reload transaction history after sync completes
+                    loadTransactionHistory().catch(err => {
+                        console.error('❌ [Breez-SDK] Failed to load transactions after sync:', err);
+                    });
+                    // Reload balance after sync
+                    loadWalletData().catch(err => {
+                        console.error('❌ [Breez-SDK] Failed to load balance after sync:', err);
+                    });
+                } else if (event.type === 'paymentSucceeded') {
+                    console.log('💰 [Breez-SDK] Payment received');
+                    // Reload transaction history and balance when payment received
+                    loadTransactionHistory().catch(err => {
+                        console.error('❌ [Breez-SDK] Failed to load transactions after payment:', err);
+                    });
+                    loadWalletData().catch(err => {
+                        console.error('❌ [Breez-SDK] Failed to load balance after payment:', err);
+                    });
+                }
+            }
+        });
+
         return sdk;
     } catch (error) {
         console.error('❌ [Popup-SDK] CONNECT_BREEZ_SDK FAILED', {
@@ -133,10 +211,22 @@ async function disconnectBreezSDK(): Promise<void> {
 document.addEventListener('DOMContentLoaded', () => {
     initializePopup();
     setupEventListeners();
+    setupModalListeners(); // Initialize modal system
+});
+
+// Clear session PIN when popup closes (security measure)
+window.addEventListener('beforeunload', () => {
+    sessionPin = null;
+    console.log('🔐 [Session] PIN cleared on popup close');
 });
 
 async function initializePopup() {
     try {
+        // Restore persistent flags from sessionStorage (survives popup reloads)
+        isAddingWallet = getIsAddingWallet();
+        isImportingWallet = getIsImportingWallet();
+        console.log('🔄 [Popup Init] Restored session flags:', { isAddingWallet, isImportingWallet });
+
         // Check if wallet setup was skipped
         const skipResult = await chrome.storage.local.get(['walletSkipped']);
         if (skipResult.walletSkipped) {
@@ -407,6 +497,8 @@ function showWalletSetupPrompt() {
 
 // Wizard Navigation
 function showWizardStep(stepId: string) {
+    console.log('[Wizard Navigation] Showing step:', stepId, '| isAddingWallet:', isAddingWallet, '| isImportingWallet:', isImportingWallet);
+
     // Hide all wizard steps
     const steps = document.querySelectorAll('.wizard-step');
     steps.forEach(step => {
@@ -417,6 +509,40 @@ function showWizardStep(stepId: string) {
     const targetStep = document.getElementById(stepId);
     if (targetStep) {
         targetStep.classList.remove('hidden');
+    }
+
+    // Special handling for PIN step - different UI for add wallet vs initial setup
+    if (stepId === 'pin-step') {
+        const header = document.querySelector('#pin-step .wizard-header h2');
+        const description = document.querySelector('#pin-step .wizard-header p');
+        const continueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
+
+        if (isAddingWallet) {
+            // PIN VERIFICATION mode (adding wallet)
+            if (header) header.textContent = '🔐 Verify Your PIN';
+            if (description) description.textContent = 'Enter your PIN to encrypt this wallet';
+
+            // Hide ONLY the confirm PIN input (not its parent) and clear its value
+            const pinConfirmInput = document.getElementById('pin-confirm') as HTMLInputElement;
+            if (pinConfirmInput) {
+                pinConfirmInput.style.display = 'none';
+                pinConfirmInput.value = ''; // Clear value to prevent validation issues
+            }
+
+            if (continueBtn) continueBtn.textContent = 'Add Wallet';
+        } else {
+            // PIN CREATION mode (initial setup)
+            if (header) header.textContent = '🔐 Create Your PIN';
+            if (description) description.textContent = 'Create a 6+ digit PIN to secure your wallet';
+
+            // Ensure confirm PIN field is visible
+            const pinConfirmInput = document.getElementById('pin-confirm') as HTMLInputElement;
+            if (pinConfirmInput) {
+                pinConfirmInput.style.display = 'block';
+            }
+
+            if (continueBtn) continueBtn.textContent = 'Continue';
+        }
     }
 }
 
@@ -434,7 +560,37 @@ function setupWizardListeners() {
     const choiceBackBtn = document.getElementById('choice-back-btn');
     if (choiceBackBtn) {
         choiceBackBtn.onclick = () => {
-            showWizardStep('welcome-step');
+            console.log('[Wizard Navigation] Choice back button clicked - isAddingWallet:', isAddingWallet);
+
+            // If adding wallet (not initial setup), close wizard and return to main interface
+            if (isAddingWallet) {
+                console.log('[Add Wallet] Back from choice step - closing wizard, returning to main interface');
+
+                // Hide wizard
+                const wizard = document.getElementById('onboarding-wizard');
+                if (wizard) {
+                    wizard.classList.add('hidden');
+                }
+
+                // Show main interface
+                const mainInterface = document.getElementById('main-interface');
+                if (mainInterface) {
+                    mainInterface.classList.remove('hidden');
+                }
+
+                // Reset wizard state
+                setIsAddingWallet(false);
+                setIsImportingWallet(false);
+                generatedMnemonic = '';
+                mnemonicWords = [];
+                selectedWords = [];
+
+                console.log('[Wizard] Closed, main interface restored');
+            } else {
+                // Initial setup flow - go back to welcome
+                console.log('[Initial Setup] Back to welcome step');
+                showWizardStep('welcome-step');
+            }
         };
     }
 
@@ -442,6 +598,7 @@ function setupWizardListeners() {
     const createNewWalletBtn = document.getElementById('create-new-wallet-btn');
     if (createNewWalletBtn) {
         createNewWalletBtn.onclick = async () => {
+            setIsImportingWallet(false); // Creating, not importing
             await handleStartSetup();
         };
     }
@@ -450,6 +607,7 @@ function setupWizardListeners() {
     const importWalletBtn = document.getElementById('import-wallet-btn');
     if (importWalletBtn) {
         importWalletBtn.onclick = () => {
+            setIsImportingWallet(true); // Importing, not creating
             initializeImportWallet();
             showWizardStep('import-wallet-step');
         };
@@ -459,6 +617,7 @@ function setupWizardListeners() {
     const importBackBtn = document.getElementById('import-back-btn');
     if (importBackBtn) {
         importBackBtn.onclick = () => {
+            console.log('[Wizard Navigation] Import back button clicked - isAddingWallet:', isAddingWallet);
             showWizardStep('setup-choice-step');
         };
     }
@@ -477,6 +636,7 @@ function setupWizardListeners() {
         skipSetupBtn.onclick = () => {
             const wizard = document.getElementById('onboarding-wizard');
             if (wizard) {
+                console.log('[Wizard] Hiding wizard (skip setup) - isAddingWallet:', isAddingWallet);
                 wizard.classList.add('hidden');
             }
 
@@ -525,7 +685,14 @@ function setupWizardListeners() {
     const pinBackBtn = document.getElementById('pin-back-btn');
     if (pinBackBtn) {
         pinBackBtn.onclick = () => {
-            showWizardStep('confirm-step');
+            // Navigate back to appropriate step based on wizard flow
+            if (isImportingWallet) {
+                showWizardStep('import-wallet-step');
+                console.log('[PIN] Navigating back to import step');
+            } else {
+                showWizardStep('confirm-step');
+                console.log('[PIN] Navigating back to confirm step');
+            }
         };
     }
 
@@ -560,8 +727,8 @@ function setupWizardListeners() {
                 return;
             }
 
-            // Check PIN match
-            if (pin !== confirmPin) {
+            // Check PIN match ONLY when NOT adding wallet (initial setup requires confirmation)
+            if (!isAddingWallet && pin !== confirmPin) {
                 if (pinStrength) {
                     pinStrength.textContent = 'PINs do not match';
                     pinStrength.style.color = '#dc3545';
@@ -574,8 +741,13 @@ function setupWizardListeners() {
 
             // PINs are valid
             if (pinStrength) {
-                pinStrength.textContent = 'PIN is valid';
-                pinStrength.style.color = '#28a745';
+                if (isAddingWallet) {
+                    pinStrength.textContent = 'Enter your PIN';
+                    pinStrength.style.color = '#6c757d';
+                } else {
+                    pinStrength.textContent = 'PIN is valid';
+                    pinStrength.style.color = '#28a745';
+                }
             }
             if (pinContinueBtn) {
                 pinContinueBtn.disabled = false;
@@ -784,45 +956,91 @@ function handleConfirmContinue() {
 // Handle PIN Continue - Complete Setup
 async function handlePinContinue() {
     const pinInput = document.getElementById('pin-input') as HTMLInputElement;
-    const pinConfirm = document.getElementById('pin-confirm') as HTMLInputElement;
-    const pinContinueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
 
-    if (!pinInput || !pinConfirm) return;
+    if (!pinInput) return;
 
     const pin = pinInput.value;
-    const confirmPin = pinConfirm.value;
 
-    // Validate
-    if (pin.length < 6) {
-        showError('PIN must be at least 6 characters');
-        return;
-    }
+    console.log('🔍 [PIN Continue] isAddingWallet:', isAddingWallet, 'PIN length:', pin.length);
 
-    if (pin !== confirmPin) {
-        showError('PINs do not match');
-        return;
-    }
+    if (isAddingWallet) {
+        // Adding wallet - verify existing PIN
+        console.log('🔵 [PIN Continue] Add wallet mode - verifying PIN');
+        await handleAddWalletWithPin(pin);
+    } else {
+        // Initial setup - create new PIN with confirmation
+        console.log('🔵 [PIN Continue] Initial setup mode - validating PIN match');
+        const pinConfirm = document.getElementById('pin-confirm') as HTMLInputElement;
+        if (!pinConfirm) return;
 
-    // Save PIN
-    userPin = pin;
-    console.log('🔑 [Setup] PIN CREATED:', {
-        pinLength: userPin.length,
-        pinValue: userPin,
-        timestamp: new Date().toISOString()
-    });
+        const confirmPin = pinConfirm.value;
 
-    try {
-        if (pinContinueBtn) {
-            pinContinueBtn.disabled = true;
-            pinContinueBtn.textContent = 'Creating Wallet...';
+        console.log('🔍 [PIN Continue] Confirm PIN length:', confirmPin.length);
+
+        // Validate PIN length and match
+        if (pin.length < 6) {
+            showError('PIN must be at least 6 characters');
+            return;
         }
 
-        // Setup wallet with mnemonic and PIN
-        console.log('🔵 [Setup] Calling setupWallet with PIN length:', userPin.length);
-        const setupResponse = await ExtensionMessaging.setupWallet(generatedMnemonic, userPin);
+        if (pin !== confirmPin) {
+            showError('PINs do not match');
+            return;
+        }
 
-        if (setupResponse.success) {
-            // Show success step
+        await handleInitialSetupWithPin(pin);
+    }
+}
+
+/**
+ * Handle adding wallet with PIN verification
+ * Verifies the entered PIN is correct by attempting to load existing wallets
+ */
+async function handleAddWalletWithPin(pin: string): Promise<void> {
+    try {
+        // Validate PIN length
+        if (pin.length < 6) {
+            showError('PIN must be at least 6 digits');
+            return;
+        }
+
+        // Verify PIN is correct by loading existing wallets
+        console.log('🔍 [Add Wallet] Verifying PIN...');
+        const verifyResponse = await ExtensionMessaging.loadWallet(pin);
+
+        if (!verifyResponse.success || !verifyResponse.data) {
+            showError('Incorrect PIN. Please try again.');
+            console.error('❌ [Add Wallet] PIN verification failed');
+            return;
+        }
+
+        console.log('✅ [Add Wallet] PIN verified successfully');
+
+        // Store PIN for wallet creation
+        userPin = pin;
+
+        // Show loading state
+        const continueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
+        if (continueBtn) {
+            continueBtn.disabled = true;
+            continueBtn.textContent = 'Adding Wallet...';
+        }
+
+        // Create or import wallet with verified PIN
+        let response;
+        if (isImportingWallet) {
+            console.log('🔵 [Add Wallet] Importing wallet...');
+            response = await ExtensionMessaging.importWallet(generatedMnemonic, '', pin);
+        } else {
+            console.log('🔵 [Add Wallet] Creating wallet...');
+            response = await ExtensionMessaging.createWallet('', pin);
+        }
+
+        if (response.success && response.data) {
+            console.log('✅ [Add Wallet] Wallet added successfully');
+            if (response.data.mnemonic) {
+                generatedMnemonic = response.data.mnemonic; // Store for display if needed
+            }
             showWizardStep('setup-complete-step');
 
             // Auto-close after 2 seconds
@@ -830,18 +1048,78 @@ async function handlePinContinue() {
                 handleSetupComplete();
             }, 2000);
         } else {
-            showError(setupResponse.error || 'Wallet setup failed');
-            if (pinContinueBtn) {
-                pinContinueBtn.disabled = false;
-                pinContinueBtn.textContent = 'Create Wallet';
-            }
+            throw new Error(response.error || 'Failed to add wallet');
         }
+
     } catch (error) {
-        console.error('Wallet setup error:', error);
-        showError('Failed to create wallet');
-        if (pinContinueBtn) {
-            pinContinueBtn.disabled = false;
-            pinContinueBtn.textContent = 'Create Wallet';
+        console.error('❌ [Add Wallet] Error:', error);
+        showError(error instanceof Error ? error.message : 'Failed to add wallet');
+
+        // Navigate back to appropriate step after error
+        if (isImportingWallet) {
+            showWizardStep('import-wallet-step');
+            console.log('[Add Wallet] Error occurred, navigating back to import step');
+        } else {
+            showWizardStep('mnemonic-step');
+            console.log('[Add Wallet] Error occurred, navigating back to mnemonic step');
+        }
+
+        // Reset button state
+        const continueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
+        if (continueBtn) {
+            continueBtn.disabled = false;
+            continueBtn.textContent = 'Add Wallet';
+        }
+    }
+}
+
+/**
+ * Handle initial wallet setup with new PIN
+ */
+async function handleInitialSetupWithPin(pin: string): Promise<void> {
+    try {
+        // Store PIN
+        userPin = pin;
+
+        console.log('🔑 [Setup] PIN CREATED:', {
+            pinLength: userPin.length,
+            pinValue: userPin,
+            timestamp: new Date().toISOString()
+        });
+
+        // Show loading state
+        const continueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
+        if (continueBtn) {
+            continueBtn.disabled = true;
+            continueBtn.textContent = 'Creating Wallet...';
+        }
+
+        console.log('🔵 [Setup] Setting up wallet with PIN...');
+
+        // Setup wallet via messaging
+        const response = await ExtensionMessaging.setupWallet(generatedMnemonic, pin);
+
+        if (response.success) {
+            console.log('✅ [Setup] Wallet setup successful');
+            showWizardStep('setup-complete-step');
+
+            // Auto-close after 2 seconds
+            setTimeout(() => {
+                handleSetupComplete();
+            }, 2000);
+        } else {
+            throw new Error(response.error || 'Wallet setup failed');
+        }
+
+    } catch (error) {
+        console.error('❌ [Setup] Wallet setup error:', error);
+        showError(error instanceof Error ? error.message : 'Wallet setup failed');
+
+        // Reset button
+        const continueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
+        if (continueBtn) {
+            continueBtn.disabled = false;
+            continueBtn.textContent = 'Continue';
         }
     }
 }
@@ -850,17 +1128,14 @@ async function handlePinContinue() {
 async function handleSetupComplete() {
     console.log('🔵 [Setup] handleSetupComplete ENTRY', {
         timestamp: new Date().toISOString(),
-        isWalletUnlocked_before: isWalletUnlocked
+        isWalletUnlocked_before: isWalletUnlocked,
+        isAddingWallet: isAddingWallet
     });
-
-    // CRITICAL: Set state to unlocked FIRST (before any async operations)
-    // This prevents race condition where user clicks Deposit before async SDK connection completes
-    isWalletUnlocked = true;
-    console.log('✅ [Setup] isWalletUnlocked set to TRUE immediately');
 
     // Hide wizard
     const wizard = document.getElementById('onboarding-wizard');
     if (wizard) {
+        console.log('[Wizard] Hiding wizard (setup complete) - isAddingWallet:', isAddingWallet);
         wizard.classList.add('hidden');
     }
 
@@ -869,6 +1144,102 @@ async function handleSetupComplete() {
     if (mainInterface) {
         mainInterface.classList.remove('hidden');
     }
+
+    // Check if we're adding a wallet or completing initial setup
+    if (isAddingWallet) {
+        // Multi-wallet flow: Wallet was added successfully
+        console.log('✅ [Add Wallet] Wallet added successfully - switching to new wallet');
+
+        try {
+            // Get all wallets to find the newly added one
+            const walletsResponse = await ExtensionMessaging.getAllWallets();
+            if (!walletsResponse.success || !walletsResponse.data || walletsResponse.data.length === 0) {
+                showError('Failed to load wallets');
+                return;
+            }
+
+            // Find newest wallet (highest lastUsedAt)
+            const newestWallet = walletsResponse.data.reduce((newest, wallet) =>
+                wallet.lastUsedAt > newest.lastUsedAt ? wallet : newest
+            );
+
+            console.log(`[Add Wallet] Switching to new wallet: ${newestWallet.nickname} (${newestWallet.id})`);
+
+            // Disconnect current SDK if connected
+            if (breezSDK) {
+                console.log('[Add Wallet] Disconnecting current SDK');
+                await breezSDK.disconnect();
+                breezSDK = null;
+            }
+
+            // Get PIN (should be stored in userPin from handleAddWalletWithPin)
+            const pin = userPin || '';
+            if (!pin) {
+                console.warn('[Add Wallet] No PIN available - wallet switch may fail');
+            }
+
+            // Switch to the new wallet
+            const switchResponse = await ExtensionMessaging.switchWallet(newestWallet.id, pin);
+            if (!switchResponse.success || !switchResponse.data) {
+                showError('Failed to switch to new wallet');
+                return;
+            }
+
+            // Connect SDK to new wallet
+            console.log('[Add Wallet] Connecting SDK to new wallet');
+            breezSDK = await connectBreezSDK(switchResponse.data.mnemonic);
+            isWalletUnlocked = true;
+
+            // Store PIN in session for multi-wallet operations
+            sessionPin = userPin;
+            console.log('🔐 [Session] PIN stored after wallet setup');
+
+            // Get initial balance from SDK
+            await loadWalletData();
+
+            // Show loading states while waiting for sync to complete
+            const balanceLoading = document.getElementById('balance-loading');
+            if (balanceLoading) {
+                balanceLoading.classList.remove('hidden');
+                console.log('🔄 [Add Wallet] Showing balance loading indicator');
+            }
+
+            const transactionList = document.getElementById('transaction-list');
+            if (transactionList) {
+                transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transaction history...</div>';
+                console.log('🔄 [Add Wallet] Showing transaction loading text');
+            }
+
+            // Transaction history will load automatically when SDK sync completes (via event listener)
+            showInfo('Syncing wallet data...');
+            console.log('⏳ [Add Wallet] Waiting for SDK sync to complete before loading transactions');
+
+            // Refresh the wallet list UI
+            await initializeMultiWalletUI();
+
+            showSuccess(`Switched to ${newestWallet.nickname}!`);
+
+        } catch (error) {
+            console.error('[Add Wallet] Error switching to new wallet:', error);
+            showError('Wallet added but failed to switch. Please select it from the dropdown.');
+        } finally {
+            // Reset flags and clear wizard state
+            // Clear from both memory and sessionStorage
+            setIsAddingWallet(false);
+            setIsImportingWallet(false);
+            generatedMnemonic = '';
+            mnemonicWords = [];
+            selectedWords = [];
+            userPin = '';
+        }
+        return;
+    }
+
+    // Initial setup flow
+    // CRITICAL: Set state to unlocked FIRST (before any async operations)
+    // This prevents race condition where user clicks Deposit before async SDK connection completes
+    isWalletUnlocked = true;
+    console.log('✅ [Setup] isWalletUnlocked set to TRUE immediately');
 
     // Initialize balance to 0 immediately (new wallet has no funds)
     updateBalance(0);
@@ -888,8 +1259,22 @@ async function handleSetupComplete() {
         currentBalance = Number(balanceSats);
         updateBalance(currentBalance);
 
-        // Load transaction history
-        await loadTransactionHistory();
+        // Show loading states while waiting for sync to complete
+        const balanceLoading = document.getElementById('balance-loading');
+        if (balanceLoading) {
+            balanceLoading.classList.remove('hidden');
+            console.log('🔄 [Setup] Showing balance loading indicator');
+        }
+
+        const transactionList = document.getElementById('transaction-list');
+        if (transactionList) {
+            transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transaction history...</div>';
+            console.log('🔄 [Setup] Showing transaction loading text');
+        }
+
+        // Transaction history will load automatically when SDK sync completes (via event listener)
+        showInfo('Syncing wallet data...');
+        console.log('⏳ [Setup] Waiting for SDK sync to complete before loading transactions');
 
         showSuccess('Wallet created and connected to Lightning Network!');
 
@@ -897,6 +1282,10 @@ async function handleSetupComplete() {
         console.log('🔔 [Setup] Starting background auto-lock alarm');
         await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
         await chrome.storage.local.set({ lastActivity: Date.now() });
+
+        // Initialize multi-wallet UI (shows + button to add more wallets)
+        await initializeMultiWalletUI();
+        console.log('✅ [Setup] Multi-wallet UI initialized');
 
         console.log('✅ [Setup] handleSetupComplete EXIT - wallet fully initialized', {
             timestamp: new Date().toISOString(),
@@ -1156,6 +1545,1211 @@ function handleImportContinue() {
     showWizardStep('pin-step');
 }
 
+// ========================================
+// Multi-Wallet UI Functions
+// ========================================
+
+/**
+ * Initialize multi-wallet UI if user has multiple wallets
+ */
+async function initializeMultiWalletUI(): Promise<void> {
+    try {
+        console.log('🔄 [Multi-Wallet] Initializing wallet selector');
+
+        // Get all wallets
+        const walletsResponse = await ExtensionMessaging.getAllWallets();
+        if (!walletsResponse.success || !walletsResponse.data) {
+            console.log('[Multi-Wallet] No wallets found or error');
+            return;
+        }
+
+        currentWallets = walletsResponse.data;
+        console.log(`[Multi-Wallet] Found ${currentWallets.length} wallet(s)`);
+
+        // Show wallet selector if one or more wallets exist (shows "+" button to add more)
+        const walletSelector = document.getElementById('wallet-selector');
+        if (currentWallets.length >= 1 && walletSelector) {
+            walletSelector.classList.remove('hidden');
+            updateWalletSelectorUI();
+            setupWalletSelectorListeners();
+        }
+    } catch (error) {
+        console.error('[Multi-Wallet] Initialization error:', error);
+    }
+}
+
+/**
+ * Update wallet selector UI with current wallets
+ */
+function updateWalletSelectorUI(): void {
+    // Find active wallet
+    const activeWallet = currentWallets.find(w => {
+        // Determine active wallet (for now, assume first wallet or marked active)
+        // This will be properly set after unlocking
+        return w.lastUsedAt === Math.max(...currentWallets.map(w => w.lastUsedAt));
+    });
+
+    if (!activeWallet) return;
+
+    // Update current wallet button
+    const currentWalletName = document.getElementById('current-wallet-name');
+    if (currentWalletName) {
+        currentWalletName.textContent = activeWallet.nickname;
+    }
+
+    // Update wallet count badge
+    const walletCountBadge = document.getElementById('wallet-count-badge');
+    if (walletCountBadge) {
+        walletCountBadge.textContent = currentWallets.length.toString();
+    }
+
+    // Populate wallet dropdown list
+    populateWalletDropdown();
+}
+
+/**
+ * Populate wallet dropdown with all wallets
+ */
+function populateWalletDropdown(): void {
+    const walletList = document.getElementById('wallet-list');
+    if (!walletList) return;
+
+    walletList.innerHTML = '';
+
+    currentWallets.forEach(wallet => {
+        const isActive = wallet.lastUsedAt === Math.max(...currentWallets.map(w => w.lastUsedAt));
+
+        const walletItem = document.createElement('div');
+        walletItem.className = `wallet-item${isActive ? ' active' : ''}`;
+        walletItem.dataset.walletId = wallet.id;
+
+        walletItem.innerHTML = `
+      <span class="wallet-item-check">${isActive ? '✓' : ''}</span>
+      <div class="wallet-item-info">
+        <div class="wallet-item-name">${wallet.nickname}</div>
+        <div class="wallet-item-balance">Last used: ${new Date(wallet.lastUsedAt).toLocaleDateString()}</div>
+      </div>
+    `;
+
+        walletItem.onclick = () => handleWalletSwitch(wallet.id);
+        walletList.appendChild(walletItem);
+    });
+}
+
+/**
+ * Setup wallet selector event listeners
+ */
+function setupWalletSelectorListeners(): void {
+    const currentWalletBtn = document.getElementById('current-wallet-btn');
+    const addWalletBtn = document.getElementById('add-wallet-btn');
+    const manageWalletsBtn = document.getElementById('manage-wallets-btn');
+    const walletDropdown = document.getElementById('wallet-dropdown');
+    const walletSelector = document.getElementById('wallet-selector');
+
+    // Toggle dropdown
+    if (currentWalletBtn) {
+        currentWalletBtn.onclick = () => {
+            isWalletSelectorOpen = !isWalletSelectorOpen;
+            currentWalletBtn.classList.toggle('open', isWalletSelectorOpen);
+            walletDropdown?.classList.toggle('hidden', !isWalletSelectorOpen);
+        };
+    }
+
+    // Add wallet
+    if (addWalletBtn) {
+        addWalletBtn.onclick = () => {
+            showAddWalletModal();
+        };
+    }
+
+    // Manage wallets
+    if (manageWalletsBtn) {
+        manageWalletsBtn.onclick = async () => {
+            // Close the dropdown first
+            isWalletSelectorOpen = false;
+            currentWalletBtn?.classList.remove('open');
+            walletDropdown?.classList.add('hidden');
+
+            // Show in-popup wallet management interface
+            await showWalletManagementInterface();
+        };
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (walletSelector && !walletSelector.contains(e.target as Node) && isWalletSelectorOpen) {
+            isWalletSelectorOpen = false;
+            currentWalletBtn?.classList.remove('open');
+            walletDropdown?.classList.add('hidden');
+        }
+    });
+}
+
+/**
+ * Handle wallet switch
+ */
+async function handleWalletSwitch(walletId: string): Promise<void> {
+    try {
+        console.log(`[Multi-Wallet] Switching to wallet: ${walletId}`);
+
+        // Close dropdown
+        const walletDropdown = document.getElementById('wallet-dropdown');
+        walletDropdown?.classList.add('hidden');
+        isWalletSelectorOpen = false;
+
+        // Show switching indicator
+        showWalletSwitchingIndicator(true);
+
+        // Use session PIN for decryption (stored during unlock)
+        const pin = sessionPin || '';
+        if (!pin) {
+            console.error('[Multi-Wallet] No session PIN available');
+            showError('Session expired. Please unlock wallet again.');
+            // Show unlock screen
+            const unlockScreen = document.getElementById('unlock-screen');
+            const mainInterface = document.getElementById('main-interface');
+            if (unlockScreen && mainInterface) {
+                unlockScreen.classList.remove('hidden');
+                mainInterface.classList.add('hidden');
+                isWalletUnlocked = false;
+            }
+            return;
+        }
+        console.log('🔐 [Multi-Wallet] Using session PIN for wallet switch');
+
+        // Disconnect current SDK
+        if (breezSDK) {
+            console.log('[Multi-Wallet] Disconnecting current SDK');
+            await breezSDK.disconnect();
+            breezSDK = null;
+        }
+
+        // Switch wallet
+        const switchResponse = await ExtensionMessaging.switchWallet(walletId, pin);
+        if (!switchResponse.success || !switchResponse.data) {
+            throw new Error(switchResponse.error || 'Wallet switch failed');
+        }
+
+        // Connect new SDK
+        console.log('[Multi-Wallet] Connecting to new wallet SDK');
+        breezSDK = await connectBreezSDK(switchResponse.data.mnemonic);
+
+        // Reload wallet data
+        await loadWalletData();
+
+        // Show loading states while waiting for sync to complete
+        const balanceLoading = document.getElementById('balance-loading');
+        if (balanceLoading) {
+            balanceLoading.classList.remove('hidden');
+            console.log('🔄 [Wallet Switch] Showing balance loading indicator');
+        }
+
+        const transactionList = document.getElementById('transaction-list');
+        if (transactionList) {
+            transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transaction history...</div>';
+            console.log('🔄 [Wallet Switch] Showing transaction loading text');
+        }
+
+        // Transaction history will load automatically when SDK sync completes (via event listener)
+        showInfo('Syncing wallet data...');
+        console.log('⏳ [Wallet Switch] Waiting for SDK sync to complete before loading transactions');
+
+        // Update UI
+        await initializeMultiWalletUI();
+
+        showSuccess('Switched to ' + currentWallets.find(w => w.id === walletId)?.nickname);
+        showWalletSwitchingIndicator(false);
+
+    } catch (error) {
+        console.error('[Multi-Wallet] Wallet switch failed:', error);
+        showError('Failed to switch wallet: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        showWalletSwitchingIndicator(false);
+    }
+}
+
+/**
+ * Show/hide wallet switching indicator
+ */
+function showWalletSwitchingIndicator(show: boolean): void {
+    let overlay = document.getElementById('wallet-switching-overlay');
+
+    if (show && !overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'wallet-switching-overlay';
+        overlay.className = 'wallet-switching-overlay';
+        overlay.innerHTML = `
+      <div class="switching-spinner"></div>
+      <div class="switching-text">Switching wallet...</div>
+    `;
+        document.body.appendChild(overlay);
+    } else if (!show && overlay) {
+        overlay.remove();
+    }
+}
+
+// ========================================
+// Modal System - Phase 4
+// ========================================
+
+/**
+ * Modal state management
+ */
+interface ModalState {
+    currentModal: string | null;
+    resolveCallback: ((value: any) => void) | null;
+    rejectCallback: ((error: any) => void) | null;
+}
+
+const modalState: ModalState = {
+    currentModal: null,
+    resolveCallback: null,
+    rejectCallback: null
+};
+
+/**
+ * Generic modal show/hide functions
+ */
+function showModalOverlay(): void {
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        document.body.classList.add('modal-open');
+    }
+}
+
+function hideModalOverlay(): void {
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        document.body.classList.remove('modal-open');
+    }
+}
+
+function showModal(modalId: string): void {
+    hideAllModals();
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('hidden');
+        showModalOverlay();
+        modalState.currentModal = modalId;
+
+        // Focus first input if exists
+        const firstInput = modal.querySelector('input') as HTMLInputElement;
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 100);
+        }
+    }
+}
+
+function hideModal(modalId: string): void {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    if (modalState.currentModal === modalId) {
+        hideModalOverlay();
+        modalState.currentModal = null;
+    }
+}
+
+function hideAllModals(): void {
+    const allModals = document.querySelectorAll('.modal');
+    allModals.forEach(modal => modal.classList.add('hidden'));
+}
+
+/**
+ * Setup modal event listeners (call once on DOMContentLoaded)
+ */
+function setupModalListeners(): void {
+    // Close on overlay click
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay) {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                closeCurrentModal(null);
+            }
+        });
+    }
+
+    // ESC key to close modals
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modalState.currentModal) {
+            closeCurrentModal(null);
+        }
+    });
+
+    // Setup all modal close buttons
+    const closeButtons = document.querySelectorAll('.modal-close');
+    closeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            closeCurrentModal(null);
+        });
+    });
+}
+
+/**
+ * Close current modal and resolve with value
+ */
+function closeCurrentModal(value: any): void {
+    if (modalState.resolveCallback) {
+        modalState.resolveCallback(value);
+        modalState.resolveCallback = null;
+        modalState.rejectCallback = null;
+    }
+    if (modalState.currentModal) {
+        hideModal(modalState.currentModal);
+    }
+}
+
+/**
+ * PIN Entry Modal
+ */
+async function showPINModal(message: string): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+        modalState.resolveCallback = resolve;
+        modalState.rejectCallback = reject;
+
+        const messageEl = document.getElementById('pin-modal-message');
+        const inputEl = document.getElementById('pin-modal-input') as HTMLInputElement;
+        const errorEl = document.getElementById('pin-modal-error');
+        const confirmBtn = document.getElementById('pin-modal-confirm');
+        const cancelBtn = document.getElementById('pin-modal-cancel');
+
+        if (!messageEl || !inputEl || !confirmBtn || !cancelBtn) {
+            resolve(null);
+            return;
+        }
+
+        // Setup modal
+        messageEl.textContent = message;
+        inputEl.value = '';
+        errorEl?.classList.add('hidden');
+
+        // Remove old listeners
+        const newConfirmBtn = confirmBtn.cloneNode(true) as HTMLButtonElement;
+        const newCancelBtn = cancelBtn.cloneNode(true) as HTMLButtonElement;
+        confirmBtn.replaceWith(newConfirmBtn);
+        cancelBtn.replaceWith(newCancelBtn);
+
+        // Confirm button
+        newConfirmBtn.addEventListener('click', () => {
+            const pin = inputEl.value.trim();
+            if (!pin || pin.length < 4) {
+                if (errorEl) {
+                    errorEl.textContent = 'PIN must be at least 4 digits';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+            closeCurrentModal(pin);
+        });
+
+        // Cancel button
+        newCancelBtn.addEventListener('click', () => {
+            closeCurrentModal(null);
+        });
+
+        // Enter key to confirm
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                newConfirmBtn.click();
+            }
+        });
+
+        showModal('pin-modal');
+    });
+}
+
+/**
+ * Add Wallet - Use onboarding wizard instead of modals
+ */
+async function showAddWalletModal(): Promise<void> {
+    console.log('[Add Wallet] Showing onboarding wizard for add wallet flow');
+
+    // Set flag to indicate we're adding a wallet (not initial setup)
+    // Using sessionStorage to persist across popup reloads
+    console.log('[Add Wallet] Opening wizard - setting isAddingWallet=true');
+    setIsAddingWallet(true);
+
+    // Hide main interface
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
+        mainInterface.classList.add('hidden');
+    }
+
+    // Show wizard
+    const wizard = document.getElementById('onboarding-wizard');
+    if (wizard) {
+        wizard.classList.remove('hidden');
+    }
+
+    // Go directly to choice step (skip welcome)
+    showWizardStep('setup-choice-step');
+
+    // Setup wizard event listeners for the buttons
+    setupWizardListeners();
+}
+
+/**
+ * Step 1: Choose create or import
+ */
+async function showAddWalletChoiceModal(): Promise<'create' | 'import' | null> {
+    return new Promise((resolve) => {
+        modalState.resolveCallback = resolve;
+
+        const createBtn = document.getElementById('modal-create-new-wallet-btn');
+        const importBtn = document.getElementById('modal-import-wallet-btn');
+        const cancelBtn = document.getElementById('add-wallet-choice-cancel');
+
+        if (!createBtn || !importBtn || !cancelBtn) {
+            resolve(null);
+            return;
+        }
+
+        // Remove old listeners
+        const newCreateBtn = createBtn.cloneNode(true) as HTMLButtonElement;
+        const newImportBtn = importBtn.cloneNode(true) as HTMLButtonElement;
+        const newCancelBtn = cancelBtn.cloneNode(true) as HTMLButtonElement;
+        createBtn.replaceWith(newCreateBtn);
+        importBtn.replaceWith(newImportBtn);
+        cancelBtn.replaceWith(newCancelBtn);
+
+        newCreateBtn.addEventListener('click', () => {
+            closeCurrentModal('create');
+        });
+
+        newImportBtn.addEventListener('click', () => {
+            closeCurrentModal('import');
+        });
+
+        newCancelBtn.addEventListener('click', () => {
+            closeCurrentModal(null);
+        });
+
+        showModal('add-wallet-choice-modal');
+    });
+}
+
+/**
+ * Handle Create Wallet Flow
+ */
+async function handleCreateWalletFlow(): Promise<void> {
+    // Step 1: Get nickname
+    const nickname = await showCreateWalletNicknameModal();
+    if (!nickname) return;
+
+    // Step 2: Get PIN
+    const pin = await showPINModal('Enter your PIN to create wallet');
+    if (!pin) return;
+
+    // Step 3: Generate wallet
+    try {
+        showWalletSwitchingIndicator(true);
+        const response = await ExtensionMessaging.createWallet(nickname, pin);
+
+        if (!response.success || !response.data) {
+            throw new Error(response.error || 'Wallet creation failed');
+        }
+
+        // Step 4: Show mnemonic
+        const confirmed = await showMnemonicDisplayModal(response.data.mnemonic);
+
+        if (confirmed) {
+            await initializeMultiWalletUI();
+            showSuccess(`Wallet "${nickname}" created successfully`);
+        }
+
+        showWalletSwitchingIndicator(false);
+    } catch (error) {
+        console.error('[Multi-Wallet] Create wallet failed:', error);
+        showError('Failed to create wallet');
+        showWalletSwitchingIndicator(false);
+    }
+}
+
+/**
+ * Show nickname input for create wallet
+ */
+async function showCreateWalletNicknameModal(): Promise<string | null> {
+    return new Promise((resolve) => {
+        modalState.resolveCallback = resolve;
+
+        const inputEl = document.getElementById('create-wallet-nickname') as HTMLInputElement;
+        const errorEl = document.getElementById('create-wallet-error');
+        const backBtn = document.getElementById('create-wallet-back');
+        const nextBtn = document.getElementById('create-wallet-next');
+
+        if (!inputEl || !backBtn || !nextBtn) {
+            resolve(null);
+            return;
+        }
+
+        inputEl.value = '';
+        errorEl?.classList.add('hidden');
+
+        // Remove old listeners
+        const newBackBtn = backBtn.cloneNode(true) as HTMLButtonElement;
+        const newNextBtn = nextBtn.cloneNode(true) as HTMLButtonElement;
+        backBtn.replaceWith(newBackBtn);
+        nextBtn.replaceWith(newNextBtn);
+
+        newBackBtn.addEventListener('click', () => {
+            hideModal('add-wallet-create-modal');
+            showAddWalletModal(); // Go back to choice
+        });
+
+        newNextBtn.addEventListener('click', () => {
+            const nickname = inputEl.value.trim();
+            if (!nickname) {
+                if (errorEl) {
+                    errorEl.textContent = 'Please enter a wallet nickname';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+            closeCurrentModal(nickname);
+        });
+
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                newNextBtn.click();
+            }
+        });
+
+        showModal('add-wallet-create-modal');
+    });
+}
+
+/**
+ * Show mnemonic display modal
+ */
+async function showMnemonicDisplayModal(mnemonic: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        modalState.resolveCallback = resolve;
+
+        const displayEl = document.getElementById('modal-mnemonic-display');
+        const copyBtn = document.getElementById('copy-mnemonic-btn');
+        const backBtn = document.getElementById('mnemonic-modal-back');
+        const confirmBtn = document.getElementById('mnemonic-modal-confirm');
+
+        if (!displayEl || !copyBtn || !backBtn || !confirmBtn) {
+            resolve(false);
+            return;
+        }
+
+        // Display mnemonic in grid
+        const words = mnemonic.split(' ');
+        displayEl.innerHTML = '';
+        words.forEach((word, index) => {
+            const wordDiv = document.createElement('div');
+            wordDiv.className = 'mnemonic-word';
+            wordDiv.innerHTML = `<span class="word-number">${index + 1}.</span> ${word}`;
+            displayEl.appendChild(wordDiv);
+        });
+
+        // Remove old listeners
+        const newCopyBtn = copyBtn.cloneNode(true) as HTMLButtonElement;
+        const newBackBtn = backBtn.cloneNode(true) as HTMLButtonElement;
+        const newConfirmBtn = confirmBtn.cloneNode(true) as HTMLButtonElement;
+        copyBtn.replaceWith(newCopyBtn);
+        backBtn.replaceWith(newBackBtn);
+        confirmBtn.replaceWith(newConfirmBtn);
+
+        newCopyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(mnemonic);
+                newCopyBtn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    newCopyBtn.textContent = '📋 Copy to Clipboard';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy:', err);
+            }
+        });
+
+        newBackBtn.addEventListener('click', () => {
+            closeCurrentModal(false);
+        });
+
+        newConfirmBtn.addEventListener('click', () => {
+            closeCurrentModal(true);
+        });
+
+        showModal('add-wallet-mnemonic-modal');
+    });
+}
+
+/**
+ * Handle Import Wallet Flow
+ */
+async function handleImportWalletFlow(): Promise<void> {
+    // Step 1: Get nickname
+    const nickname = await showImportWalletNicknameModal();
+    if (!nickname) return;
+
+    // Step 2: Get mnemonic
+    const mnemonic = await showImportMnemonicModal();
+    if (!mnemonic) return;
+
+    // Step 3: Get PIN
+    const pin = await showPINModal('Enter your PIN to import wallet');
+    if (!pin) return;
+
+    // Step 4: Import wallet
+    try {
+        showWalletSwitchingIndicator(true);
+        const response = await ExtensionMessaging.importWallet(mnemonic, nickname, pin);
+
+        if (!response.success) {
+            throw new Error(response.error || 'Wallet import failed');
+        }
+
+        await initializeMultiWalletUI();
+        showSuccess(`Wallet "${nickname}" imported successfully`);
+        showWalletSwitchingIndicator(false);
+    } catch (error) {
+        console.error('[Multi-Wallet] Import wallet failed:', error);
+        showError('Failed to import wallet: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        showWalletSwitchingIndicator(false);
+    }
+}
+
+/**
+ * Show nickname input for import wallet
+ */
+async function showImportWalletNicknameModal(): Promise<string | null> {
+    return new Promise((resolve) => {
+        modalState.resolveCallback = resolve;
+
+        const inputEl = document.getElementById('import-wallet-nickname') as HTMLInputElement;
+        const errorEl = document.getElementById('import-nickname-error');
+        const backBtn = document.getElementById('import-nickname-back');
+        const nextBtn = document.getElementById('import-nickname-next');
+
+        if (!inputEl || !backBtn || !nextBtn) {
+            resolve(null);
+            return;
+        }
+
+        inputEl.value = '';
+        errorEl?.classList.add('hidden');
+
+        // Remove old listeners
+        const newBackBtn = backBtn.cloneNode(true) as HTMLButtonElement;
+        const newNextBtn = nextBtn.cloneNode(true) as HTMLButtonElement;
+        backBtn.replaceWith(newBackBtn);
+        nextBtn.replaceWith(newNextBtn);
+
+        newBackBtn.addEventListener('click', () => {
+            hideModal('add-wallet-import-nickname-modal');
+            showAddWalletModal(); // Go back to choice
+        });
+
+        newNextBtn.addEventListener('click', () => {
+            const nickname = inputEl.value.trim();
+            if (!nickname) {
+                if (errorEl) {
+                    errorEl.textContent = 'Please enter a wallet nickname';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+            closeCurrentModal(nickname);
+        });
+
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                newNextBtn.click();
+            }
+        });
+
+        showModal('add-wallet-import-nickname-modal');
+    });
+}
+
+/**
+ * Show mnemonic import modal with word input grid
+ */
+async function showImportMnemonicModal(): Promise<string | null> {
+    return new Promise((resolve) => {
+        modalState.resolveCallback = resolve;
+
+        const container = document.getElementById('modal-import-words-container');
+        const suggestionsDiv = document.getElementById('modal-word-suggestions');
+        const errorEl = document.getElementById('import-mnemonic-error');
+        const backBtn = document.getElementById('import-modal-back');
+        const confirmBtn = document.getElementById('import-modal-confirm');
+
+        if (!container || !suggestionsDiv || !backBtn || !confirmBtn) {
+            resolve(null);
+            return;
+        }
+
+        // Setup word input grid
+        container.innerHTML = '';
+        errorEl?.classList.add('hidden');
+
+        // Clone buttons first
+        const newBackBtn = backBtn.cloneNode(true) as HTMLButtonElement;
+        const newConfirmBtn = confirmBtn.cloneNode(true) as HTMLButtonElement;
+        backBtn.replaceWith(newBackBtn);
+        confirmBtn.replaceWith(newConfirmBtn);
+
+        // Create word inputs
+        for (let i = 1; i <= 12; i++) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'word-input-wrapper';
+            wrapper.innerHTML = `
+                <span class="word-number">${i}</span>
+                <input
+                    type="text"
+                    id="modal-import-word-${i}"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    data-word-index="${i-1}"
+                    placeholder="word ${i}"
+                />
+            `;
+            container.appendChild(wrapper);
+
+            const input = wrapper.querySelector('input') as HTMLInputElement;
+            setupModalWordAutocomplete(input, suggestionsDiv, newConfirmBtn);
+        }
+
+        newBackBtn.addEventListener('click', () => {
+            hideModal('add-wallet-import-modal');
+            handleImportWalletFlow(); // Restart flow
+        });
+
+        newConfirmBtn.addEventListener('click', () => {
+            const words: string[] = [];
+            for (let i = 1; i <= 12; i++) {
+                const input = document.getElementById(`modal-import-word-${i}`) as HTMLInputElement;
+                if (input) {
+                    words.push(input.value.toLowerCase().trim());
+                }
+            }
+
+            // Validate all words
+            const invalidWords = words.filter(word => !BIP39_WORDS.includes(word));
+            if (invalidWords.length > 0) {
+                if (errorEl) {
+                    errorEl.textContent = 'Invalid words detected. Please check your input.';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+
+            closeCurrentModal(words.join(' '));
+        });
+
+        showModal('add-wallet-import-modal');
+    });
+}
+
+/**
+ * Setup word autocomplete for modal word inputs
+ */
+function setupModalWordAutocomplete(input: HTMLInputElement, suggestionsDiv: HTMLElement, confirmBtn: HTMLButtonElement): void {
+    input.addEventListener('input', () => {
+        const value = input.value.toLowerCase().trim();
+
+        if (value.length < 2) {
+            suggestionsDiv.style.display = 'none';
+            validateModalWordInput(input);
+            checkModalImportComplete(confirmBtn);
+            return;
+        }
+
+        const matches = BIP39_WORDS.filter(word => word.startsWith(value)).slice(0, 10);
+
+        if (matches.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            validateModalWordInput(input);
+            checkModalImportComplete(confirmBtn);
+            return;
+        }
+
+        // Show suggestions
+        suggestionsDiv.innerHTML = '';
+        matches.forEach(word => {
+            const div = document.createElement('div');
+            div.className = 'word-suggestion';
+            div.textContent = word;
+            div.addEventListener('click', () => {
+                input.value = word;
+                suggestionsDiv.style.display = 'none';
+                validateModalWordInput(input);
+
+                // Focus next input
+                const wordIndex = parseInt(input.dataset.wordIndex || '0');
+                if (wordIndex < 11) {
+                    const nextInput = document.getElementById(`modal-import-word-${wordIndex + 2}`) as HTMLInputElement;
+                    if (nextInput) nextInput.focus();
+                }
+
+                checkModalImportComplete(confirmBtn);
+            });
+            suggestionsDiv.appendChild(div);
+        });
+
+        // Position suggestions below input
+        const rect = input.getBoundingClientRect();
+        suggestionsDiv.style.display = 'block';
+        suggestionsDiv.style.left = rect.left + 'px';
+        suggestionsDiv.style.top = (rect.bottom + 4) + 'px';
+        suggestionsDiv.style.width = rect.width + 'px';
+
+        validateModalWordInput(input);
+        checkModalImportComplete(confirmBtn);
+    });
+
+    // Hide suggestions on blur
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            suggestionsDiv.style.display = 'none';
+        }, 200);
+    });
+
+    // Enter key handler
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const firstSuggestion = suggestionsDiv.querySelector('.word-suggestion') as HTMLElement;
+            if (firstSuggestion && suggestionsDiv.style.display === 'block') {
+                firstSuggestion.click();
+            } else {
+                const value = input.value.toLowerCase().trim();
+                if (BIP39_WORDS.includes(value)) {
+                    const wordIndex = parseInt(input.dataset.wordIndex || '0');
+                    if (wordIndex < 11) {
+                        const nextInput = document.getElementById(`modal-import-word-${wordIndex + 2}`) as HTMLInputElement;
+                        if (nextInput) nextInput.focus();
+                    }
+                }
+            }
+        }
+    });
+}
+
+function validateModalWordInput(input: HTMLInputElement): void {
+    const value = input.value.toLowerCase().trim();
+    if (value.length === 0) {
+        input.classList.remove('valid', 'invalid');
+    } else if (BIP39_WORDS.includes(value)) {
+        input.classList.add('valid');
+        input.classList.remove('invalid');
+    } else {
+        input.classList.add('invalid');
+        input.classList.remove('valid');
+    }
+}
+
+function checkModalImportComplete(confirmBtn: HTMLButtonElement): void {
+    let allValid = true;
+    for (let i = 1; i <= 12; i++) {
+        const input = document.getElementById(`modal-import-word-${i}`) as HTMLInputElement;
+        if (input) {
+            const value = input.value.toLowerCase().trim();
+            if (!BIP39_WORDS.includes(value)) {
+                allValid = false;
+                break;
+            }
+        }
+    }
+    confirmBtn.disabled = !allValid;
+}
+
+/**
+ * Rename Wallet Modal
+ */
+async function showRenameWalletModal(currentName: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        modalState.resolveCallback = resolve;
+
+        const inputEl = document.getElementById('rename-wallet-input') as HTMLInputElement;
+        const errorEl = document.getElementById('rename-wallet-error');
+        const cancelBtn = document.getElementById('rename-wallet-cancel');
+        const saveBtn = document.getElementById('rename-wallet-save');
+
+        if (!inputEl || !cancelBtn || !saveBtn) {
+            resolve(null);
+            return;
+        }
+
+        inputEl.value = currentName;
+        errorEl?.classList.add('hidden');
+
+        // Remove old listeners
+        const newCancelBtn = cancelBtn.cloneNode(true) as HTMLButtonElement;
+        const newSaveBtn = saveBtn.cloneNode(true) as HTMLButtonElement;
+        cancelBtn.replaceWith(newCancelBtn);
+        saveBtn.replaceWith(newSaveBtn);
+
+        newCancelBtn.addEventListener('click', () => {
+            closeCurrentModal(null);
+        });
+
+        newSaveBtn.addEventListener('click', () => {
+            const newName = inputEl.value.trim();
+            if (!newName) {
+                if (errorEl) {
+                    errorEl.textContent = 'Please enter a wallet name';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+            closeCurrentModal(newName);
+        });
+
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                newSaveBtn.click();
+            }
+        });
+
+        showModal('rename-wallet-modal');
+    });
+}
+
+/**
+ * Legacy function for backward compatibility
+ */
+async function promptForPIN(message: string): Promise<string | null> {
+    return showPINModal(message);
+}
+
+// ========================================
+// Wallet Management Interface Functions
+// ========================================
+
+/**
+ * Show wallet management interface (in-popup)
+ */
+async function showWalletManagementInterface(): Promise<void> {
+    console.log('[Wallet Management] Showing management interface');
+
+    // Hide main interface
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
+        mainInterface.classList.add('hidden');
+    }
+
+    // Show wallet management interface
+    const managementInterface = document.getElementById('wallet-management-interface');
+    if (managementInterface) {
+        managementInterface.classList.remove('hidden');
+    }
+
+    // Load and display wallets
+    await loadWalletManagementList();
+
+    // Setup back button
+    const backBtn = document.getElementById('wallet-mgmt-back-btn');
+    if (backBtn) {
+        backBtn.onclick = () => {
+            hideWalletManagementInterface();
+        };
+    }
+}
+
+/**
+ * Hide wallet management interface and return to main interface
+ */
+function hideWalletManagementInterface(): void {
+    console.log('[Wallet Management] Hiding management interface');
+
+    // Hide wallet management interface
+    const managementInterface = document.getElementById('wallet-management-interface');
+    if (managementInterface) {
+        managementInterface.classList.add('hidden');
+    }
+
+    // Show main interface
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
+        mainInterface.classList.remove('hidden');
+    }
+}
+
+/**
+ * Load and display wallet list in management interface
+ */
+async function loadWalletManagementList(): Promise<void> {
+    try {
+        console.log('[Wallet Management] Loading wallet list');
+
+        // Get all wallets
+        const walletsResponse = await ExtensionMessaging.getAllWallets();
+        if (!walletsResponse.success || !walletsResponse.data) {
+            showError('Failed to load wallets');
+            return;
+        }
+
+        const wallets = walletsResponse.data;
+        console.log(`[Wallet Management] Loaded ${wallets.length} wallet(s)`);
+
+        // Get current active wallet ID
+        const activeWalletData = await chrome.storage.local.get(['activeWalletId']);
+        const activeWalletId = activeWalletData.activeWalletId;
+
+        // Render wallet list
+        const listContainer = document.getElementById('wallet-management-list');
+        if (!listContainer) {
+            console.error('[Wallet Management] List container not found');
+            return;
+        }
+
+        if (wallets.length === 0) {
+            listContainer.innerHTML = '<div class="no-transactions" style="padding: 40px 20px;">No wallets found</div>';
+            return;
+        }
+
+        listContainer.innerHTML = wallets.map(wallet => {
+            const isActive = wallet.id === activeWalletId;
+            const canDelete = wallets.length > 1; // Can't delete if it's the only wallet
+
+            // Format creation date
+            const createdDate = new Date(wallet.createdAt).toLocaleDateString();
+
+            return `
+                <div class="wallet-mgmt-item ${isActive ? 'active' : ''}" data-wallet-id="${wallet.id}">
+                    <div class="wallet-mgmt-header">
+                        <div class="wallet-mgmt-name">
+                            ${wallet.nickname}
+                            ${isActive ? '<span class="active-badge">Active</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="wallet-mgmt-balance">
+                        Created: ${createdDate}
+                    </div>
+                    <div class="wallet-mgmt-actions">
+                        <button class="wallet-mgmt-btn rename-btn" data-wallet-id="${wallet.id}" data-wallet-name="${wallet.nickname}">
+                            Rename
+                        </button>
+                        <button class="wallet-mgmt-btn delete-btn" data-wallet-id="${wallet.id}" ${!canDelete ? 'disabled' : ''}>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Attach event listeners to buttons
+        attachWalletManagementListeners();
+
+    } catch (error) {
+        console.error('[Wallet Management] Failed to load wallet list:', error);
+        showError('Failed to load wallets');
+    }
+}
+
+/**
+ * Attach event listeners to wallet management buttons
+ */
+function attachWalletManagementListeners(): void {
+    // Rename buttons
+    const renameButtons = document.querySelectorAll('.wallet-mgmt-btn.rename-btn');
+    renameButtons.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const walletId = target.getAttribute('data-wallet-id');
+            const currentName = target.getAttribute('data-wallet-name');
+
+            if (walletId && currentName) {
+                await handleRenameWallet(walletId, currentName);
+            }
+        });
+    });
+
+    // Delete buttons
+    const deleteButtons = document.querySelectorAll('.wallet-mgmt-btn.delete-btn');
+    deleteButtons.forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const walletId = target.getAttribute('data-wallet-id');
+
+            if (walletId) {
+                await handleDeleteWallet(walletId);
+            }
+        });
+    });
+}
+
+/**
+ * Handle rename wallet action
+ */
+async function handleRenameWallet(walletId: string, currentName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Renaming wallet ${walletId}`);
+
+        // Show rename modal
+        const newName = await showRenameWalletModal(currentName);
+        if (!newName) return;
+
+        // Get PIN
+        const pin = await showPINModal('Enter your PIN to rename wallet');
+        if (!pin) return;
+
+        // Rename wallet
+        const response = await ExtensionMessaging.renameWallet(walletId, newName, pin);
+        if (response.success) {
+            showSuccess('Wallet renamed successfully!');
+
+            // Reload wallet list
+            await loadWalletManagementList();
+
+            // Update main interface if this is the active wallet
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to rename wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Rename failed:', error);
+        showError('Failed to rename wallet');
+    }
+}
+
+/**
+ * Handle delete wallet action
+ */
+async function handleDeleteWallet(walletId: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Deleting wallet ${walletId}`);
+
+        // Confirm deletion
+        const confirmed = confirm('Are you sure you want to delete this wallet? This action cannot be undone. Make sure you have backed up your recovery phrase!');
+        if (!confirmed) return;
+
+        // Get PIN
+        const pin = await showPINModal('Enter your PIN to delete wallet');
+        if (!pin) return;
+
+        // Delete wallet
+        const response = await ExtensionMessaging.deleteWallet(walletId, pin);
+        if (response.success) {
+            showSuccess('Wallet deleted successfully!');
+
+            // Reload wallet list
+            await loadWalletManagementList();
+
+            // Update main interface
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to delete wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Delete failed:', error);
+        showError('Failed to delete wallet');
+    }
+}
+
+// ========================================
+// End Multi-Wallet UI Functions & Modal System
+// ========================================
+
 function showUnlockPrompt() {
     console.log('🔵 [Unlock] showUnlockPrompt ENTRY');
 
@@ -1168,6 +2762,7 @@ function showUnlockPrompt() {
 
     // Hide wizard and main interface
     if (wizard) {
+        console.log('[Wizard] Hiding wizard (unlock interface) - isAddingWallet:', isAddingWallet);
         wizard.classList.add('hidden');
         console.log('🔍 [Unlock] Hidden onboarding-wizard');
     }
@@ -1223,6 +2818,14 @@ function showUnlockPrompt() {
             console.log('🔵 [Popup] Starting unlock process...');
             console.log('🔍 [Unlock] isWalletUnlocked BEFORE unlock:', isWalletUnlocked);
 
+            // Check if migration from single-wallet to multi-wallet is needed
+            const storage = new ChromeStorageManager();
+            if (await storage.needsMigration()) {
+                console.log('🔄 [Unlock] Migrating single wallet to multi-wallet format...');
+                await storage.migrateToMultiWallet(pin);
+                console.log('✅ [Unlock] Migration complete');
+            }
+
             // Load and decrypt wallet data from storage
             const walletDataResponse = await ExtensionMessaging.loadWallet(pin);
             console.log('🔍 [Unlock] Response received:', {
@@ -1259,9 +2862,24 @@ function showUnlockPrompt() {
                 throw new Error('No mnemonic found in wallet data');
             }
 
+            // Disconnect any existing SDK instance to clear IndexedDB cache
+            // This prevents reading stale data from previous wallet sessions
+            if (breezSDK) {
+                console.log('🔌 [Unlock] Disconnecting existing SDK to clear cache');
+                await breezSDK.disconnect();
+                breezSDK = null;
+                console.log('✅ [Unlock] SDK disconnected successfully');
+            }
+
             // Initialize SDK connection in popup
+            console.log('🔌 [Unlock] Connecting SDK to active wallet');
             breezSDK = await connectBreezSDK(mnemonic);
             isWalletUnlocked = true;
+            console.log('✅ [Unlock] SDK connected successfully');
+
+            // Store PIN in session for wallet switching
+            sessionPin = pin;
+            console.log('🔐 [Session] PIN stored in session memory');
 
             console.log('✅ [Popup] Wallet unlocked and SDK connected');
             console.log('🔍 [Unlock] isWalletUnlocked AFTER unlock:', isWalletUnlocked);
@@ -1279,11 +2897,28 @@ function showUnlockPrompt() {
             showSuccess('Wallet unlocked successfully!');
             await updateBalanceDisplay();
 
-            // Load transaction history
-            await loadTransactionHistory();
+            // Show loading states while waiting for sync to complete
+            const balanceLoading = document.getElementById('balance-loading');
+            if (balanceLoading) {
+                balanceLoading.classList.remove('hidden');
+                console.log('🔄 [Unlock] Showing balance loading indicator');
+            }
+
+            const transactionList = document.getElementById('transaction-list');
+            if (transactionList) {
+                transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transaction history...</div>';
+                console.log('🔄 [Unlock] Showing transaction loading text');
+            }
+
+            // Transaction history will load automatically when SDK sync completes (via event listener)
+            showInfo('Syncing wallet data...');
+            console.log('⏳ [Unlock] Waiting for SDK sync to complete before loading transactions');
 
             // Enable wallet controls
             enableWalletControls();
+
+            // Initialize multi-wallet UI if multiple wallets exist
+            await initializeMultiWalletUI();
 
             // Start background alarm for auto-lock
             console.log('🔔 [Unlock] Starting background auto-lock alarm');
@@ -1578,6 +3213,7 @@ function restoreMainInterface() {
 
     if (wizard && mainInterface) {
         // Hide wizard, show main interface
+        console.log('[Wizard] Hiding wizard (restore interface) - isAddingWallet:', isAddingWallet);
         wizard.classList.add('hidden');
         mainInterface.classList.remove('hidden');
 
@@ -1831,59 +3467,58 @@ function showConfirmDialog(title: string, message: string): Promise<boolean> {
 // Enhanced Deposit Interface
 function showDepositInterface() {
     const modal = createModal('deposit-modal', 'Deposit Funds');
-    
+    modal.className = 'modal-overlay';
+
     modal.innerHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>📥 Deposit Funds</h3>
-                    <button class="modal-close" id="close-deposit">&times;</button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📥 Deposit Funds</h3>
+                <button class="modal-close" id="close-deposit">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="deposit-step" id="amount-step">
+                    <p>Enter the amount you want to deposit:</p>
+                    <div class="amount-input-group">
+                        <input type="number" id="deposit-amount" placeholder="Amount in sats" min="1" max="100000000">
+                        <span class="input-suffix">sats</span>
+                    </div>
+                    <div class="quick-amounts">
+                        <button class="quick-amount-btn" data-amount="10000">10K</button>
+                        <button class="quick-amount-btn" data-amount="50000">50K</button>
+                        <button class="quick-amount-btn" data-amount="100000">100K</button>
+                        <button class="quick-amount-btn" data-amount="500000">500K</button>
+                    </div>
+                    <div class="modal-actions">
+                        <button id="generate-invoice-btn" class="btn-primary" disabled>Generate Invoice</button>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <div class="deposit-step" id="amount-step">
-                        <p>Enter the amount you want to deposit:</p>
-                        <div class="amount-input-group">
-                            <input type="number" id="deposit-amount" placeholder="Amount in sats" min="1" max="100000000">
-                            <span class="input-suffix">sats</span>
+
+                <div class="deposit-step hidden" id="invoice-step">
+                    <div class="invoice-container">
+                        <div class="qr-container">
+                            <canvas id="deposit-qr-canvas"></canvas>
                         </div>
-                        <div class="quick-amounts">
-                            <button class="quick-amount-btn" data-amount="10000">10K</button>
-                            <button class="quick-amount-btn" data-amount="50000">50K</button>
-                            <button class="quick-amount-btn" data-amount="100000">100K</button>
-                            <button class="quick-amount-btn" data-amount="500000">500K</button>
+                        <div class="invoice-details">
+                            <p class="invoice-amount">Amount: <span id="invoice-amount-display"></span> sats</p>
+                            <div class="invoice-text-container">
+                                <textarea id="invoice-text" readonly></textarea>
+                                <button id="copy-invoice-btn" class="copy-btn">📋 Copy</button>
+                            </div>
                         </div>
-                        <div class="modal-actions">
-                            <button id="generate-invoice-btn" class="btn-primary" disabled>Generate Invoice</button>
+                        <div class="payment-status" id="payment-status">
+                            <div class="status-indicator">⏳ Waiting for payment...</div>
+                            <div class="status-timer">Expires in: <span id="invoice-timer">15:00</span></div>
                         </div>
                     </div>
-                    
-                    <div class="deposit-step hidden" id="invoice-step">
-                        <div class="invoice-container">
-                            <div class="qr-container">
-                                <canvas id="deposit-qr-canvas"></canvas>
-                            </div>
-                            <div class="invoice-details">
-                                <p class="invoice-amount">Amount: <span id="invoice-amount-display"></span> sats</p>
-                                <div class="invoice-text-container">
-                                    <textarea id="invoice-text" readonly></textarea>
-                                    <button id="copy-invoice-btn" class="copy-btn">📋 Copy</button>
-                                </div>
-                            </div>
-                            <div class="payment-status" id="payment-status">
-                                <div class="status-indicator">⏳ Waiting for payment...</div>
-                                <div class="status-timer">Expires in: <span id="invoice-timer">15:00</span></div>
-                            </div>
-                        </div>
-                        <div class="modal-actions">
-                            <button id="new-invoice-btn" class="btn-secondary">New Invoice</button>
-                            <button id="close-invoice-btn" class="btn-primary">Close</button>
-                        </div>
+                    <div class="modal-actions">
+                        <button id="new-invoice-btn" class="btn-secondary">New Invoice</button>
+                        <button id="close-invoice-btn" class="btn-primary">Close</button>
                     </div>
                 </div>
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(modal);
     setupDepositListeners();
 }
@@ -2211,72 +3846,71 @@ function handlePaymentExpired() {
 // Enhanced Withdrawal Interface
 function showWithdrawalInterface() {
     const modal = createModal('withdrawal-modal', 'Withdraw Funds');
-    
+    modal.className = 'modal-overlay';
+
     modal.innerHTML = `
-        <div class="modal-overlay">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>📤 Withdraw Funds</h3>
-                    <button class="modal-close" id="close-withdrawal">&times;</button>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>📤 Withdraw Funds</h3>
+                <button class="modal-close" id="close-withdrawal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="balance-info">
+                    <p>Available Balance: <strong>${currentBalance.toLocaleString()} sats</strong></p>
                 </div>
-                <div class="modal-body">
-                    <div class="balance-info">
-                        <p>Available Balance: <strong>${currentBalance.toLocaleString()} sats</strong></p>
+
+                <div class="withdrawal-form">
+                    <div class="form-group">
+                        <label for="payment-input">Lightning Invoice or Address:</label>
+                        <textarea id="payment-input" placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)" rows="3"></textarea>
                     </div>
-                    
-                    <div class="withdrawal-form">
-                        <div class="form-group">
-                            <label for="payment-input">Lightning Invoice or Address:</label>
-                            <textarea id="payment-input" placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)" rows="3"></textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="withdrawal-amount">Amount (leave empty for invoice amount):</label>
-                            <div class="amount-input-group">
-                                <input type="number" id="withdrawal-amount" placeholder="Amount in sats" min="1" max="${currentBalance}">
-                                <span class="input-suffix">sats</span>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="withdrawal-comment">Comment (optional):</label>
-                            <input type="text" id="withdrawal-comment" placeholder="Payment description" maxlength="144">
-                        </div>
-                        
-                        <div class="payment-preview hidden" id="payment-preview">
-                            <h4>Payment Preview</h4>
-                            <div class="preview-item">
-                                <span>Recipient:</span>
-                                <span id="preview-recipient"></span>
-                            </div>
-                            <div class="preview-item">
-                                <span>Amount:</span>
-                                <span id="preview-amount"></span>
-                            </div>
-                            <div class="preview-item">
-                                <span>Fee Estimate:</span>
-                                <span id="preview-fee"></span>
-                            </div>
-                            <div class="preview-item">
-                                <span>Total:</span>
-                                <span id="preview-total"></span>
-                            </div>
+
+                    <div class="form-group">
+                        <label for="withdrawal-amount">Amount (leave empty for invoice amount):</label>
+                        <div class="amount-input-group">
+                            <input type="number" id="withdrawal-amount" placeholder="Amount in sats" min="1" max="${currentBalance}">
+                            <span class="input-suffix">sats</span>
                         </div>
                     </div>
-                    
-                    <div class="modal-actions">
-                        <button id="preview-payment-btn" class="btn-secondary" disabled>Preview Payment</button>
-                        <button id="send-payment-btn" class="btn-primary hidden" disabled>Send Payment</button>
+
+                    <div class="form-group">
+                        <label for="withdrawal-comment">Comment (optional):</label>
+                        <input type="text" id="withdrawal-comment" placeholder="Payment description" maxlength="144">
                     </div>
-                    
-                    <div class="payment-status hidden" id="withdrawal-status">
-                        <div class="status-indicator" id="withdrawal-status-text">Processing payment...</div>
+
+                    <div class="payment-preview hidden" id="payment-preview">
+                        <h4>Payment Preview</h4>
+                        <div class="preview-item">
+                            <span>Recipient:</span>
+                            <span id="preview-recipient"></span>
+                        </div>
+                        <div class="preview-item">
+                            <span>Amount:</span>
+                            <span id="preview-amount"></span>
+                        </div>
+                        <div class="preview-item">
+                            <span>Fee Estimate:</span>
+                            <span id="preview-fee"></span>
+                        </div>
+                        <div class="preview-item">
+                            <span>Total:</span>
+                            <span id="preview-total"></span>
+                        </div>
                     </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button id="preview-payment-btn" class="btn-secondary" disabled>Preview Payment</button>
+                    <button id="send-payment-btn" class="btn-primary hidden" disabled>Send Payment</button>
+                </div>
+
+                <div class="payment-status hidden" id="withdrawal-status">
+                    <div class="status-indicator" id="withdrawal-status-text">Processing payment...</div>
                 </div>
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(modal);
     setupWithdrawalListeners();
 }
@@ -2584,6 +4218,10 @@ async function lockWallet() {
 
     // Clear sensitive data
     currentBalance = 0;
+
+    // Clear session PIN on lock
+    sessionPin = null;
+    console.log('🔐 [Session] PIN cleared from session memory');
 
     // Show lock screen
     showUnlockPrompt();

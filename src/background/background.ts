@@ -302,11 +302,26 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'LOAD_WALLET':
         console.log('🔵 [Background] LOAD_WALLET - PIN received, length:', message.pin?.length);
-        const walletData = await storageManager.loadEncryptedWallet(message.pin);
-        console.log('✅ [Background] LOAD_WALLET - Wallet decrypted successfully');
-        console.log('🔍 [Background] LOAD_WALLET - Response property:', { hasData: !!walletData, hasMnemonic: !!walletData?.mnemonic });
-        // FIX: Changed from walletData to data to match popup expectation
-        sendResponse({ success: true, data: walletData });
+
+        // FIX: Use getActiveWallet() to respect multi-wallet activeWalletId
+        const activeWalletData = await storageManager.getActiveWallet(message.pin);
+
+        if (!activeWalletData) {
+          console.error('❌ [Background] LOAD_WALLET - No active wallet found');
+          sendResponse({ success: false, error: 'No active wallet found' });
+          break;
+        }
+
+        console.log('✅ [Background] LOAD_WALLET - Active wallet decrypted successfully');
+        console.log('🔍 [Background] LOAD_WALLET - Wallet ID:', activeWalletData.metadata.id);
+        console.log('🔍 [Background] LOAD_WALLET - Response data:', {
+          hasWallet: !!activeWalletData.wallet,
+          hasMnemonic: !!activeWalletData.wallet?.mnemonic,
+          walletId: activeWalletData.metadata.id,
+          nickname: activeWalletData.metadata.nickname
+        });
+
+        sendResponse({ success: true, data: activeWalletData.wallet, metadata: activeWalletData.metadata });
         break;
 
       case 'SAVE_DOMAIN_SETTINGS':
@@ -401,6 +416,193 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           const popupUrl = chrome.runtime.getURL('popup.html?action=withdraw');
           await chrome.tabs.create({ url: popupUrl });
           sendResponse({ success: true });
+        }
+        break;
+
+      // ========================================
+      // Multi-Wallet Support Message Handlers (Phase 2)
+      // ========================================
+
+      case 'CREATE_WALLET':
+        try {
+          console.log('[Background] CREATE_WALLET - Creating new wallet');
+          let { nickname, pin } = message;
+
+          // Validate PIN
+          if (!pin || typeof pin !== 'string') {
+            throw new Error('PIN is required');
+          }
+
+          // Auto-generate nickname if not provided
+          if (!nickname || typeof nickname !== 'string' || !nickname.trim()) {
+            const wallets = await walletManager.getAllWallets();
+            const walletCount = wallets.length;
+            nickname = `Wallet ${walletCount + 1}`;
+            console.log(`[Background] CREATE_WALLET - Auto-generated nickname: "${nickname}"`);
+          }
+
+          const newWallet = await walletManager.createWallet(nickname, pin);
+          console.log('[Background] CREATE_WALLET - Wallet created successfully');
+          sendResponse({ success: true, data: newWallet });
+        } catch (error) {
+          console.error('[Background] CREATE_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Wallet creation failed'
+          });
+        }
+        break;
+
+      case 'IMPORT_WALLET':
+        try {
+          console.log('[Background] IMPORT_WALLET - Importing wallet');
+          let { mnemonic, nickname, pin } = message;
+
+          // Validate parameters
+          if (!mnemonic || typeof mnemonic !== 'string') {
+            throw new Error('Mnemonic is required');
+          }
+          if (!pin || typeof pin !== 'string') {
+            throw new Error('PIN is required');
+          }
+
+          // Auto-generate nickname if not provided
+          if (!nickname || typeof nickname !== 'string' || !nickname.trim()) {
+            const wallets = await walletManager.getAllWallets();
+            const walletCount = wallets.length;
+            nickname = `Wallet ${walletCount + 1}`;
+            console.log(`[Background] IMPORT_WALLET - Auto-generated nickname: "${nickname}"`);
+          }
+
+          const importedWallet = await walletManager.importWallet(mnemonic, nickname, pin);
+          console.log('[Background] IMPORT_WALLET - Wallet imported successfully');
+          sendResponse({ success: true, data: importedWallet });
+        } catch (error) {
+          console.error('[Background] IMPORT_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Wallet import failed'
+          });
+        }
+        break;
+
+      case 'GET_ALL_WALLETS':
+        try {
+          console.log('[Background] GET_ALL_WALLETS - Fetching wallet metadata');
+          const wallets = await walletManager.getAllWallets();
+          console.log('[Background] GET_ALL_WALLETS - Retrieved wallets:', { count: wallets.length });
+          sendResponse({ success: true, data: wallets });
+        } catch (error) {
+          console.error('[Background] GET_ALL_WALLETS - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to retrieve wallets'
+          });
+        }
+        break;
+
+      case 'SWITCH_WALLET':
+        try {
+          console.log('[Background] SWITCH_WALLET - Switching wallet');
+          const { walletId, pin } = message;
+
+          // Validate parameters
+          if (!walletId || typeof walletId !== 'string') {
+            throw new Error('Wallet ID is required');
+          }
+          // PIN validation relaxed - allow empty PIN when wallet is already unlocked
+          // Actual decryption in storage layer will validate PIN if needed
+          if (typeof pin !== 'string') {
+            throw new Error('PIN must be a string');
+          }
+
+          const switchedWallet = await walletManager.switchWallet(walletId, pin);
+          console.log('[Background] SWITCH_WALLET - Wallet switched successfully');
+          sendResponse({ success: true, data: switchedWallet });
+        } catch (error) {
+          console.error('[Background] SWITCH_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Wallet switch failed'
+          });
+        }
+        break;
+
+      case 'RENAME_WALLET':
+        try {
+          console.log('[Background] RENAME_WALLET - Renaming wallet');
+          const { walletId, newNickname, pin } = message;
+
+          // Validate parameters
+          if (!walletId || typeof walletId !== 'string') {
+            throw new Error('Wallet ID is required');
+          }
+          if (!newNickname || typeof newNickname !== 'string') {
+            throw new Error('New wallet name is required');
+          }
+          if (!pin || typeof pin !== 'string') {
+            throw new Error('PIN is required');
+          }
+
+          await walletManager.renameWallet(walletId, newNickname, pin);
+          console.log('[Background] RENAME_WALLET - Wallet renamed successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RENAME_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Wallet rename failed'
+          });
+        }
+        break;
+
+      case 'DELETE_WALLET':
+        try {
+          console.log('[Background] DELETE_WALLET - Deleting wallet');
+          const { walletId, pin } = message;
+
+          // Validate parameters
+          if (!walletId || typeof walletId !== 'string') {
+            throw new Error('Wallet ID is required');
+          }
+          if (!pin || typeof pin !== 'string') {
+            throw new Error('PIN is required');
+          }
+
+          await walletManager.deleteWallet(walletId, pin);
+          console.log('[Background] DELETE_WALLET - Wallet deleted successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] DELETE_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Wallet deletion failed'
+          });
+        }
+        break;
+
+      case 'CHECK_DUPLICATE_MNEMONIC':
+        try {
+          console.log('[Background] CHECK_DUPLICATE_MNEMONIC - Checking for duplicate');
+          const { mnemonic, pin } = message;
+
+          // Validate parameters
+          if (!mnemonic || typeof mnemonic !== 'string') {
+            throw new Error('Mnemonic is required');
+          }
+          if (!pin || typeof pin !== 'string') {
+            throw new Error('PIN is required');
+          }
+
+          const isDuplicate = await walletManager.isDuplicateMnemonic(mnemonic, pin);
+          console.log('[Background] CHECK_DUPLICATE_MNEMONIC - Check complete:', { isDuplicate });
+          sendResponse({ success: true, data: isDuplicate });
+        } catch (error) {
+          console.error('[Background] CHECK_DUPLICATE_MNEMONIC - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Duplicate check failed'
+          });
         }
         break;
 
