@@ -261,11 +261,18 @@ export class ChromeStorageManager {
 
   /**
    * Check if a wallet exists (has been set up)
+   * Checks multi-wallet storage format only
    */
   async walletExists(): Promise<boolean> {
     try {
-      const result = await chrome.storage.local.get(['encryptedWallet']);
-      return !!result.encryptedWallet;
+      const result = await chrome.storage.local.get(['multiWalletData', 'walletVersion']);
+      const exists = !!(result.multiWalletData || result.walletVersion === 1);
+      console.log('🔍 [Storage] walletExists() check', {
+        hasMultiWalletData: !!result.multiWalletData,
+        walletVersion: result.walletVersion,
+        exists
+      });
+      return exists;
     } catch (error) {
       console.error('Failed to check wallet existence:', error);
       return false;
