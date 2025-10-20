@@ -1586,7 +1586,7 @@ body.modal-open {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 #wallet-management-interface h1 {
@@ -1612,22 +1612,31 @@ body.modal-open {
     color: #333;
 }
 
-.add-wallet-top-btn {
+.wallet-mgmt-actions {
+    margin-bottom: 16px;
+}
+
+.add-wallet-full-btn {
+    width: 100%;
     background: #4CAF50;
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
+    border-radius: 8px;
+    padding: 12px 16px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 15px;
+    font-weight: 600;
     transition: all 0.2s;
-    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
-.add-wallet-top-btn:hover {
+.add-wallet-full-btn:hover {
     background: #45a049;
-    transform: scale(1.02);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
 }
 
 .wallet-management-list {
