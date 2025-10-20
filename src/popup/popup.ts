@@ -306,7 +306,18 @@ async function loadWalletData() {
     }
 }
 
+// CRITICAL FIX: Guard against duplicate event listener registration
+let eventListenersSetup = false;
+
 function setupEventListeners() {
+    // Prevent duplicate event listener registration
+    if (eventListenersSetup) {
+        console.log('🔄 [EventListeners] Already setup - skipping duplicate registration');
+        return;
+    }
+
+    console.log('🔵 [EventListeners] Setting up event listeners (first time)');
+
     // Get current DOM elements
     depositBtn = document.getElementById('deposit-btn') as HTMLButtonElement;
     withdrawBtn = document.getElementById('withdraw-btn') as HTMLButtonElement;
@@ -318,6 +329,38 @@ function setupEventListeners() {
     if (withdrawBtn) withdrawBtn.addEventListener('click', handleWithdraw);
     if (settingsBtn) settingsBtn.addEventListener('click', handleSettings);
     document.getElementById('delete-wallet-btn')?.addEventListener('click', showForgotPinModal);
+
+    // Rename wallet interface event listeners
+    const backBtn = document.getElementById('rename-back-btn');
+    const saveBtnEl = document.getElementById('rename-save-btn');
+    const nameInputEl = document.getElementById('rename-wallet-name-input');
+    console.log('?? [EventListeners][Rename] Wiring listeners', {
+        hasBackBtn: !!backBtn,
+        hasSaveBtn: !!saveBtnEl,
+        hasNameInput: !!nameInputEl
+    });
+
+    backBtn?.addEventListener('click', hideRenameInterface);
+    saveBtnEl?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isRenameSaving) return;
+        handleRenameSave();
+    });
+
+    // Enter key to save in rename interface
+    nameInputEl?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const renameInterface = document.getElementById('rename-wallet-interface');
+            const isHidden = renameInterface?.classList.contains('hidden');
+            if (isRenameSaving || !renameWalletId || isHidden) return;
+            handleRenameSave();
+        }
+    });
+
+    // Mark as setup to prevent duplicates
+    eventListenersSetup = true;
+    console.log('✅ [EventListeners] Event listeners setup complete');
 }
 
 function updateBalance(balance: number) {
@@ -1717,6 +1760,11 @@ async function handleWalletSwitch(walletId: string): Promise<void> {
         }
         console.log('🔐 [Multi-Wallet] Using session PIN for wallet switch');
 
+        // CRITICAL FIX: Clear cached balance before switching wallets
+        // Balance cache is global and not wallet-specific
+        await chrome.storage.local.remove(['cachedBalance']);
+        console.log('🔄 [Multi-Wallet] Cleared global balance cache before switch');
+
         // Disconnect current SDK
         if (breezSDK) {
             console.log('[Multi-Wallet] Disconnecting current SDK');
@@ -1734,8 +1782,10 @@ async function handleWalletSwitch(walletId: string): Promise<void> {
         console.log('[Multi-Wallet] Connecting to new wallet SDK');
         breezSDK = await connectBreezSDK(switchResponse.data.mnemonic);
 
-        // Reload wallet data
-        await loadWalletData();
+        // CRITICAL FIX: Query fresh balance from SDK instead of using cached value
+        // loadWalletData() uses cached balance which is stale after wallet switch
+        await updateBalanceDisplay();
+        console.log('🔄 [Multi-Wallet] Queried fresh balance from new wallet SDK');
 
         // Show loading states while waiting for sync to complete
         const balanceLoading = document.getElementById('balance-loading');
@@ -2463,56 +2513,9 @@ function checkModalImportComplete(confirmBtn: HTMLButtonElement): void {
 }
 
 /**
- * Rename Wallet Modal
+ * REMOVED: Old showRenameWalletModal() function
+ * Replaced with full-screen rename interface (showRenameInterface)
  */
-async function showRenameWalletModal(currentName: string): Promise<string | null> {
-    return new Promise((resolve) => {
-        modalState.resolveCallback = resolve;
-
-        const inputEl = document.getElementById('rename-wallet-input') as HTMLInputElement;
-        const errorEl = document.getElementById('rename-wallet-error');
-        const cancelBtn = document.getElementById('rename-wallet-cancel');
-        const saveBtn = document.getElementById('rename-wallet-save');
-
-        if (!inputEl || !cancelBtn || !saveBtn) {
-            resolve(null);
-            return;
-        }
-
-        inputEl.value = currentName;
-        errorEl?.classList.add('hidden');
-
-        // Remove old listeners
-        const newCancelBtn = cancelBtn.cloneNode(true) as HTMLButtonElement;
-        const newSaveBtn = saveBtn.cloneNode(true) as HTMLButtonElement;
-        cancelBtn.replaceWith(newCancelBtn);
-        saveBtn.replaceWith(newSaveBtn);
-
-        newCancelBtn.addEventListener('click', () => {
-            closeCurrentModal(null);
-        });
-
-        newSaveBtn.addEventListener('click', () => {
-            const newName = inputEl.value.trim();
-            if (!newName) {
-                if (errorEl) {
-                    errorEl.textContent = 'Please enter a wallet name';
-                    errorEl.classList.remove('hidden');
-                }
-                return;
-            }
-            closeCurrentModal(newName);
-        });
-
-        inputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                newSaveBtn.click();
-            }
-        });
-
-        showModal('rename-wallet-modal');
-    });
-}
 
 /**
  * Legacy function for backward compatibility
@@ -2678,38 +2681,188 @@ function attachWalletManagementListeners(): void {
     });
 }
 
+// Global state for rename flow
+let renameWalletId: string | null = null;
+let renameWalletCurrentName: string | null = null;
+
 /**
- * Handle rename wallet action
+ * Handle rename wallet action - show full-screen rename interface
  */
 async function handleRenameWallet(walletId: string, currentName: string): Promise<void> {
     try {
         console.log(`[Wallet Management] Renaming wallet ${walletId}`);
 
-        // Show rename modal
-        const newName = await showRenameWalletModal(currentName);
-        if (!newName) return;
+        // Store wallet info for rename flow
+        renameWalletId = walletId;
+        renameWalletCurrentName = currentName;
 
-        // Get PIN
-        const pin = await showPINModal('Enter your PIN to rename wallet');
-        if (!pin) return;
+        // Show rename interface
+        showRenameInterface(currentName);
+    } catch (error) {
+        console.error('[Wallet Management] Failed to show rename interface:', error);
+        showError('Failed to open rename screen');
+    }
+}
+
+/**
+ * Show rename wallet full-screen interface
+ */
+function showRenameInterface(currentName: string): void {
+    console.log('[Rename] Showing rename interface');
+
+    // Hide wallet management interface
+    const managementInterface = document.getElementById('wallet-management-interface');
+    if (managementInterface) {
+        managementInterface.classList.add('hidden');
+    }
+
+    // Show rename interface
+    const renameInterface = document.getElementById('rename-wallet-interface');
+    if (renameInterface) {
+        renameInterface.classList.remove('hidden');
+    }
+
+    // Set current wallet name in input
+    const input = document.getElementById('rename-wallet-name-input') as HTMLInputElement;
+    if (input) {
+        input.value = currentName;
+        input.focus();
+        input.select(); // Select all text for easy overwriting
+    }
+
+    // Focus and select input text for easy editing
+    // (No longer need 350ms delay workaround - duplicate listener issue fixed)
+
+    // Clear any previous error
+    const errorEl = document.getElementById('rename-error-message');
+    if (errorEl) {
+        errorEl.classList.add('hidden');
+        errorEl.textContent = '';
+    }
+}
+
+// CRITICAL FIX: Prevent duplicate rename save calls
+let isRenameSaving = false;
+
+/**
+ * Handle rename save action
+ */
+async function handleRenameSave(): Promise<void> {
+    try {
+        console.log('🔵 [Rename] handleRenameSave() CALLED', {
+            timestamp: new Date().toISOString(),
+            renameWalletId: renameWalletId,
+            renameWalletCurrentName: renameWalletCurrentName,
+            isRenameSaving: isRenameSaving
+        });
+
+        // Prevent duplicate calls
+        if (isRenameSaving) {
+            console.log('🔄 [Rename] Save already in progress - ignoring duplicate call');
+            return;
+        }
+
+        // Set lock before validation
+        isRenameSaving = true;
+        console.log('🔒 [Rename] Locking save operation');
+
+        // Now validate - if validation fails, lock will be released in finally
+        if (!renameWalletId) {
+            console.error('[Rename] No wallet ID set - ABORTING');
+            console.error('[Rename] State at error:', {
+                renameWalletId: renameWalletId,
+                renameWalletCurrentName: renameWalletCurrentName,
+                timestamp: new Date().toISOString()
+            });
+            console.warn('[Rename] Ignoring save with no wallet ID');
+            return;
+        }
+
+        const input = document.getElementById('rename-wallet-name-input') as HTMLInputElement;
+        const errorEl = document.getElementById('rename-error-message');
+        const newName = input?.value.trim();
+        console.log('?? [Rename] Input captured', { newNameLength: newName?.length, preview: newName });
+
+        // Validate input
+        if (!newName) {
+            if (errorEl) {
+                errorEl.textContent = 'Please enter a wallet name';
+                errorEl.classList.remove('hidden');
+            }
+            console.warn('[Rename] Validation failed: empty name');
+            return;
+        }
+
+        // Use session PIN (wallet is already unlocked)
+        const pin = sessionPin || '';
+        if (!pin) {
+            console.error('[Rename] No session PIN available');
+            showError('Session expired. Please unlock wallet again.');
+            return;
+        }
+
+        console.log('[Rename] Saving new wallet name', { walletId: renameWalletId, newName });
 
         // Rename wallet
-        const response = await ExtensionMessaging.renameWallet(walletId, newName, pin);
+        const response = await ExtensionMessaging.renameWallet(renameWalletId, newName, pin);
+        console.log('?? [Rename] Background response received', { success: response.success, error: response.error });
+
         if (response.success) {
             showSuccess('Wallet renamed successfully!');
 
-            // Reload wallet list
+            // Clear rename state
+            renameWalletId = null;
+            renameWalletCurrentName = null;
+
+            // Hide rename interface
+            hideRenameInterface();
+
+            // Reload wallet list in management interface
             await loadWalletManagementList();
 
             // Update main interface if this is the active wallet
             await initializeMultiWalletUI();
         } else {
-            showError(response.error || 'Failed to rename wallet');
+            if (errorEl) {
+                errorEl.textContent = response.error || 'Failed to rename wallet';
+                errorEl.classList.remove('hidden');
+            }
         }
     } catch (error) {
-        console.error('[Wallet Management] Rename failed:', error);
-        showError('Failed to rename wallet');
+        console.error('[Rename] Save failed:', error);
+        const errorEl = document.getElementById('rename-error-message');
+        if (errorEl) {
+            errorEl.textContent = 'Failed to rename wallet';
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        // CRITICAL FIX: Always reset the save lock, even on error
+        isRenameSaving = false;
+        console.log('🔓 [Rename] Unlocking save operation');
     }
+}
+
+/**
+ * Hide rename interface and return to wallet management
+ */
+function hideRenameInterface(): void {
+    console.log('[Rename] Hiding rename interface');
+
+    // Hide rename interface
+    const renameInterface = document.getElementById('rename-wallet-interface');
+    if (renameInterface) {
+        renameInterface.classList.add('hidden');
+    }
+
+    // Show wallet management interface
+    const managementInterface = document.getElementById('wallet-management-interface');
+    if (managementInterface) {
+        managementInterface.classList.remove('hidden');
+    }
+
+    // Clear rename state
+    renameWalletId = null;
+    renameWalletCurrentName = null;
 }
 
 /**
@@ -2792,8 +2945,24 @@ function showUnlockPrompt() {
 
     console.log('✅ [Unlock] Unlock form elements found, setting up listeners');
 
-    // Set up unlock button listener
-    unlockBtn.onclick = async () => {
+    // CRITICAL FIX: Clear PIN input and reset button state
+    pinInput.value = '';
+    pinInput.focus();
+    unlockBtn.disabled = false;
+    unlockBtn.textContent = 'Unlock';
+    if (unlockError) {
+        unlockError.classList.add('hidden');
+        unlockError.textContent = '';
+    }
+    console.log('🔄 [Unlock] Reset input field, button state, and error message');
+
+    // CRITICAL FIX: Remove old event handlers by cloning and replacing element
+    const newUnlockBtn = unlockBtn.cloneNode(true) as HTMLButtonElement;
+    unlockBtn.parentNode?.replaceChild(newUnlockBtn, unlockBtn);
+    console.log('🔄 [Unlock] Replaced unlock button to remove duplicate handlers');
+
+    // Set up unlock button listener on the NEW element
+    newUnlockBtn.onclick = async () => {
         const pin = pinInput.value;
         console.log('🔑 [Unlock] PIN ENTERED:', {
             pinLength: pin.length,
@@ -2811,8 +2980,8 @@ function showUnlockPrompt() {
         }
 
         try {
-            unlockBtn.disabled = true;
-            unlockBtn.textContent = 'Unlocking...';
+            newUnlockBtn.disabled = true;
+            newUnlockBtn.textContent = 'Unlocking...';
             if (unlockError) unlockError.classList.add('hidden');
 
             console.log('🔵 [Popup] Starting unlock process...');
@@ -2841,8 +3010,8 @@ function showUnlockPrompt() {
                     unlockError.textContent = errorMsg;
                     unlockError.classList.remove('hidden');
                 }
-                unlockBtn.disabled = false;
-                unlockBtn.textContent = 'Unlock';
+                newUnlockBtn.disabled = false;
+                newUnlockBtn.textContent = 'Unlock';
                 return;
             }
 
@@ -2935,15 +3104,18 @@ function showUnlockPrompt() {
                 unlockError.textContent = errorMsg;
                 unlockError.classList.remove('hidden');
             }
-            unlockBtn.disabled = false;
-            unlockBtn.textContent = 'Unlock';
+            newUnlockBtn.disabled = false;
+            newUnlockBtn.textContent = 'Unlock';
+            // Clear PIN input on error
+            pinInput.value = '';
+            pinInput.focus();
         }
     };
 
     // Allow Enter key to unlock
     pinInput.onkeypress = (e) => {
         if (e.key === 'Enter') {
-            unlockBtn.click();
+            newUnlockBtn.click();
         }
     };
 
@@ -3219,8 +3391,8 @@ function restoreMainInterface() {
 
         console.log('✅ [Restore] Main interface visibility restored');
 
-        // Re-setup event listeners just in case
-        setupEventListeners();
+        // Event listeners already setup on DOMContentLoaded - no need to re-setup
+        // setupEventListeners() was causing duplicate event listener registration
     } else {
         // Fallback: If elements don't exist, reload the page
         console.warn('⚠️ [Restore] Main interface elements not found - reloading popup');
