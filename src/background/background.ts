@@ -74,11 +74,11 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
             transactions: []
           };
 
-          // Save encrypted wallet data
-          await storageManager.saveEncryptedWallet(walletData, message.pin);
+          // Save to multi-wallet storage (works for first wallet and additional wallets)
+          const walletId = await storageManager.addWallet(walletData, 'Wallet 1', message.pin);
           await storageManager.unlockWallet();
 
-          console.log('Background: Wallet data saved successfully');
+          console.log('Background: Wallet added successfully to multi-wallet storage', { walletId });
           sendResponse({
             success: true,
             message: 'Wallet created. SDK will be initialized in popup.'
@@ -532,6 +532,11 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         try {
           console.log('[Background] RENAME_WALLET - Renaming wallet');
           const { walletId, newNickname, pin } = message;
+          console.log('[Background] RENAME_WALLET - Payload received', {
+            walletId,
+            newNickname,
+            pinLength: typeof pin === 'string' ? pin.length : undefined
+          });
 
           // Validate parameters
           if (!walletId || typeof walletId !== 'string') {
@@ -547,12 +552,14 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           await walletManager.renameWallet(walletId, newNickname, pin);
           console.log('[Background] RENAME_WALLET - Wallet renamed successfully');
           sendResponse({ success: true });
+          console.log('[Background] RENAME_WALLET - Response sent: success');
         } catch (error) {
           console.error('[Background] RENAME_WALLET - Failed:', error);
           sendResponse({
             success: false,
             error: error instanceof Error ? error.message : 'Wallet rename failed'
           });
+          console.log('[Background] RENAME_WALLET - Response sent: failure');
         }
         break;
 
