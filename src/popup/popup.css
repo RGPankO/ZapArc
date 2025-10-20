@@ -598,6 +598,216 @@ header h1 {
     color: white;
 }
 
+/* ========================================
+   Multi-Wallet Selector Styles
+   ======================================== */
+
+.wallet-selector {
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.wallet-selector.hidden {
+    display: none;
+}
+
+.wallet-selector-header {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.current-wallet-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.current-wallet-btn:hover {
+    background: #f8f8f8;
+    border-color: #4CAF50;
+}
+
+#current-wallet-name {
+    flex: 1;
+    text-align: left;
+    font-weight: 500;
+    color: #333;
+}
+
+.wallet-count-badge {
+    background: #4CAF50;
+    color: white;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.dropdown-arrow {
+    color: #666;
+    font-size: 10px;
+    transition: transform 0.2s;
+}
+
+.current-wallet-btn.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.add-wallet-btn {
+    width: 40px;
+    height: 40px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.add-wallet-btn:hover {
+    background: #45a049;
+    transform: scale(1.05);
+}
+
+/* Wallet Dropdown */
+.wallet-dropdown {
+    position: absolute;
+    top: 48px;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.wallet-dropdown.hidden {
+    display: none;
+}
+
+.wallet-list {
+    padding: 8px 0;
+}
+
+.wallet-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.wallet-item:last-child {
+    border-bottom: none;
+}
+
+.wallet-item:hover {
+    background: #f8f8f8;
+}
+
+.wallet-item.active {
+    background: #e8f5e9;
+}
+
+.wallet-item-check {
+    width: 20px;
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.wallet-item-info {
+    flex: 1;
+}
+
+.wallet-item-name {
+    font-weight: 500;
+    color: #333;
+    font-size: 14px;
+}
+
+.wallet-item-balance {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+}
+
+.wallet-dropdown-footer {
+    border-top: 1px solid #ddd;
+    padding: 8px;
+}
+
+.manage-wallets-btn {
+    width: 100%;
+    padding: 8px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.manage-wallets-btn:hover {
+    background: #f8f8f8;
+    border-color: #4CAF50;
+}
+
+/* Wallet Switching Indicator */
+.wallet-switching-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.wallet-switching-overlay.hidden {
+    display: none;
+}
+
+.switching-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #4CAF50;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.switching-text {
+    margin-top: 12px;
+    font-size: 14px;
+    color: #666;
+}
+
 /* Unlock Interface */
 #unlock-interface {
     height: 100%;
@@ -1056,3 +1266,461 @@ al Styles */
 .notification-error::before {
     content: '❌';
 }
+
+/* ========================================
+   Modal System Styles
+   ======================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: modalOverlayFadeIn 0.2s ease-out;
+}
+
+.modal-overlay.hidden {
+    display: none;
+}
+
+@keyframes modalOverlayFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.modal {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 400px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    animation: modalScaleIn 0.2s ease-out;
+    overflow: hidden;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+@keyframes modalScaleIn {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    line-height: 1;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.modal-close:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-body p {
+    margin: 0 0 16px 0;
+    line-height: 1.5;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.modal-footer button {
+    flex: 1;
+}
+
+/* Modal Input Styles */
+.modal-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.modal-input:focus {
+    outline: none;
+    border-color: #f7931a;
+}
+
+.modal-input::placeholder {
+    color: #999;
+}
+
+/* Modal Error Message */
+.modal-body .error-message {
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+/* PIN Modal Specific */
+#pin-modal-input {
+    text-align: center;
+    font-size: 16px;
+    letter-spacing: 2px;
+}
+
+/* Add Wallet Modals - Flow Management */
+#add-wallet-choice-modal .modal-body,
+#add-wallet-create-modal .modal-body,
+#add-wallet-import-nickname-modal .modal-body {
+    min-height: 150px;
+}
+
+#add-wallet-mnemonic-modal .modal-body {
+    min-height: 300px;
+}
+
+#add-wallet-import-modal .modal-body {
+    min-height: 350px;
+}
+
+/* Mnemonic Display in Modal */
+#modal-mnemonic-display.mnemonic-grid {
+    margin-bottom: 16px;
+}
+
+#modal-mnemonic-display .mnemonic-word {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    padding: 10px 8px;
+    text-align: center;
+    border-radius: 6px;
+}
+
+#modal-mnemonic-display .mnemonic-word .word-number {
+    display: block;
+    font-size: 10px;
+    color: #999;
+    margin-bottom: 4px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#modal-mnemonic-display .mnemonic-word {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+}
+
+/* Copy Mnemonic Button */
+#copy-mnemonic-btn {
+    background: white;
+    border: 1px solid #f7931a;
+    color: #f7931a;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+#copy-mnemonic-btn:hover {
+    background: #f7931a;
+    color: white;
+}
+
+#copy-mnemonic-btn:active {
+    transform: scale(0.98);
+}
+
+/* Import Words Grid in Modal */
+#modal-import-words-container.import-words-grid {
+    margin-bottom: 12px;
+}
+
+#modal-import-words-container .word-input-wrapper input {
+    padding: 10px 10px 10px 32px;
+}
+
+/* Word Suggestions in Modal */
+#modal-word-suggestions.word-suggestions {
+    position: fixed;
+    z-index: 10001;
+}
+
+/* Rename Wallet Modal */
+#rename-wallet-modal .modal-body {
+    min-height: 100px;
+}
+
+/* Modal Overlay Click-to-Close Helper */
+.modal-overlay::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+}
+
+/* Prevent Body Scroll When Modal Open */
+body.modal-open {
+    overflow: hidden;
+}
+
+/* Modal Accessibility - Focus Ring */
+.modal-input:focus,
+.modal button:focus {
+    outline: 2px solid #f7931a;
+    outline-offset: 2px;
+}
+
+.modal-close:focus {
+    outline: 2px solid #f7931a;
+    outline-offset: 2px;
+}
+
+/* Responsive Modal Adjustments */
+@media (max-height: 600px) {
+    .modal {
+        max-height: 95vh;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-header,
+    .modal-footer {
+        padding: 12px 16px;
+    }
+}
+
+/* Loading State for Modal Buttons */
+.modal-footer button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Modal Animation for Sequential Modals */
+.modal.slide-out {
+    animation: modalSlideOut 0.2s ease-in forwards;
+}
+
+@keyframes modalSlideOut {
+    from {
+        transform: scale(1);
+        opacity: 1;
+    }
+    to {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+}
+/* ========================================
+   Wallet Management Interface Styles
+   ======================================== */
+
+#wallet-management-interface {
+    padding: 16px;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+#wallet-management-interface header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+#wallet-management-interface h1 {
+    flex: 1;
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+}
+
+.back-btn {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #666;
+    transition: all 0.2s;
+}
+
+.back-btn:hover {
+    background: #f8f8f8;
+    color: #333;
+}
+
+.add-wallet-top-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.add-wallet-top-btn:hover {
+    background: #45a049;
+    transform: scale(1.02);
+}
+
+.wallet-management-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.wallet-mgmt-item {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+}
+
+.wallet-mgmt-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.wallet-mgmt-item.active {
+    border-color: #4CAF50;
+    background: #f1f8f4;
+}
+
+.wallet-mgmt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.wallet-mgmt-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.active-badge {
+    background: #4CAF50;
+    color: white;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.wallet-mgmt-balance {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 12px;
+}
+
+.wallet-mgmt-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.wallet-mgmt-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.wallet-mgmt-btn:hover {
+    background: #f8f8f8;
+}
+
+.wallet-mgmt-btn.rename-btn:hover {
+    border-color: #2196F3;
+    color: #2196F3;
+}
+
+.wallet-mgmt-btn.delete-btn {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.wallet-mgmt-btn.delete-btn:hover {
+    background: #dc3545;
+    color: white;
+}
+
+.wallet-mgmt-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+

@@ -2559,6 +2559,15 @@ async function showWalletManagementInterface(): Promise<void> {
             hideWalletManagementInterface();
         };
     }
+
+    // Setup add wallet button
+    const addBtn = document.getElementById('wallet-mgmt-add-btn');
+    if (addBtn) {
+        addBtn.onclick = () => {
+            console.log('[Wallet Management] Add wallet button clicked');
+            showAddWalletModal();
+        };
+    }
 }
 
 /**
