@@ -166,8 +166,8 @@ async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                     loadTransactionHistory().catch(err => {
                         console.error('❌ [Breez-SDK] Failed to load transactions after sync:', err);
                     });
-                    // Reload balance after sync
-                    loadWalletData().catch(err => {
+                    // Reload balance after sync - query SDK directly for fresh balance
+                    updateBalanceDisplay().catch(err => {
                         console.error('❌ [Breez-SDK] Failed to load balance after sync:', err);
                     });
                 } else if (event.type === 'paymentSucceeded') {
@@ -176,7 +176,7 @@ async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                     loadTransactionHistory().catch(err => {
                         console.error('❌ [Breez-SDK] Failed to load transactions after payment:', err);
                     });
-                    loadWalletData().catch(err => {
+                    updateBalanceDisplay().catch(err => {
                         console.error('❌ [Breez-SDK] Failed to load balance after payment:', err);
                     });
                 }
@@ -1237,8 +1237,8 @@ async function handleSetupComplete() {
             sessionPin = userPin;
             console.log('🔐 [Session] PIN stored after wallet setup');
 
-            // Get initial balance from SDK
-            await loadWalletData();
+            // Get initial balance from SDK directly (not cached)
+            await updateBalanceDisplay();
 
             // Show loading states while waiting for sync to complete
             const balanceLoading = document.getElementById('balance-loading');
@@ -3355,10 +3355,10 @@ function showWalletReconnectPrompt() {
             if (unlockResponse.success) {
                 reconnectDiv.remove();
                 isWalletUnlocked = true;
-                
+
                 // Restore the main interface
                 restoreMainInterface();
-                await loadWalletData();
+                await updateBalanceDisplay();
             } else {
                 showError(unlockResponse.error || 'Failed to reconnect wallet');
             }
@@ -3987,9 +3987,9 @@ function handlePaymentReceived() {
     if (timerElement) {
         timerElement.textContent = 'Completed';
     }
-    
-    // Refresh wallet data
-    loadWalletData();
+
+    // Refresh wallet data - query SDK for fresh balance
+    updateBalanceDisplay();
     
     showSuccess('Deposit received successfully!');
     
