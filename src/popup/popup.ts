@@ -1240,6 +1240,9 @@ async function handleSetupComplete() {
             // Get initial balance from SDK directly (not cached)
             await updateBalanceDisplay();
 
+            // Enable wallet controls now that wallet is loaded
+            enableWalletControls();
+
             // Show loading states while waiting for sync to complete
             const balanceLoading = document.getElementById('balance-loading');
             if (balanceLoading) {
@@ -3359,6 +3362,9 @@ function showWalletReconnectPrompt() {
                 // Restore the main interface
                 restoreMainInterface();
                 await updateBalanceDisplay();
+
+                // Enable wallet controls after reconnect
+                enableWalletControls();
             } else {
                 showError(unlockResponse.error || 'Failed to reconnect wallet');
             }
