@@ -572,4 +572,124 @@ export class ExtensionMessaging {
       groupId
     });
   }
+
+  // ========================================
+  // Multi-Wallet Support Methods (Phase 2)
+  // ========================================
+
+  /**
+   * Create a new wallet with generated mnemonic
+   * Generates a new 12-word BIP39 mnemonic and adds to wallet storage
+   *
+   * @param nickname - User-friendly name for the wallet
+   * @param pin - User's PIN for encryption
+   * @returns Wallet data with mnemonic and initial balance
+   */
+  static async createWallet(nickname: string, pin: string): Promise<MessageResponse<WalletData>> {
+    return this.sendToBackground({
+      type: 'CREATE_WALLET',
+      nickname,
+      pin
+    });
+  }
+
+  /**
+   * Import an existing wallet from mnemonic
+   * Validates mnemonic and checks for duplicates before importing
+   *
+   * @param mnemonic - 12-word BIP39 mnemonic phrase
+   * @param nickname - User-friendly name for the wallet
+   * @param pin - User's PIN for encryption
+   * @returns Wallet data
+   */
+  static async importWallet(mnemonic: string, nickname: string, pin: string): Promise<MessageResponse<WalletData>> {
+    return this.sendToBackground({
+      type: 'IMPORT_WALLET',
+      mnemonic,
+      nickname,
+      pin
+    });
+  }
+
+  /**
+   * Get all wallets (metadata only, no mnemonics)
+   * Returns wallet metadata for UI display
+   *
+   * @returns Array of wallet metadata
+   */
+  static async getAllWallets(): Promise<MessageResponse<import('../types').WalletMetadata[]>> {
+    return this.sendToBackground({
+      type: 'GET_ALL_WALLETS'
+    });
+  }
+
+  /**
+   * Switch to a different wallet
+   * Disconnects current SDK, loads new wallet, and prepares for SDK reconnection
+   *
+   * @param walletId - UUID of the wallet to switch to
+   * @param pin - User's PIN to decrypt wallet
+   * @returns Wallet data for the new active wallet
+   */
+  static async switchWallet(walletId: string, pin: string): Promise<MessageResponse<WalletData>> {
+    return this.sendToBackground({
+      type: 'SWITCH_WALLET',
+      walletId,
+      pin
+    });
+  }
+
+  /**
+   * Rename a wallet
+   * Updates the wallet's nickname in metadata
+   *
+   * @param walletId - UUID of the wallet to rename
+   * @param newNickname - New name for the wallet
+   * @param pin - User's PIN for verification
+   */
+  static async renameWallet(walletId: string, newNickname: string, pin: string): Promise<MessageResponse<void>> {
+    console.log('?? [ExtensionMessaging] RENAME_WALLET request', {
+      walletId,
+      newNickname,
+      pinLength: typeof pin === 'string' ? pin.length : undefined,
+      timestamp: new Date().toISOString()
+    });
+    return this.sendToBackground({
+      type: 'RENAME_WALLET',
+      walletId,
+      newNickname,
+      pin
+    });
+  }
+
+  /**
+   * Delete a wallet
+   * Removes wallet from storage (prevents deleting the last wallet)
+   *
+   * @param walletId - UUID of the wallet to delete
+   * @param pin - User's PIN for verification
+   */
+  static async deleteWallet(walletId: string, pin: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'DELETE_WALLET',
+      walletId,
+      pin
+    });
+  }
+
+  /**
+   * Check if mnemonic already exists (duplicate detection)
+   * Derives fingerprint from mnemonic and compares with existing wallets
+   *
+   * @param mnemonic - Mnemonic to check
+   * @param pin - User's PIN to decrypt existing wallets
+   * @returns True if duplicate found, false otherwise
+   */
+  static async checkDuplicateMnemonic(mnemonic: string, pin: string): Promise<MessageResponse<boolean>> {
+    return this.sendToBackground({
+      type: 'CHECK_DUPLICATE_MNEMONIC',
+      mnemonic,
+      pin
+    });
+  }
 }
