@@ -215,6 +215,104 @@ declare module '@breeztech/breez-sdk-spark/web' {
     lnurl: string;
   }
 
+  // LNURL Pay Request Details (returned from parse() for Lightning addresses)
+  export interface LnurlPayRequestDetails {
+    callback: string;
+    minSendable: number;
+    maxSendable: number;
+    metadataStr: string;
+    commentAllowed: number;
+    domain: string;
+    url: string;
+    address?: string;
+    allowsNostr?: boolean;
+    nostrPubkey?: string;
+  }
+
+  // Lightning Address Details
+  export interface LightningAddressDetails {
+    address: string;
+    payRequest: LnurlPayRequestDetails;
+  }
+
+  // Input types returned by parse()
+  export type InputType =
+    | ({ type: "bitcoinAddress" } & any)
+    | ({ type: "bolt11Invoice" } & any)
+    | ({ type: "lightningAddress" } & LightningAddressDetails)
+    | ({ type: "lnurlPay" } & LnurlPayRequestDetails)
+    | ({ type: "lnurlAuth" } & any)
+    | ({ type: "url" } & string)
+    | ({ type: "bip21" } & any)
+    | ({ type: "lnurlWithdraw" } & any)
+    | ({ type: "sparkAddress" } & any);
+
+  // Prepare LNURL Pay Request
+  export interface PrepareLnurlPayRequest {
+    amountSats: number;
+    comment?: string;
+    payRequest: LnurlPayRequestDetails;
+    validateSuccessActionUrl?: boolean;
+  }
+
+  // Bolt11 Invoice Details
+  export interface Bolt11InvoiceDetails {
+    amount?: number;
+    description?: string;
+    paymentHash?: string;
+    timestamp?: number;
+    expiresAt?: number;
+    [key: string]: any;
+  }
+
+  // Success Action Types
+  export interface MessageSuccessActionData {
+    message: string;
+  }
+
+  export interface UrlSuccessActionData {
+    description: string;
+    url: string;
+    matchesCallbackDomain: boolean;
+  }
+
+  export interface AesSuccessActionData {
+    description: string;
+    ciphertext: string;
+    iv: string;
+  }
+
+  export type SuccessAction =
+    | { type: "message"; data: MessageSuccessActionData }
+    | { type: "url"; data: UrlSuccessActionData }
+    | { type: "aes"; data: AesSuccessActionData };
+
+  export type SuccessActionProcessed =
+    | { type: "message"; data: MessageSuccessActionData }
+    | { type: "url"; data: UrlSuccessActionData }
+    | { type: "aes"; result: any };
+
+  // Prepare LNURL Pay Response
+  export interface PrepareLnurlPayResponse {
+    amountSats: number;
+    comment?: string;
+    payRequest: LnurlPayRequestDetails;
+    feeSats: number;
+    invoiceDetails: Bolt11InvoiceDetails;
+    successAction?: SuccessAction;
+  }
+
+  // LNURL Pay Request (for actual payment execution)
+  export interface LnurlPayRequestNew {
+    prepareResponse: PrepareLnurlPayResponse;
+  }
+
+  // LNURL Pay Response
+  export interface LnurlPayResponse {
+    payment: Payment;
+    successAction?: SuccessActionProcessed;
+  }
+
   export interface ListPaymentsRequest {
     offset?: number;
     limit?: number;
@@ -224,6 +322,12 @@ declare module '@breeztech/breez-sdk-spark/web' {
     payments: Payment[];
   }
 
+  export interface EventListener {
+    onEvent: (e: SdkEvent) => void;
+  }
+
+  export type SdkEvent = { type: "synced" } | { type: "claimDepositsFailed" } | { type: "claimDepositsSucceeded" } | { type: "paymentSucceeded" };
+
   export interface BreezSdk {
     nodeInfo(): Promise<NodeInfo>;
     getInfo(req: GetInfoRequest): Promise<GetInfoResponse>;
@@ -231,10 +335,14 @@ declare module '@breeztech/breez-sdk-spark/web' {
     prepareSendPayment(req: PrepareSendPaymentRequest): Promise<PrepareResponse>;
     sendPayment(req: SendPaymentRequest): Promise<void>;
     listPayments(req?: ListPaymentsRequest): Promise<ListPaymentsResponse>;
-    parse(input: string): Promise<any>;
+    parse(input: string): Promise<InputType>;
     parseLnurl(lnurl: string): Promise<any>; // Legacy, use parse() instead
     payLnurl(req: LnUrlPayRequest): Promise<void>;
+    prepareLnurlPay(req: PrepareLnurlPayRequest): Promise<PrepareLnurlPayResponse>;
+    lnurlPay(req: LnurlPayRequestNew): Promise<LnurlPayResponse>;
     receiveLnurlPay(): Promise<LnUrlPayData>;
+    addEventListener(listener: EventListener): string;
+    removeEventListener(id: string): boolean;
     disconnect(): Promise<void>;
   }
 

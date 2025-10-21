@@ -29,6 +29,8 @@ import './popup.css';
 import { ExtensionMessaging } from '../utils/messaging';
 import * as QRCode from 'qrcode';
 import init, { connect, defaultConfig, type BreezSdk, type Config, type ConnectRequest, type EventListener, type SdkEvent } from '@breeztech/breez-sdk-spark/web';
+// @ts-ignore - parse function exists but TypeScript can't find it in re-exports
+import { parse as parseInput } from '@breeztech/breez-sdk-spark/web';
 import * as bip39 from 'bip39';
 import type { WalletMetadata } from '../types';
 import { ChromeStorageManager } from '../utils/storage';
@@ -696,7 +698,37 @@ function setupWizardListeners() {
     const mnemonicBackBtn = document.getElementById('mnemonic-back-btn');
     if (mnemonicBackBtn) {
         mnemonicBackBtn.onclick = () => {
-            showWizardStep('welcome-step');
+            console.log('[Wizard Navigation] Mnemonic back button clicked - isAddingWallet:', isAddingWallet);
+
+            // If adding wallet (not initial setup), close wizard and return to main interface
+            if (isAddingWallet) {
+                console.log('[Add Wallet] Back from mnemonic step - closing wizard, returning to main interface');
+
+                // Hide wizard
+                const wizard = document.getElementById('onboarding-wizard');
+                if (wizard) {
+                    wizard.classList.add('hidden');
+                }
+
+                // Show main interface
+                const mainInterface = document.getElementById('main-interface');
+                if (mainInterface) {
+                    mainInterface.classList.remove('hidden');
+                }
+
+                // Reset wizard state
+                setIsAddingWallet(false);
+                setIsImportingWallet(false);
+                generatedMnemonic = '';
+                mnemonicWords = [];
+                selectedWords = [];
+
+                console.log('[Wizard] Closed, main interface restored');
+            } else {
+                // Initial setup flow - go back to welcome
+                console.log('[Initial Setup] Back to welcome step');
+                showWizardStep('welcome-step');
+            }
         };
     }
 
@@ -2028,6 +2060,12 @@ async function showAddWalletModal(): Promise<void> {
     const mainInterface = document.getElementById('main-interface');
     if (mainInterface) {
         mainInterface.classList.add('hidden');
+    }
+
+    // Hide wallet management interface (if visible)
+    const managementInterface = document.getElementById('wallet-management-interface');
+    if (managementInterface) {
+        managementInterface.classList.add('hidden');
     }
 
     // Show wizard
@@ -4208,22 +4246,72 @@ async function previewPayment() {
 
             displayPaymentPreview(previewData);
         } else {
-            // For LNURL/Lightning addresses, use parse()
-            console.log('🔍 [Withdraw] Using parse for LNURL/Lightning address');
-            const parsed = await breezSDK.parse(input);
+            // For LNURL/Lightning addresses, use parseLnurl() instead of parse()
+            // Convert Lightning address to LNURL if needed
+            let lnurlInput = input;
+            if (input.includes('@') && !input.toLowerCase().startsWith('lnurl')) {
+                // Lightning address format: user@domain.com
+                // Convert to LNURL: https://domain/.well-known/lnurlp/user
+                const [username, domain] = input.split('@');
+                lnurlInput = `https://${domain}/.well-known/lnurlp/${username}`;
+                console.log(`[Withdraw] Converted Lightning address to LNURL: ${lnurlInput}`);
+            }
 
-            console.log('✅ [Withdraw] Parsed result:', parsed);
+            // Parse the LNURL to get payment request details
+            console.log(`[Withdraw] Parsing LNURL: ${lnurlInput}`);
+            const parsed = await parseInput(lnurlInput);
+            console.log('[Withdraw] Parsed LNURL result:', parsed);
 
-            // Store for later use
-            preparedPayment = parsed;
+            // parse() returns InputType union - check for lnurlPay or lightningAddress
+            if (parsed.type !== 'lnurlPay' && parsed.type !== 'lightningAddress') {
+                throw new Error(`Unsupported input type: ${parsed.type}. Expected LNURL pay request or Lightning address.`);
+            }
 
-            // Extract preview data from parse response
+            // Extract payment request details from the parsed result
+            const payRequest = parsed.type === 'lightningAddress' ? parsed.payRequest : parsed;
+
+            // Validate amount is provided
+            if (!amount || amount <= 0) {
+                throw new Error('Amount is required for Lightning addresses and LNURL payments');
+            }
+
+            // Validate amount is within sendable range (amounts are in msat, convert to sats)
+            const minSendableSats = Math.ceil((payRequest.minSendable || 0) / 1000);
+            const maxSendableSats = Math.floor((payRequest.maxSendable || Number.MAX_SAFE_INTEGER) / 1000);
+
+            console.log(`[Withdraw] LNURL amount range: ${minSendableSats}-${maxSendableSats} sats`);
+
+            if (amount < minSendableSats) {
+                throw new Error(`Amount must be at least ${minSendableSats} sats`);
+            }
+            if (amount > maxSendableSats) {
+                throw new Error(`Amount cannot exceed ${maxSendableSats} sats`);
+            }
+
+            // Get comment if provided
+            const commentInput = document.getElementById('withdrawal-comment') as HTMLInputElement;
+            const comment = commentInput?.value?.trim() || undefined;
+
+            // Prepare the LNURL payment
+            console.log('[Withdraw] Preparing LNURL payment with prepareLnurlPay');
+            const prepareResponse = await breezSDK.prepareLnurlPay({
+                amountSats: amount,
+                payRequest: payRequest,
+                comment: comment,
+                validateSuccessActionUrl: true
+            });
+
+            console.log('[Withdraw] LNURL payment prepared:', prepareResponse);
+
+            // Store prepared response for sending
+            preparedPayment = prepareResponse;
+
             const previewData = {
                 recipient: input,
                 amount: amount,
-                fee: 0, // Will be calculated during actual send
+                fee: prepareResponse.feeSats,
                 type: 'lnurl',
-                prepareResponse: parsed
+                prepareResponse: prepareResponse
             };
 
             displayPaymentPreview(previewData);
@@ -4311,18 +4399,44 @@ async function sendPayment() {
 
         console.log('🔵 [Withdraw] Sending payment via SDK...', { hasPrepareResponse: !!preparedPayment });
 
-        // Breez SDK Spark requires the prepare response from prepareSendPayment()
-        await breezSDK.sendPayment({
-            prepareResponse: preparedPayment
-        });
+        // Check payment type and route to appropriate SDK method
+        // LNURL payments have feeSats property, BOLT11 have paymentMethod property
+        const isLnurlPayment = preparedPayment && 'feeSats' in preparedPayment && !('paymentMethod' in preparedPayment);
 
-        console.log('✅ [Withdraw] Payment sent successfully');
+        if (isLnurlPayment) {
+            // LNURL payment flow - use lnurlPay()
+            console.log('🔵 [Withdraw] Executing LNURL payment');
+            const result = await breezSDK.lnurlPay({
+                prepareResponse: preparedPayment
+            });
 
-        // Log fee breakdown for transparency
-        const feeAmount = preparedPayment?.paymentMethod?.lightningFeeSats || 0;
-        const paymentAmount = preparedPayment?.amountSats || 0;
-        const totalDeducted = paymentAmount + feeAmount;
-        console.log(`💰 [Withdraw] Payment breakdown: ${paymentAmount} sats sent + ${feeAmount} sats fee = ${totalDeducted} sats total deducted from balance`);
+            console.log('✅ [Withdraw] LNURL payment sent successfully', result);
+
+            // Log fee breakdown for transparency
+            const feeAmount = preparedPayment.feeSats || 0;
+            const paymentAmount = preparedPayment.amountSats || 0;
+            const totalDeducted = paymentAmount + feeAmount;
+            console.log(`💰 [Withdraw] Payment breakdown: ${paymentAmount} sats sent + ${feeAmount} sats fee = ${totalDeducted} sats total deducted from balance`);
+
+            // Handle success action if present
+            if (result.successAction) {
+                console.log('🎉 [Withdraw] Success action:', result.successAction);
+            }
+        } else {
+            // BOLT11 invoice payment flow - use sendPayment()
+            console.log('🔵 [Withdraw] Executing BOLT11 payment');
+            await breezSDK.sendPayment({
+                prepareResponse: preparedPayment
+            });
+
+            console.log('✅ [Withdraw] Payment sent successfully');
+
+            // Log fee breakdown for transparency
+            const feeAmount = preparedPayment?.paymentMethod?.lightningFeeSats || 0;
+            const paymentAmount = preparedPayment?.amountSats || 0;
+            const totalDeducted = paymentAmount + feeAmount;
+            console.log(`💰 [Withdraw] Payment breakdown: ${paymentAmount} sats sent + ${feeAmount} sats fee = ${totalDeducted} sats total deducted from balance`);
+        }
 
         // Clear prepared payment
         preparedPayment = null;

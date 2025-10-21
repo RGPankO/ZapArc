@@ -16,6 +16,40 @@ export interface WalletData {
   transactions: Transaction[];
 }
 
+// Multi-Wallet Support Interfaces
+/**
+ * Metadata for a wallet entry (unencrypted for fast UI access)
+ */
+export interface WalletMetadata {
+  id: string;                    // UUID for stable identification
+  nickname: string;              // User-friendly name ("Wallet 1", "Wallet 2")
+  createdAt: number;            // Timestamp of wallet creation
+  lastUsedAt: number;           // Timestamp of last wallet usage
+  colorTag?: string;            // Optional UI color tag
+}
+
+/**
+ * Encrypted wallet entry with metadata
+ */
+export interface EncryptedWalletEntry {
+  metadata: WalletMetadata;     // Unencrypted metadata
+  encryptedMnemonic: {
+    data: number[];             // Encrypted mnemonic data
+    iv: number[];               // Initialization vector
+    timestamp: number;          // Encryption timestamp for integrity check
+  };
+}
+
+/**
+ * Multi-wallet storage structure
+ */
+export interface MultiWalletStorage {
+  wallets: EncryptedWalletEntry[];  // All wallet entries
+  activeWalletId: string;           // Currently selected wallet UUID
+  walletOrder: string[];            // User-defined wallet ordering (UUIDs)
+  version: number;                  // Schema version (1 for multi-wallet)
+}
+
 export interface UserSettings {
   defaultPostingAmounts: [number, number, number];
   defaultTippingAmounts: [number, number, number];
@@ -64,7 +98,9 @@ export interface PostingContext {
 
 // Chrome Storage Schema
 export interface ChromeStorageSchema {
-  encryptedWallet: string;
+  encryptedWallet: string;       // Legacy single wallet (for migration)
+  multiWalletData: string;       // New multi-wallet structure (JSON.stringify(MultiWalletStorage))
+  walletVersion: number;         // Schema version (1 for multi-wallet)
   userSettings: UserSettings;
   domainSettings: DomainSettings;
   blacklistData: BlacklistData;
