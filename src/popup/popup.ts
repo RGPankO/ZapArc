@@ -35,6 +35,11 @@ import * as bip39 from 'bip39';
 import type { WalletMetadata } from '../types';
 import { ChromeStorageManager } from '../utils/storage';
 
+// Popup instance management - prevent duplicate initializations
+const POPUP_INSTANCE_KEY = 'activePopupInstance';
+const popupInstanceId = `popup_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+console.log('🆔 [Popup Instance] Created instance ID:', popupInstanceId);
 console.log('Lightning Tipping Extension popup loaded');
 
 // DOM elements (will be set dynamically)
@@ -210,7 +215,24 @@ async function disconnectBreezSDK(): Promise<void> {
 }
 
 // Initialize popup
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🔄 [Popup] DOMContentLoaded - Instance:', popupInstanceId);
+
+    // Check if another instance is already active (logging only - Chrome creates multiple instances normally)
+    const existingInstance = sessionStorage.getItem(POPUP_INSTANCE_KEY);
+
+    if (existingInstance && existingInstance !== popupInstanceId) {
+        console.warn('⚠️ [Popup] Another instance already active:', existingInstance);
+        console.log('ℹ️ [Popup] Multiple instances are normal - initializing anyway');
+    }
+
+    // Register this instance as active
+    sessionStorage.setItem(POPUP_INSTANCE_KEY, popupInstanceId);
+    console.log('✅ [Popup] Registered as active instance:', popupInstanceId);
+
+    console.log('Lightning Tipping Extension popup loaded');
+
+    // Initialize popup
     initializePopup();
     setupEventListeners();
     setupModalListeners(); // Initialize modal system
@@ -218,8 +240,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Clear session PIN when popup closes (security measure)
 window.addEventListener('beforeunload', () => {
-    sessionPin = null;
-    console.log('🔐 [Session] PIN cleared on popup close');
+    const currentInstance = sessionStorage.getItem(POPUP_INSTANCE_KEY);
+
+    if (currentInstance === popupInstanceId) {
+        console.log('🧹 [Popup] Cleaning up instance:', popupInstanceId);
+        sessionStorage.removeItem(POPUP_INSTANCE_KEY);
+
+        // Also clear session PIN for security
+        sessionPin = null;
+    }
+});
+
+// Also clear on visibility change (when popup is hidden)
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        const currentInstance = sessionStorage.getItem(POPUP_INSTANCE_KEY);
+
+        if (currentInstance === popupInstanceId) {
+            console.log('👁️ [Popup] Hidden - maintaining instance registration');
+            // Don't clear on hide, only on close
+        }
+    }
 });
 
 async function initializePopup() {
@@ -479,13 +520,20 @@ async function loadTransactionHistory() {
 
 async function handleDeposit() {
     console.log('🔵 [Deposit] BUTTON CLICKED', {
-        isWalletUnlocked,
-        hasBreezSDK: !!breezSDK,
         timestamp: new Date().toISOString()
     });
 
     try {
-        if (!isWalletUnlocked) {
+        // Check lock state from storage (shared across all popup instances)
+        const { isUnlocked } = await chrome.storage.local.get(['isUnlocked']);
+
+        console.log('🔍 [Deposit] Lock state check', {
+            isUnlocked,
+            hasBreezSDK: !!breezSDK,
+            moduleVar: isWalletUnlocked
+        });
+
+        if (!isUnlocked) {
             console.warn('⚠️ [Deposit] Wallet is LOCKED - showing unlock prompt');
             showUnlockPrompt();
             return;
@@ -500,8 +548,22 @@ async function handleDeposit() {
 }
 
 async function handleWithdraw() {
+    console.log('🔵 [Withdraw] BUTTON CLICKED', {
+        timestamp: new Date().toISOString()
+    });
+
     try {
-        if (!isWalletUnlocked) {
+        // Check lock state from storage (shared across all popup instances)
+        const { isUnlocked } = await chrome.storage.local.get(['isUnlocked']);
+
+        console.log('🔍 [Withdraw] Lock state check', {
+            isUnlocked,
+            hasBreezSDK: !!breezSDK,
+            moduleVar: isWalletUnlocked
+        });
+
+        if (!isUnlocked) {
+            console.warn('⚠️ [Withdraw] Wallet is LOCKED - showing unlock prompt');
             showUnlockPrompt();
             return;
         }
@@ -511,9 +573,10 @@ async function handleWithdraw() {
             return;
         }
 
+        console.log('✅ [Withdraw] Wallet is UNLOCKED - showing withdraw interface');
         showWithdrawalInterface();
     } catch (error) {
-        console.error('Withdrawal error:', error);
+        console.error('❌ [Withdraw] Error:', error);
         showError('Failed to open withdrawal interface');
     }
 }
@@ -3691,71 +3754,79 @@ function showConfirmDialog(title: string, message: string): Promise<boolean> {
 
 // Enhanced Deposit Interface
 function showDepositInterface() {
-    const modal = createModal('deposit-modal', 'Deposit Funds');
-    modal.className = 'modal-overlay';
+    console.log('[Deposit] Showing deposit interface');
 
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>📥 Deposit Funds</h3>
-                <button class="modal-close" id="close-deposit">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="deposit-step" id="amount-step">
-                    <p>Enter the amount you want to deposit:</p>
-                    <div class="amount-input-group">
-                        <input type="number" id="deposit-amount" placeholder="Amount in sats" min="1" max="100000000">
-                        <span class="input-suffix">sats</span>
-                    </div>
-                    <div class="quick-amounts">
-                        <button class="quick-amount-btn" data-amount="10000">10K</button>
-                        <button class="quick-amount-btn" data-amount="50000">50K</button>
-                        <button class="quick-amount-btn" data-amount="100000">100K</button>
-                        <button class="quick-amount-btn" data-amount="500000">500K</button>
-                    </div>
-                    <div class="modal-actions">
-                        <button id="generate-invoice-btn" class="btn-primary" disabled>Generate Invoice</button>
-                    </div>
-                </div>
+    // Hide main interface
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
+        mainInterface.classList.add('hidden');
+    }
 
-                <div class="deposit-step hidden" id="invoice-step">
-                    <div class="invoice-container">
-                        <div class="qr-container">
-                            <canvas id="deposit-qr-canvas"></canvas>
-                        </div>
-                        <div class="invoice-details">
-                            <p class="invoice-amount">Amount: <span id="invoice-amount-display"></span> sats</p>
-                            <div class="invoice-text-container">
-                                <textarea id="invoice-text" readonly></textarea>
-                                <button id="copy-invoice-btn" class="copy-btn">📋 Copy</button>
-                            </div>
-                        </div>
-                        <div class="payment-status" id="payment-status">
-                            <div class="status-indicator">⏳ Waiting for payment...</div>
-                            <div class="status-timer">Expires in: <span id="invoice-timer">15:00</span></div>
-                        </div>
-                    </div>
-                    <div class="modal-actions">
-                        <button id="new-invoice-btn" class="btn-secondary">New Invoice</button>
-                        <button id="close-invoice-btn" class="btn-primary">Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    // Show deposit interface
+    const depositInterface = document.getElementById('deposit-interface');
+    if (depositInterface) {
+        depositInterface.classList.remove('hidden');
+    }
 
-    document.body.appendChild(modal);
+    // Reset to amount step
+    showDepositStep('deposit-amount-step');
+
+    // Reset amount input
+    const amountInput = document.getElementById('deposit-amount') as HTMLInputElement;
+    if (amountInput) {
+        amountInput.value = '';
+    }
+
+    // Setup listeners
     setupDepositListeners();
 }
 
+function hideDepositInterface() {
+    console.log('[Deposit] Hiding deposit interface');
+
+    // Stop payment monitoring if active
+    if (paymentMonitoringInterval) {
+        clearInterval(paymentMonitoringInterval);
+        paymentMonitoringInterval = null;
+    }
+
+    // Hide deposit interface
+    const depositInterface = document.getElementById('deposit-interface');
+    if (depositInterface) {
+        depositInterface.classList.add('hidden');
+    }
+
+    // Show main interface
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
+        mainInterface.classList.remove('hidden');
+    }
+
+    // Reset form
+    const amountInput = document.getElementById('deposit-amount') as HTMLInputElement;
+    if (amountInput) amountInput.value = '';
+
+    // Reset to amount step
+    showDepositStep('deposit-amount-step');
+}
+
 function setupDepositListeners() {
+    console.log('[Deposit] Setting up listeners');
+
+    // Add back button listener
+    const backBtn = document.getElementById('deposit-back-btn');
+    if (backBtn && !backBtn.onclick) {
+        backBtn.onclick = () => {
+            console.log('[Deposit] Back button clicked');
+            hideDepositInterface();
+        };
+    }
+
     const depositAmount = document.getElementById('deposit-amount') as HTMLInputElement;
     const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
-    const closeBtn = document.getElementById('close-deposit');
     const copyBtn = document.getElementById('copy-invoice-btn');
     const newInvoiceBtn = document.getElementById('new-invoice-btn');
-    const closeInvoiceBtn = document.getElementById('close-invoice-btn');
-    
+
     // Amount input validation
     if (depositAmount) {
         depositAmount.addEventListener('input', () => {
@@ -3765,7 +3836,7 @@ function setupDepositListeners() {
             }
         });
     }
-    
+
     // Quick amount buttons
     document.querySelectorAll('.quick-amount-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -3778,7 +3849,7 @@ function setupDepositListeners() {
             }
         });
     });
-    
+
     // Generate invoice
     if (generateBtn) {
         generateBtn.addEventListener('click', async () => {
@@ -3788,7 +3859,7 @@ function setupDepositListeners() {
             }
         });
     }
-    
+
     // Copy invoice
     if (copyBtn) {
         copyBtn.addEventListener('click', () => {
@@ -3799,25 +3870,13 @@ function setupDepositListeners() {
             }
         });
     }
-    
+
     // New invoice
     if (newInvoiceBtn) {
         newInvoiceBtn.addEventListener('click', () => {
-            showDepositStep('amount-step');
+            showDepositStep('deposit-amount-step');
         });
     }
-    
-    // Close modal
-    [closeBtn, closeInvoiceBtn].forEach(btn => {
-        if (btn) {
-            btn.addEventListener('click', () => {
-                const modal = document.getElementById('deposit-modal');
-                if (modal) {
-                    modal.remove();
-                }
-            });
-        }
-    });
 }
 
 async function generateDepositInvoice(amount: number) {
@@ -3860,7 +3919,7 @@ async function generateDepositInvoice(amount: number) {
         });
 
         await displayInvoice(invoice, amount);
-        showDepositStep('invoice-step');
+        showDepositStep('deposit-invoice-step');
         startPaymentMonitoring(invoice);
 
     } catch (error) {
@@ -3913,7 +3972,7 @@ async function displayInvoice(invoice: string, amount: number) {
 }
 
 function showDepositStep(stepId: string) {
-    const steps = ['amount-step', 'invoice-step'];
+    const steps = ['deposit-amount-step', 'deposit-invoice-step'];
     steps.forEach(id => {
         const element = document.getElementById(id);
         if (element) {
@@ -3999,9 +4058,8 @@ async function checkPaymentStatus(invoice: string) {
             // Refresh transaction history
             await loadTransactionHistory();
 
-            // Close deposit modal
-            const modal = document.getElementById('deposit-modal');
-            if (modal) modal.remove();
+            // Close deposit interface
+            hideDepositInterface();
         }
     } catch (error) {
         console.error('❌ [Popup] Payment status check error:', error);
@@ -4046,12 +4104,9 @@ function handlePaymentReceived() {
     
     showSuccess('Deposit received successfully!');
     
-    // Auto-close modal after 3 seconds
+    // Auto-close interface after 3 seconds
     setTimeout(() => {
-        const modal = document.getElementById('deposit-modal');
-        if (modal) {
-            modal.remove();
-        }
+        hideDepositInterface();
     }, 3000);
 }
 
@@ -4070,97 +4125,105 @@ function handlePaymentExpired() {
 
 // Enhanced Withdrawal Interface
 function showWithdrawalInterface() {
-    const modal = createModal('withdrawal-modal', 'Withdraw Funds');
-    modal.className = 'modal-overlay';
+    console.log('[Withdraw] Showing withdraw interface');
 
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>📤 Withdraw Funds</h3>
-                <button class="modal-close" id="close-withdrawal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="balance-info">
-                    <p>Available Balance: <strong>${currentBalance.toLocaleString()} sats</strong></p>
-                </div>
+    // Hide main interface
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
+        mainInterface.classList.add('hidden');
+    }
 
-                <div class="withdrawal-form">
-                    <div class="form-group">
-                        <label for="payment-input">Lightning Invoice or Address:</label>
-                        <textarea id="payment-input" placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)" rows="3"></textarea>
-                    </div>
+    // Show withdraw interface
+    const withdrawInterface = document.getElementById('withdraw-interface');
+    if (withdrawInterface) {
+        withdrawInterface.classList.remove('hidden');
+    }
 
-                    <div class="form-group">
-                        <label for="withdrawal-amount">Amount (leave empty for invoice amount):</label>
-                        <div class="amount-input-group">
-                            <input type="number" id="withdrawal-amount" placeholder="Amount in sats" min="1" max="${currentBalance}">
-                            <span class="input-suffix">sats</span>
-                        </div>
-                    </div>
+    // Update balance display
+    const balanceDisplay = document.getElementById('withdraw-balance-display');
+    if (balanceDisplay) {
+        balanceDisplay.textContent = `${currentBalance.toLocaleString()}`;
+    }
 
-                    <div class="form-group">
-                        <label for="withdrawal-comment">Comment (optional):</label>
-                        <input type="text" id="withdrawal-comment" placeholder="Payment description" maxlength="144">
-                    </div>
+    // Reset form
+    resetWithdrawForm();
 
-                    <div class="payment-preview hidden" id="payment-preview">
-                        <h4>Payment Preview</h4>
-                        <div class="preview-item">
-                            <span>Recipient:</span>
-                            <span id="preview-recipient"></span>
-                        </div>
-                        <div class="preview-item">
-                            <span>Amount:</span>
-                            <span id="preview-amount"></span>
-                        </div>
-                        <div class="preview-item">
-                            <span>Fee Estimate:</span>
-                            <span id="preview-fee"></span>
-                        </div>
-                        <div class="preview-item">
-                            <span>Total:</span>
-                            <span id="preview-total"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-actions">
-                    <button id="preview-payment-btn" class="btn-secondary" disabled>Preview Payment</button>
-                    <button id="send-payment-btn" class="btn-primary hidden" disabled>Send Payment</button>
-                </div>
-
-                <div class="payment-status hidden" id="withdrawal-status">
-                    <div class="status-indicator" id="withdrawal-status-text">Processing payment...</div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
+    // Setup listeners
     setupWithdrawalListeners();
 }
 
+function hideWithdrawInterface() {
+    console.log('[Withdraw] Hiding withdraw interface');
+
+    // Hide withdraw interface
+    const withdrawInterface = document.getElementById('withdraw-interface');
+    if (withdrawInterface) {
+        withdrawInterface.classList.add('hidden');
+    }
+
+    // Show main interface
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
+        mainInterface.classList.remove('hidden');
+    }
+
+    // Reset form and state
+    resetWithdrawForm();
+    preparedPayment = null;
+}
+
+function resetWithdrawForm() {
+    const paymentInput = document.getElementById('payment-input') as HTMLTextAreaElement;
+    const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
+    const commentInput = document.getElementById('withdrawal-comment') as HTMLInputElement;
+    const previewDiv = document.getElementById('payment-preview');
+    const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
+    const previewBtn = document.getElementById('preview-payment-btn') as HTMLButtonElement;
+    const statusDiv = document.getElementById('withdrawal-status');
+
+    if (paymentInput) paymentInput.value = '';
+    if (amountInput) amountInput.value = '';
+    if (commentInput) commentInput.value = '';
+    if (previewDiv) previewDiv.classList.add('hidden');
+    if (sendBtn) {
+        sendBtn.classList.add('hidden');
+        sendBtn.disabled = true;
+    }
+    if (previewBtn) previewBtn.disabled = true;
+    if (statusDiv) statusDiv.classList.add('hidden');
+}
+
 function setupWithdrawalListeners() {
+    console.log('[Withdraw] Setting up listeners');
+
+    // Add back button listener
+    const backBtn = document.getElementById('withdraw-back-btn');
+    if (backBtn && !backBtn.onclick) {
+        backBtn.onclick = () => {
+            console.log('[Withdraw] Back button clicked');
+            hideWithdrawInterface();
+        };
+    }
+
     const paymentInput = document.getElementById('payment-input') as HTMLTextAreaElement;
     const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
     const previewBtn = document.getElementById('preview-payment-btn') as HTMLButtonElement;
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
-    const closeBtn = document.getElementById('close-withdrawal');
-    
+
     // Input validation
     if (paymentInput) {
         paymentInput.addEventListener('input', validateWithdrawalForm);
     }
-    
+
     if (amountInput) {
         amountInput.addEventListener('input', validateWithdrawalForm);
     }
-    
+
     // Preview payment
     if (previewBtn) {
         previewBtn.addEventListener('click', previewPayment);
     }
-    
+
     // Send payment
     if (sendBtn) {
         sendBtn.addEventListener('click', () => {
@@ -4170,16 +4233,6 @@ function setupWithdrawalListeners() {
         console.log('✅ [Withdraw] Send button event listener attached');
     } else {
         console.error('❌ [Withdraw] Send button not found - event listener NOT attached');
-    }
-    
-    // Close modal
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            const modal = document.getElementById('withdrawal-modal');
-            if (modal) {
-                modal.remove();
-            }
-        });
     }
 }
 
@@ -4454,12 +4507,9 @@ async function sendPayment() {
         // Refresh transaction history to show the new withdraw transaction
         await loadTransactionHistory();
 
-        // Auto-close modal after 3 seconds
+        // Auto-close interface after 3 seconds
         setTimeout(() => {
-            const modal = document.getElementById('withdrawal-modal');
-            if (modal) {
-                modal.remove();
-            }
+            hideWithdrawInterface();
         }, 3000);
 
     } catch (error) {
@@ -4570,17 +4620,3 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// Utility function to create modal
-function createModal(id: string, title: string): HTMLElement {
-    // Remove existing modal if present
-    const existing = document.getElementById(id);
-    if (existing) {
-        existing.remove();
-    }
-    
-    const modal = document.createElement('div');
-    modal.id = id;
-    modal.className = 'modal';
-    
-    return modal;
-}

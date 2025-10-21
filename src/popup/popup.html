@@ -402,6 +402,116 @@
             </div>
         </div>
 
+        <!-- Deposit Interface -->
+        <div id="deposit-interface" class="hidden">
+            <header>
+                <button id="deposit-back-btn" class="back-btn">← Back</button>
+                <h1>Deposit Funds</h1>
+            </header>
+
+            <main>
+                <div class="deposit-step" id="deposit-amount-step">
+                    <p style="margin-bottom: 16px;">Enter the amount you want to deposit:</p>
+                    <div class="form-group">
+                        <input type="number" id="deposit-amount" placeholder="Amount in sats" min="1" max="100000000">
+                    </div>
+                    <div class="quick-amounts" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                        <button class="quick-amount-btn btn-secondary" data-amount="10000">10K</button>
+                        <button class="quick-amount-btn btn-secondary" data-amount="50000">50K</button>
+                        <button class="quick-amount-btn btn-secondary" data-amount="100000">100K</button>
+                        <button class="quick-amount-btn btn-secondary" data-amount="500000">500K</button>
+                    </div>
+                    <div class="wizard-actions">
+                        <button id="generate-invoice-btn" class="btn-primary" disabled>Generate Invoice</button>
+                    </div>
+                </div>
+
+                <div class="deposit-step hidden" id="deposit-invoice-step">
+                    <div class="invoice-container">
+                        <div class="qr-container" style="text-align: center; margin-bottom: 16px;">
+                            <canvas id="deposit-qr-canvas"></canvas>
+                        </div>
+                        <div class="invoice-details">
+                            <p style="margin-bottom: 8px;">Amount: <strong><span id="invoice-amount-display"></span> sats</strong></p>
+                            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                                <textarea id="invoice-text" readonly style="flex: 1; min-height: 80px; font-family: monospace; font-size: 12px;"></textarea>
+                                <button id="copy-invoice-btn" class="btn-secondary">Copy</button>
+                            </div>
+                        </div>
+                        <div class="payment-status" id="payment-status">
+                            <div style="text-align: center; padding: 12px; background: #f0f0f0; border-radius: 8px;">
+                                <div style="margin-bottom: 8px;">⏳ Waiting for payment...</div>
+                                <div>Expires in: <strong><span id="invoice-timer">15:00</span></strong></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wizard-actions">
+                        <button id="new-invoice-btn" class="btn-secondary">New Invoice</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Withdraw Interface -->
+        <div id="withdraw-interface" class="hidden">
+            <header>
+                <button id="withdraw-back-btn" class="back-btn">← Back</button>
+                <h1>Withdraw Funds</h1>
+            </header>
+
+            <main>
+                <div style="padding: 12px; background: #f0f0f0; border-radius: 8px; margin-bottom: 16px;">
+                    <p>Available Balance: <strong id="withdraw-balance-display">-- sats</strong></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Lightning Invoice or Address:</label>
+                    <textarea id="payment-input" placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Amount (leave empty for invoice amount):</label>
+                    <input type="number" id="withdrawal-amount" placeholder="Amount in sats" min="1">
+                </div>
+
+                <div class="form-group">
+                    <label>Comment (optional):</label>
+                    <input type="text" id="withdrawal-comment" placeholder="Payment description" maxlength="144">
+                </div>
+
+                <div class="payment-preview hidden" id="payment-preview" style="padding: 16px; background: #f0f0f0; border-radius: 8px; margin-bottom: 16px;">
+                    <h4 style="margin-bottom: 12px;">Payment Preview</h4>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Recipient:</span>
+                        <strong id="preview-recipient"></strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Amount:</span>
+                        <strong id="preview-amount"></strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Fee:</span>
+                        <strong id="preview-fee"></strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #ddd;">
+                        <span>Total:</span>
+                        <strong id="preview-total"></strong>
+                    </div>
+                </div>
+
+                <div class="wizard-actions">
+                    <button id="preview-payment-btn" class="btn-secondary" disabled>Preview Payment</button>
+                    <button id="send-payment-btn" class="btn-primary hidden" disabled>Send Payment</button>
+                </div>
+
+                <div class="payment-status hidden" id="withdrawal-status">
+                    <div style="text-align: center; padding: 12px; background: #f0f0f0; border-radius: 8px;">
+                        <div id="withdrawal-status-text">Processing payment...</div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
         <!-- QR Only Interface -->
         <div id="qr-only-interface" class="hidden">
             <header>
