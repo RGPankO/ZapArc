@@ -4,9 +4,12 @@
   "description": "A complete cross-platform mobile app skeleton with React Native and Node.js backend",
   "private": true,
   "scripts": {
+    "postinstall": "concurrently \"cd backend && npm install\" \"cd mobile-app && npm install\"",
     "setup": "npm run setup:backend && npm run setup:mobile",
     "setup:backend": "cd backend && npm install && npm run db:setup",
     "setup:mobile": "cd mobile-app && npm install",
+    "services:start": "docker-compose up -d",
+    "services:stop": "docker-compose down",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:mobile\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:mobile": "cd mobile-app && npm start",
