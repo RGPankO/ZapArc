@@ -1,7 +1,11 @@
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 import { hashPassword, comparePassword } from '../../utils/auth';
-import { router, protectedProcedure } from '../trpc';
+import { router, protectedProcedure } from '../../server/trpc';
+import {
+  updateProfileSchema,
+  changePasswordSchema,
+  deleteAccountSchema,
+} from './user.schema';
 
 /**
  * User Router
@@ -65,33 +69,7 @@ export const userRouter = router({
    * @returns Updated user profile
    */
   updateProfile: protectedProcedure
-    .input(
-      z.object({
-        nickname: z
-          .string()
-          .min(2, 'Nickname must be at least 2 characters')
-          .max(50, 'Nickname must not exceed 50 characters')
-          .optional(),
-        email: z
-          .string()
-          .email('Invalid email format')
-          .optional(),
-        firstName: z
-          .string()
-          .min(1, 'First name cannot be empty')
-          .max(50, 'First name must not exceed 50 characters')
-          .optional(),
-        lastName: z
-          .string()
-          .min(1, 'Last name cannot be empty')
-          .max(50, 'Last name must not exceed 50 characters')
-          .optional(),
-        profilePicture: z
-          .string()
-          .url('Invalid profile picture URL')
-          .optional(),
-      })
-    )
+    .input(updateProfileSchema)
     .mutation(async ({ ctx, input }) => {
       const { nickname, email, firstName, lastName, profilePicture } = input;
 
@@ -168,15 +146,7 @@ export const userRouter = router({
    * @returns Success message
    */
   changePassword: protectedProcedure
-    .input(
-      z.object({
-        currentPassword: z.string().min(1, 'Current password is required'),
-        newPassword: z
-          .string()
-          .min(8, 'New password must be at least 8 characters')
-          .max(100, 'New password must not exceed 100 characters'),
-      })
-    )
+    .input(changePasswordSchema)
     .mutation(async ({ ctx, input }) => {
       const { currentPassword, newPassword } = input;
 
@@ -269,16 +239,7 @@ export const userRouter = router({
    * @returns Success message
    */
   deleteAccount: protectedProcedure
-    .input(
-      z.object({
-        password: z.string().optional(),
-        confirmation: z
-          .string()
-          .refine((val) => val === 'DELETE', {
-            message: 'Confirmation must be exactly "DELETE"',
-          }),
-      })
-    )
+    .input(deleteAccountSchema)
     .mutation(async ({ ctx, input }) => {
       const { password, confirmation } = input;
 
