@@ -1,12 +1,30 @@
+import { IsEnum, IsString, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
+import { AdType, AdAction } from '../../../../generated/prisma/index';
+
 export class UpsertAdConfigDto {
-  adType: 'BANNER' | 'INTERSTITIAL';
+  @IsEnum(AdType)
+  adType: AdType;
+
+  @IsString()
   adNetworkId: string;
+
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
   displayFrequency?: number;
 }
 
 export class TrackAnalyticsDto {
-  adType: 'BANNER' | 'INTERSTITIAL';
-  action: 'IMPRESSION' | 'CLICK' | 'CLOSE' | 'ERROR';
+  @IsEnum(AdType)
+  adType: AdType;
+
+  @IsEnum(AdAction)
+  action: AdAction;
+
+  @IsString()
   adNetworkId: string;
 }

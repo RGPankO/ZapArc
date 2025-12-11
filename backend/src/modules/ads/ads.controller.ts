@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Put, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { AdsService } from './ads.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdType, AdAction } from '../../../generated/prisma/index';
+import { AdType } from '../../../generated/prisma/index';
 import type { UpsertAdConfigDto, TrackAnalyticsDto } from './dto/ads.dto';
 
 @Controller('ads')
@@ -26,29 +26,9 @@ export class AdsController {
 
   @Post('configs')
   async upsertAdConfig(@Body() dto: UpsertAdConfigDto) {
-    if (!dto.adType || !dto.adNetworkId) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_INPUT',
-          message: 'adType and adNetworkId are required',
-        },
-      };
-    }
-
-    if (!Object.values(AdType).includes(dto.adType as AdType)) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_AD_TYPE',
-          message: 'Invalid ad type',
-        },
-      };
-    }
-
     try {
       const config = await this.adsService.upsertAdConfig({
-        adType: dto.adType as AdType,
+        adType: dto.adType,
         adNetworkId: dto.adNetworkId,
         isActive: dto.isActive,
         displayFrequency: dto.displayFrequency,
@@ -107,41 +87,11 @@ export class AdsController {
   async trackAnalytics(@Request() req: any, @Body() dto: TrackAnalyticsDto) {
     const userId = req.user?.id;
 
-    if (!dto.adType || !dto.action || !dto.adNetworkId) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_INPUT',
-          message: 'adType, action, and adNetworkId are required',
-        },
-      };
-    }
-
-    if (!Object.values(AdType).includes(dto.adType as AdType)) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_AD_TYPE',
-          message: 'Invalid ad type',
-        },
-      };
-    }
-
-    if (!Object.values(AdAction).includes(dto.action as AdAction)) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_AD_ACTION',
-          message: 'Invalid ad action',
-        },
-      };
-    }
-
     try {
       await this.adsService.trackAdAnalytics({
         userId,
-        adType: dto.adType as AdType,
-        action: dto.action as AdAction,
+        adType: dto.adType,
+        action: dto.action,
         adNetworkId: dto.adNetworkId,
       });
       return { success: true, message: 'Analytics tracked successfully' };

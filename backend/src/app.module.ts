@@ -8,6 +8,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { AdsModule } from './modules/ads/ads.module';
 import { EmailModule } from './modules/email/email.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { UtilityModule } from './modules/utility/utility.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -16,6 +17,7 @@ import { HealthController } from './health.controller';
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
+    UtilityModule.forRoot(),
     PrismaModule,
     AuthModule,
     UserModule,
