@@ -235,3 +235,5 @@ coverage/
 *.tmp
 *.temp
 .claude
+
+**/**/query_engine-windows.dll.node

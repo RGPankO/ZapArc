@@ -45,30 +45,6 @@
 
 ---
 
-## 🧭 Folder Layout
-```plaintext
-template/
-├── apps/
-│   ├── mobile/               # Expo app
-│   └── server/               # Express + tRPC + Prisma API
-│
-├── packages/
-│   ├── schema/               # Shared Zod & Prisma types
-│   ├── domain/               # Framework-independent logic
-│   ├── api-client/           # tRPC client setup
-│   ├── ui/                   # Cross-platform UI library
-│   ├── config/               # Shared configs
-│   ├── feature-auth-core/    # Auth domain logic
-│   ├── feature-auth-mobile/  # Auth screens/hooks
-│   ├── feature-auth-server/  # Auth routers/controllers
-│   └── ...other features
-│
-│
-├── pnpm-workspace.yaml
-├── tsconfig.base.json
-└── package.json
-```
-
 ## Alternative Structure
 
 ```plaintext
@@ -101,7 +77,7 @@ template/
 │       │   │   └── schema.prisma
 │       │   ├── trpc/
 │       │   │   ├── index.ts        # Root router
-│       │   ├── features/
+│       │   ├── modules/
 │       │   │   ├── auth/           # Google OAuth, JWT, refresh tokens
 │       │   │   ├── payments/      # Stripe handlers, routers & webhooks
 │       │   │       ├── payments.router.ts  
