@@ -1,5 +1,4 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
@@ -13,12 +12,6 @@ async function bootstrap() {
 
   // CORS
   app.enableCors();
-
-  // Global validation pipe (minimal validation as requested)
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true,
-    whitelist: true,
-  }));
 
   // Global prefix
   app.setGlobalPrefix('api');

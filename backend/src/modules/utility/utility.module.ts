@@ -1,8 +1,9 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { AllExceptionFilter } from './filters/all-exception.filter';
 import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
+import { AppValidationPipe } from './pipes/app-validation.pipe';
 
 @Global()
 @Module({})
@@ -11,6 +12,10 @@ export class UtilityModule {
     return {
       module: UtilityModule,
       providers: [
+        {
+          provide: APP_PIPE,
+          useClass: AppValidationPipe,
+        },
         /**
          * The order of the filters matters. Filters are executed in reverse order of registration.
          * AllExceptionFilter is registered first (executes last as fallback for all exceptions).
@@ -28,9 +33,7 @@ export class UtilityModule {
           provide: APP_FILTER,
           useClass: HttpExceptionFilter,
         },
-
       ],
     };
   }
 }
-
