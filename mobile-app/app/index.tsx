@@ -6,63 +6,15 @@ import { router } from 'expo-router';
 import { InterstitialAd } from '../src/components';
 import { useInterstitialAd } from '../src/hooks/useInterstitialAd';
 import { useAuth } from '../src/hooks/useAuth';
-import { useUsers } from '../src/hooks/useUsers';
+
 
 export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
   const { isAuthenticated, isLoading, checkAuth } = useAuth();
-  const users = useUsers();
+
 
   // Log when component mounts and hook is initialized
-  useEffect(() => {
-    console.log('🚀 Index component mounted - useUsers hook initialized');
-    console.log('Initial hook state:', {
-      isLoading: users.isLoading,
-      hasUser: !!users.user,
-      isError: users.isError,
-    });
-  }, []);
 
-  // Log useUsers hook state changes
-  useEffect(() => {
-    console.log('=== useUsers Hook State ===');
-    console.log('isLoading:', users.isLoading);
-    console.log('isError:', users.isError);
-    console.log('user data:', users.user);
-    console.log('error:', users.error);
-    console.log('isUpdating:', users.isUpdating);
-    console.log('isChangingPassword:', users.isChangingPassword);
-    console.log('isDeleting:', users.isDeleting);
-    console.log('==========================');
-  }, [
-    users.isLoading,
-    users.isError,
-    users.user,
-    users.error,
-    users.isUpdating,
-    users.isChangingPassword,
-    users.isDeleting,
-  ]);
-
-  // Log when user data changes
-  useEffect(() => {
-    if (users.user) {
-      console.log('✅ User profile loaded successfully:', {
-        id: users.user.id,
-        nickname: users.user.nickname,
-        email: users.user.email,
-        isVerified: users.user.isVerified,
-        premiumStatus: users.user.premiumStatus,
-      });
-    }
-  }, [users.user]);
-
-  // Log errors
-  useEffect(() => {
-    if (users.error) {
-      console.error('❌ useUsers error:', users.error);
-    }
-  }, [users.error]);
 
   // Redirect to welcome page if not authenticated (without animation)
   useEffect(() => {
@@ -120,31 +72,10 @@ export default function Index(): React.JSX.Element {
         </Text>
 
         {/* User Profile Info from useUsers hook */}
-        {users.user && (
-          <View style={styles.userInfoContainer}>
-            <Text variant="bodySmall" style={styles.userInfoText}>
-              Logged in as: {users.user.nickname} ({users.user.email})
-            </Text>
-            {users.isLoading && (
-              <Text variant="bodySmall" style={styles.userInfoText}>
-                Refreshing profile...
-              </Text>
-            )}
-          </View>
-        )}
+
 
         <View style={styles.buttonContainer}>
-          <Button
-            mode="outlined"
-            onPress={() => {
-              console.log('🔄 Manual refetch triggered');
-              users.refetch();
-            }}
-            style={styles.button}
-            disabled={users.isLoading}
-          >
-            {users.isLoading ? 'Loading...' : 'Refresh Profile'}
-          </Button>
+
           <Button
             mode="contained"
             onPress={() => router.push('/(main)/profile')}
@@ -211,17 +142,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 16,
   },
-  userInfoContainer: {
-    backgroundColor: '#e3f2fd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 24,
-    alignItems: 'center',
-  },
-  userInfoText: {
-    color: '#1976d2',
-    textAlign: 'center',
-  },
+
   buttonContainer: {
     gap: 16,
   },
