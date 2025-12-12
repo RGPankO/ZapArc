@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { environmentConfig } from '../../config/config';
 
 interface EmailOptions {
   to: string;
@@ -16,20 +16,18 @@ export class EmailService implements OnModuleInit {
   private transporter: Transporter | null = null;
   private isConfigured = false;
 
-  constructor(private readonly configService: ConfigService) {}
-
   onModuleInit() {
     this.initializeTransporter();
   }
 
   private initializeTransporter() {
     const emailConfig = {
-      host: this.configService.get('EMAIL_HOST') || 'smtp.gmail.com',
-      port: parseInt(this.configService.get('EMAIL_PORT') || '587'),
-      secure: this.configService.get('EMAIL_SECURE') === 'true',
+      host: environmentConfig.email.host,
+      port: environmentConfig.email.port,
+      secure: environmentConfig.email.secure,
       auth: {
-        user: this.configService.get('EMAIL_USER') || '',
-        pass: this.configService.get('EMAIL_PASS') || '',
+        user: environmentConfig.email.user,
+        pass: environmentConfig.email.pass,
       },
     };
 
@@ -50,7 +48,7 @@ export class EmailService implements OnModuleInit {
 
     try {
       const mailOptions = {
-        from: this.configService.get('EMAIL_FROM') || this.configService.get('EMAIL_USER'),
+        from: environmentConfig.email.from,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -68,7 +66,7 @@ export class EmailService implements OnModuleInit {
 
   async sendVerificationEmail(email: string, nickname: string, verificationToken: string): Promise<boolean> {
     const verificationUrl = `mobile-app://verify-email?token=${verificationToken}`;
-    const fallbackUrl = `${this.configService.get('FRONTEND_URL') || 'http://46.10.214.242:8081'}/verify-email?token=${verificationToken}`;
+    const fallbackUrl = `${environmentConfig.app.frontendUrl}/verify-email?token=${verificationToken}`;
 
     const html = `
       <!DOCTYPE html>
@@ -127,7 +125,7 @@ export class EmailService implements OnModuleInit {
   }
 
   async sendPasswordResetEmail(email: string, nickname: string, resetToken: string): Promise<boolean> {
-    const resetUrl = `${this.configService.get('FRONTEND_URL') || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    const resetUrl = `${environmentConfig.app.frontendUrl}/reset-password?token=${resetToken}`;
 
     const html = `
       <!DOCTYPE html>

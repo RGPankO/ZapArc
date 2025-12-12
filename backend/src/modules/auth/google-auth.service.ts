@@ -1,8 +1,8 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service';
+import { environmentConfig } from '../../config/config';
 
 interface GooglePayload {
   sub: string;
@@ -16,22 +16,18 @@ interface GooglePayload {
 @Injectable()
 export class GoogleAuthService {
   private readonly logger = new Logger(GoogleAuthService.name);
-  private readonly client: OAuth2Client;
-  private readonly jwtRefreshSecret: string;
+  private readonly client = new OAuth2Client(environmentConfig.google.clientId);
+  private readonly jwtRefreshSecret = environmentConfig.jwt.refreshSecret;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-  ) {
-    this.client = new OAuth2Client(this.configService.get('GOOGLE_CLIENT_ID'));
-    this.jwtRefreshSecret = this.configService.get('JWT_REFRESH_SECRET') || 'your-refresh-secret-key';
-  }
+  ) {}
 
   async googleLogin(idToken: string) {
     const ticket = await this.client.verifyIdToken({
       idToken,
-      audience: this.configService.get('GOOGLE_CLIENT_ID'),
+      audience: environmentConfig.google.clientId,
     });
 
     const payload = ticket.getPayload() as GooglePayload | undefined;

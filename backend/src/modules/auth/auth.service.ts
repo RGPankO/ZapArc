@@ -1,11 +1,11 @@
 import { Injectable, Logger, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { RegisterDto, LoginDto, VerifyEmailDto, RefreshTokenDto } from './dto/auth.dto';
+import { environmentConfig } from '../../config/config';
 
 const SALT_ROUNDS = 12;
 
@@ -17,18 +17,14 @@ export interface TokenPair {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly jwtRefreshSecret: string;
-  private readonly jwtRefreshExpiresIn: string;
+  private readonly jwtRefreshSecret = environmentConfig.jwt.refreshSecret;
+  private readonly jwtRefreshExpiresIn = environmentConfig.jwt.refreshExpiresIn;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
     private readonly emailService: EmailService,
-  ) {
-    this.jwtRefreshSecret = this.configService.get('JWT_REFRESH_SECRET') || 'your-refresh-secret-key';
-    this.jwtRefreshExpiresIn = this.configService.get('JWT_REFRESH_EXPIRES_IN') || '7d';
-  }
+  ) {}
 
   async register(data: RegisterDto) {
     const { email, nickname, password } = data;
