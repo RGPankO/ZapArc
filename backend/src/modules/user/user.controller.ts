@@ -1,8 +1,9 @@
-import { Controller, Get, Put, Delete, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Put, Delete, Body, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../auth/guards/verified-email.guard';
-import type { UpdateProfileDto, ChangePasswordDto } from './dto/user.dto';
+import { CurrentUser, CurrentUserData } from '../../decorators/current-user.decorator';
+import { UpdateProfileDto, ChangePasswordDto } from './dto/user.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -10,25 +11,25 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Get('profile')
-  async getProfile(@Request() req: any) {
-    return this.userService.getProfile(req.user.id);
+  async getProfile(@CurrentUser('id') userId: string) {
+    return this.userService.getProfile(userId);
   }
 
   @Put('profile')
   @UseGuards(VerifiedEmailGuard)
-  async updateProfile(@Request() req: any, @Body() dto: UpdateProfileDto) {
-    return this.userService.updateProfile(req.user.id, dto);
+  async updateProfile(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {
+    return this.userService.updateProfile(userId, dto);
   }
 
   @Put('password')
   @UseGuards(VerifiedEmailGuard)
-  async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
-    return this.userService.changePassword(req.user.id, dto);
+  async changePassword(@CurrentUser('id') userId: string, @Body() dto: ChangePasswordDto) {
+    return this.userService.changePassword(userId, dto);
   }
 
   @Delete('account')
   @UseGuards(VerifiedEmailGuard)
-  async deleteAccount(@Request() req: any) {
-    return this.userService.deleteAccount(req.user.id);
+  async deleteAccount(@CurrentUser('id') userId: string) {
+    return this.userService.deleteAccount(userId);
   }
 }

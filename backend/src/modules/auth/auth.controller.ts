@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { GoogleAuthService } from './google-auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RegisterDto, LoginDto, VerifyEmailDto, RefreshTokenDto, LogoutDto, GoogleLoginDto } from './dto/auth.dto';
+import { CurrentUser, CurrentUserData } from '../../decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -49,11 +50,11 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Request() req: any) {
+  async getProfile(@CurrentUser() user: CurrentUserData) {
     return {
       success: true,
       data: {
-        user: req.user,
+        user,
       },
     };
   }

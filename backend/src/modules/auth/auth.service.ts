@@ -117,6 +117,8 @@ export class AuthService {
       where: { verificationToken: token },
     });
 
+    console.log('user',user);
+
     if (!user) {
       throw new BadRequestException('Invalid or expired verification token');
     }

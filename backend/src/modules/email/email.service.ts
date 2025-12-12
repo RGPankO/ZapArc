@@ -54,12 +54,12 @@ export class EmailService implements OnModuleInit {
         html: options.html,
         text: options.text || options.html.replace(/<[^>]*>/g, ''),
       };
-
+ 
       const result = await this.transporter.sendMail(mailOptions);
       this.logger.log(`Email sent successfully to ${options.to}: ${result.messageId}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}:`, error);
+      this.logger.error(`Failed to send email to ${options.to}: ${error}`);
       return false;
     }
   }

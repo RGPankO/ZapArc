@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Put, Param, Body, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreatePaymentDto, UpdatePaymentStatusDto, PaymentWebhookDto } from './dto/payments.dto';
 import { PaymentStatus, PaymentType } from '../../../generated/prisma';
+import { CurrentUser } from '../../decorators/current-user.decorator';
 
 @Controller('payments')
 export class PaymentsController {
@@ -16,9 +17,9 @@ export class PaymentsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  async createPayment(@Request() req: any, @Body() dto: CreatePaymentDto) {
+  async createPayment(@CurrentUser('id') userId: string, @Body() dto: CreatePaymentDto) {
     const payment = await this.paymentsService.createPayment({
-      userId: req.user.id,
+      userId,
       type: dto.type,
       amount: dto.amount,
       currency: dto.currency,
@@ -50,23 +51,23 @@ export class PaymentsController {
 
   @Get('user/payments')
   @UseGuards(JwtAuthGuard)
-  async getUserPayments(@Request() req: any) {
-    const payments = await this.paymentsService.getUserPayments(req.user.id);
+  async getUserPayments(@CurrentUser('id') userId: string) {
+    const payments = await this.paymentsService.getUserPayments(userId);
     return { success: true, data: payments };
   }
 
   @Get('user/status')
   @UseGuards(JwtAuthGuard)
-  async getUserPaymentStatus(@Request() req: any) {
-    const status = await this.paymentsService.getUserPaymentStatus(req.user.id);
+  async getUserPaymentStatus(@CurrentUser('id') userId: string) {
+    const status = await this.paymentsService.getUserPaymentStatus(userId);
     return { success: true, data: status };
   }
 
   @Post('user/cancel-subscription')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async cancelSubscription(@Request() req: any) {
-    await this.paymentsService.cancelSubscription(req.user.id);
+  async cancelSubscription(@CurrentUser('id') userId: string) {
+    await this.paymentsService.cancelSubscription(userId);
     return { success: true, data: { message: 'Subscription cancelled successfully' } };
   }
 
