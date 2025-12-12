@@ -2,7 +2,7 @@ import { Controller, Post, Get, Body, UseGuards, Request, HttpCode, HttpStatus }
 import { AuthService } from './auth.service';
 import { GoogleAuthService } from './google-auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import type { RegisterDto, LoginDto, VerifyEmailDto, RefreshTokenDto, LogoutDto, GoogleLoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, VerifyEmailDto, RefreshTokenDto, LogoutDto, GoogleLoginDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
