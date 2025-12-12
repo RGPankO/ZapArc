@@ -1,13 +1,13 @@
 import { Catch, ArgumentsHost, HttpStatus, ExceptionFilter } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { Logger } from '@nestjs/common';
-import { Prisma } from '../../../../generated/prisma/index';
+import { PrismaClientKnownRequestError, PrismaClientValidationError } from '../../../../generated/prisma/runtime/library';
 
-@Catch(Prisma.PrismaClientKnownRequestError, Prisma.PrismaClientValidationError)
+@Catch(PrismaClientKnownRequestError, PrismaClientValidationError)
 export class PrismaExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(PrismaExceptionFilter.name);
 
-  catch(exception: Prisma.PrismaClientKnownRequestError | Prisma.PrismaClientValidationError, host: ArgumentsHost): void {
+  catch(exception: PrismaClientKnownRequestError | PrismaClientValidationError, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
@@ -15,7 +15,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     let statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
     let message = exception.message;
 
-    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+    if (exception instanceof PrismaClientKnownRequestError) {
       switch (exception.code) {
         case 'P2025':
           statusCode = HttpStatus.NOT_FOUND;
@@ -36,7 +36,7 @@ export class PrismaExceptionFilter implements ExceptionFilter {
       }
     }
 
-    if (exception instanceof Prisma.PrismaClientValidationError) {
+    if (exception instanceof PrismaClientValidationError) {
       statusCode = HttpStatus.BAD_REQUEST;
     }
 
@@ -51,9 +51,11 @@ export class PrismaExceptionFilter implements ExceptionFilter {
     });
 
     response.status(statusCode).json({
-      code: statusCode,
-      message: message,
-      name: exception.name,
+      success: false,
+      error: {
+        code: statusCode,
+        message: message,
+      },
     });
   }
 }

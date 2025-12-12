@@ -1,29 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-enum PaymentType {
-  SUBSCRIPTION = 'SUBSCRIPTION',
-  ONE_TIME = 'ONE_TIME',
-}
-
-enum PaymentStatus {
-  PENDING = 'PENDING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED',
-}
-
-enum PremiumStatus {
-  FREE = 'FREE',
-  PREMIUM_SUBSCRIPTION = 'PREMIUM_SUBSCRIPTION',
-  PREMIUM_LIFETIME = 'PREMIUM_LIFETIME',
-}
-
-enum PaymentModel {
-  SUBSCRIPTION_ONLY = 'SUBSCRIPTION_ONLY',
-  ONE_TIME_ONLY = 'ONE_TIME_ONLY',
-  BOTH = 'BOTH',
-}
+import { PaymentType, PaymentStatus, PremiumStatus, PaymentModel } from '../../../generated/prisma';
 
 interface CreatePaymentRequest {
   userId: string;
@@ -49,7 +26,7 @@ export class PaymentsService {
     const appConfig = await this.prisma.appConfig.findFirst();
 
     if (!appConfig) {
-      throw new Error('App configuration not found');
+      throw new NotFoundException('App configuration not found');
     }
 
     const plans: any[] = [];
@@ -100,10 +77,10 @@ export class PaymentsService {
     const payment = await this.prisma.payment.create({
       data: {
         userId: request.userId,
-        type: request.type as any,
+        type: request.type,
         amount: request.amount,
         currency: request.currency,
-        status: PaymentStatus.PENDING as any,
+        status: PaymentStatus.PENDING,
         platformId: request.platformId || null,
       },
     });
@@ -116,13 +93,13 @@ export class PaymentsService {
     const payment = await this.prisma.payment.update({
       where: { id: request.paymentId },
       data: {
-        status: request.status as any,
+        status: request.status,
         platformId: request.platformId || null,
       },
     });
 
     if (request.status === PaymentStatus.COMPLETED) {
-      await this.updateUserPremiumStatus(payment.userId, payment.type as PaymentType);
+      await this.updateUserPremiumStatus(payment.userId, payment.type);
     }
 
     this.logger.log(`Payment status updated: ${payment.id} to ${request.status}`);
@@ -130,7 +107,7 @@ export class PaymentsService {
   }
 
   async getPaymentById(paymentId: string) {
-    return this.prisma.payment.findUnique({
+    return this.prisma.payment.findUniqueOrThrow({
       where: { id: paymentId },
     });
   }
@@ -143,7 +120,7 @@ export class PaymentsService {
   }
 
   async getUserPaymentStatus(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       include: {
         payments: {
@@ -152,10 +129,6 @@ export class PaymentsService {
         },
       },
     });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
 
     const hasPremium = user.premiumStatus !== PremiumStatus.FREE;
     const isExpired = user.premiumExpiry && user.premiumExpiry < new Date();
@@ -183,7 +156,7 @@ export class PaymentsService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        premiumStatus: premiumStatus as any,
+        premiumStatus,
         premiumExpiry,
       },
     });
@@ -192,13 +165,9 @@ export class PaymentsService {
   }
 
   async processSubscriptionRenewal(userId: string, paymentId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
     });
-
-    if (!user) {
-      throw new Error('User not found');
-    }
 
     const newExpiry = user.premiumExpiry || new Date();
     newExpiry.setDate(newExpiry.getDate() + 30);
@@ -206,7 +175,7 @@ export class PaymentsService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        premiumStatus: PremiumStatus.PREMIUM_SUBSCRIPTION as any,
+        premiumStatus: PremiumStatus.PREMIUM_SUBSCRIPTION,
         premiumExpiry: newExpiry,
       },
     });
@@ -230,7 +199,7 @@ export class PaymentsService {
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          premiumStatus: PremiumStatus.FREE as any,
+          premiumStatus: PremiumStatus.FREE,
           premiumExpiry: null,
         },
       });

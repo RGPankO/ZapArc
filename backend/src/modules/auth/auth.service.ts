@@ -1,28 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
-import type { RegisterDto, LoginDto, VerifyEmailDto, RefreshTokenDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, VerifyEmailDto, RefreshTokenDto } from './dto/auth.dto';
 
 const SALT_ROUNDS = 12;
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
-}
-
-export interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    nickname: string;
-    isVerified: boolean;
-    premiumStatus: string;
-  };
-  tokens: TokenPair;
 }
 
 @Injectable()
@@ -44,50 +33,12 @@ export class AuthService {
   async register(data: RegisterDto) {
     const { email, nickname, password } = data;
 
-    if (!email || !nickname || !password) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Email, nickname, and password are required',
-        },
-      };
-    }
-
-    if (!this.validateEmail(email)) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_EMAIL',
-          message: 'Please provide a valid email address',
-        },
-      };
-    }
-
-    const passwordValidation = this.validatePassword(password);
-    if (!passwordValidation.isValid) {
-      return {
-        success: false,
-        error: {
-          code: 'WEAK_PASSWORD',
-          message: 'Password does not meet requirements',
-          details: passwordValidation.errors,
-        },
-      };
-    }
-
     const existingUser = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
 
     if (existingUser) {
-      return {
-        success: false,
-        error: {
-          code: 'USER_EXISTS',
-          message: 'A user with this email already exists',
-        },
-      };
+      throw new ConflictException('A user with this email already exists');
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -118,60 +69,22 @@ export class AuthService {
   async login(data: LoginDto) {
     const { email, password } = data;
 
-    if (!email || !password) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Email and password are required',
-        },
-      };
-    }
-
     const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
 
-    if (!user) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
-        },
-      };
-    }
-
-    if (!user.passwordHash) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
-        },
-      };
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
-        },
-      };
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.isVerified) {
-      return {
-        success: false,
-        error: {
-          code: 'EMAIL_NOT_VERIFIED',
-          message: 'Please verify your email address before logging in',
-        },
-      };
+      throw new UnauthorizedException('Please verify your email address before logging in');
     }
 
     const tokens = this.generateTokenPair(user.id, user.email);
@@ -204,38 +117,16 @@ export class AuthService {
   async verifyEmail(data: VerifyEmailDto) {
     const { token } = data;
 
-    if (!token) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Verification token is required',
-        },
-      };
-    }
-
     const user = await this.prisma.user.findFirst({
       where: { verificationToken: token },
     });
 
     if (!user) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: 'Invalid or expired verification token',
-        },
-      };
+      throw new BadRequestException('Invalid or expired verification token');
     }
 
     if (user.isVerified) {
-      return {
-        success: false,
-        error: {
-          code: 'ALREADY_VERIFIED',
-          message: 'Email address is already verified',
-        },
-      };
+      throw new BadRequestException('Email address is already verified');
     }
 
     await this.prisma.user.update({
@@ -259,29 +150,12 @@ export class AuthService {
   async refreshToken(data: RefreshTokenDto) {
     const { refreshToken } = data;
 
-    if (!refreshToken) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Refresh token is required',
-        },
-      };
-    }
-
-    let decoded: { userId: string; email: string };
     try {
-      decoded = this.jwtService.verify(refreshToken, {
+      this.jwtService.verify(refreshToken, {
         secret: this.jwtRefreshSecret,
       });
     } catch {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: 'Invalid refresh token',
-        },
-      };
+      throw new UnauthorizedException('Invalid refresh token');
     }
 
     const session = await this.prisma.session.findUnique({
@@ -293,13 +167,7 @@ export class AuthService {
       if (session) {
         await this.prisma.session.delete({ where: { id: session.id } });
       }
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: 'Invalid or expired refresh token',
-        },
-      };
+      throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
     const newAccessToken = this.generateAccessToken(session.user.id, session.user.email);
@@ -315,16 +183,6 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    if (!refreshToken) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Refresh token is required',
-        },
-      };
-    }
-
     await this.prisma.session.deleteMany({
       where: { token: refreshToken },
     });
@@ -350,29 +208,5 @@ export class AuthService {
 
   private generateAccessToken(userId: string, email: string): string {
     return this.jwtService.sign({ userId, email, type: 'access' });
-  }
-
-  private validateEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  private validatePassword(password: string): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (password.length < 8) {
-      errors.push('Password must be at least 8 characters long');
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter');
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push('Password must contain at least one lowercase letter');
-    }
-    if (!/\d/.test(password)) {
-      errors.push('Password must contain at least one number');
-    }
-
-    return { isValid: errors.length === 0, errors };
   }
 }

@@ -1,5 +1,5 @@
 import { IsEnum, IsString, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
-import { AdType, AdAction } from '../../../../generated/prisma/index';
+import { AdType, AdAction } from '../../../../generated/prisma';
 
 export class UpsertAdConfigDto {
   @IsEnum(AdType)

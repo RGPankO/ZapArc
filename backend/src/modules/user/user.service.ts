@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, BadRequestException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import type { UpdateProfileDto, ChangePasswordDto } from './dto/user.dto';
+import { UpdateProfileDto, ChangePasswordDto } from './dto/user.dto';
 
 const SALT_ROUNDS = 12;
 
@@ -12,7 +13,7 @@ export class UserService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
         id: true,
@@ -26,16 +27,6 @@ export class UserService {
       },
     });
 
-    if (!user) {
-      return {
-        success: false,
-        error: {
-          code: 'USER_NOT_FOUND',
-          message: 'User not found',
-        },
-      };
-    }
-
     return {
       success: true,
       data: { user },
@@ -46,23 +37,7 @@ export class UserService {
     const { nickname, email } = data;
 
     if (!nickname && !email) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'At least one field (nickname or email) must be provided',
-        },
-      };
-    }
-
-    if (email && !this.validateEmail(email)) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_EMAIL',
-          message: 'Please provide a valid email address',
-        },
-      };
+      throw new BadRequestException('At least one field (nickname or email) must be provided');
     }
 
     if (email) {
@@ -74,13 +49,7 @@ export class UserService {
       });
 
       if (existingUser) {
-        return {
-          success: false,
-          error: {
-            code: 'EMAIL_TAKEN',
-            message: 'This email address is already in use',
-          },
-        };
+        throw new ConflictException('This email address is already in use');
       }
     }
 
@@ -89,7 +58,7 @@ export class UserService {
     if (email) {
       updateData.email = email.toLowerCase();
       updateData.isVerified = false;
-      updateData.verificationToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      updateData.verificationToken = crypto.randomBytes(32).toString('hex');
     }
 
     const updatedUser = await this.prisma.user.update({
@@ -118,73 +87,23 @@ export class UserService {
   async changePassword(userId: string, data: ChangePasswordDto) {
     const { currentPassword, newPassword } = data;
 
-    if (!currentPassword || !newPassword) {
-      return {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Current password and new password are required',
-        },
-      };
-    }
-
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { id: true, email: true, passwordHash: true },
     });
 
-    if (!user) {
-      return {
-        success: false,
-        error: {
-          code: 'USER_NOT_FOUND',
-          message: 'User not found',
-        },
-      };
-    }
-
     if (!user.passwordHash) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_CURRENT_PASSWORD',
-          message: 'Current password is incorrect',
-        },
-      };
+      throw new BadRequestException('Current password is incorrect');
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isCurrentPasswordValid) {
-      return {
-        success: false,
-        error: {
-          code: 'INVALID_CURRENT_PASSWORD',
-          message: 'Current password is incorrect',
-        },
-      };
-    }
-
-    const passwordValidation = this.validatePassword(newPassword);
-    if (!passwordValidation.isValid) {
-      return {
-        success: false,
-        error: {
-          code: 'WEAK_PASSWORD',
-          message: 'New password does not meet requirements',
-          details: passwordValidation.errors,
-        },
-      };
+      throw new BadRequestException('Current password is incorrect');
     }
 
     const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
     if (isSamePassword) {
-      return {
-        success: false,
-        error: {
-          code: 'SAME_PASSWORD',
-          message: 'New password must be different from current password',
-        },
-      };
+      throw new BadRequestException('New password must be different from current password');
     }
 
     const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
@@ -206,20 +125,10 @@ export class UserService {
   }
 
   async deleteAccount(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { email: true },
     });
-
-    if (!user) {
-      return {
-        success: false,
-        error: {
-          code: 'USER_NOT_FOUND',
-          message: 'User not found',
-        },
-      };
-    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.session.deleteMany({ where: { userId } });
@@ -235,29 +144,5 @@ export class UserService {
         message: 'Account deleted successfully',
       },
     };
-  }
-
-  private validateEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  private validatePassword(password: string): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (password.length < 8) {
-      errors.push('Password must be at least 8 characters long');
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push('Password must contain at least one uppercase letter');
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push('Password must contain at least one lowercase letter');
-    }
-    if (!/\d/.test(password)) {
-      errors.push('Password must contain at least one number');
-    }
-
-    return { isValid: errors.length === 0, errors };
   }
 }

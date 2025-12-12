@@ -1,21 +1,50 @@
+import { IsEnum, IsNumber, IsString, IsOptional, Min } from 'class-validator';
+import { PaymentType, PaymentStatus } from '../../../../generated/prisma';
+
 export class CreatePaymentDto {
-  type: 'SUBSCRIPTION' | 'ONE_TIME';
+  @IsEnum(PaymentType)
+  type: PaymentType;
+
+  @IsNumber()
+  @Min(0)
   amount: number;
+
+  @IsString()
   currency: string;
+
+  @IsOptional()
+  @IsString()
   platformId?: string;
 }
 
 export class UpdatePaymentStatusDto {
-  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  @IsEnum(PaymentStatus)
+  status: PaymentStatus;
+
+  @IsOptional()
+  @IsString()
   platformId?: string;
 }
 
 export class PaymentWebhookDto {
+  @IsString()
   paymentId: string;
+
+  @IsString()
   platformId: string;
-  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+  @IsEnum(PaymentStatus)
+  status: PaymentStatus;
+
+  @IsNumber()
   amount: number;
+
+  @IsString()
   currency: string;
+
+  @IsString()
   userId: string;
-  type: 'SUBSCRIPTION' | 'ONE_TIME';
+
+  @IsEnum(PaymentType)
+  type: PaymentType;
 }

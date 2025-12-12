@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AdType, AdAction, PremiumStatus } from '../../../generated/prisma/index';
+import { AdType, AdAction, PremiumStatus } from '../../../generated/prisma';
 
 export interface AdConfigData {
   adType: AdType;
@@ -51,16 +51,16 @@ export class AdsService {
           updatedAt: new Date(),
         },
       });
-    } else {
-      return this.prisma.adConfig.create({
-        data: {
-          adType: data.adType,
-          adNetworkId: data.adNetworkId,
-          isActive: data.isActive ?? true,
-          displayFrequency: data.displayFrequency ?? 1,
-        },
-      });
     }
+
+    return this.prisma.adConfig.create({
+      data: {
+        adType: data.adType,
+        adNetworkId: data.adNetworkId,
+        isActive: data.isActive ?? true,
+        displayFrequency: data.displayFrequency ?? 1,
+      },
+    });
   }
 
   async shouldShowAds(userId: string): Promise<boolean> {
@@ -115,20 +115,16 @@ export class AdsService {
   }
 
   async trackAdAnalytics(data: AdAnalyticsData) {
-    try {
-      await this.prisma.adAnalytics.create({
-        data: {
-          userId: data.userId || null,
-          adType: data.adType,
-          action: data.action,
-          adNetworkId: data.adNetworkId,
-        },
-      });
+    await this.prisma.adAnalytics.create({
+      data: {
+        userId: data.userId || null,
+        adType: data.adType,
+        action: data.action,
+        adNetworkId: data.adNetworkId,
+      },
+    });
 
-      this.logger.log(`Ad analytics tracked: ${data.action} for ${data.adType} ad`);
-    } catch (error) {
-      this.logger.error('Error tracking ad analytics:', error);
-    }
+    this.logger.log(`Ad analytics tracked: ${data.action} for ${data.adType} ad`);
   }
 
   async getAdAnalytics(startDate?: Date, endDate?: Date) {
