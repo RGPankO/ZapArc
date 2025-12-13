@@ -17,8 +17,8 @@ export const NetworkConfig = {
   getApiBaseUrls(): string[] {
     if (Platform.OS === 'web') {
       return [
-        'http://localhost:3000/api',
         'http://127.0.0.1:3000/api',
+        'http://localhost:3000/api',
         `http://${CURRENT_NETWORK_IP}:3000/api`
       ];
     }

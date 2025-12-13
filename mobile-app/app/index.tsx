@@ -7,9 +7,14 @@ import { InterstitialAd } from '../src/components';
 import { useInterstitialAd } from '../src/hooks/useInterstitialAd';
 import { useAuth } from '../src/hooks/useAuth';
 
+
 export default function Index(): React.JSX.Element {
   const interstitialAd = useInterstitialAd();
   const { isAuthenticated, isLoading, checkAuth } = useAuth();
+
+
+  // Log when component mounts and hook is initialized
+
 
   // Redirect to welcome page if not authenticated (without animation)
   useEffect(() => {
@@ -66,7 +71,11 @@ export default function Index(): React.JSX.Element {
           Welcome back!
         </Text>
 
+        {/* User Profile Info from useUsers hook */}
+
+
         <View style={styles.buttonContainer}>
+
           <Button
             mode="contained"
             onPress={() => router.push('/(main)/profile')}
@@ -131,8 +140,9 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     color: '#666',
-    marginBottom: 32,
+    marginBottom: 16,
   },
+
   buttonContainer: {
     gap: 16,
   },

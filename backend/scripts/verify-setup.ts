@@ -1,13 +1,6 @@
 #!/usr/bin/env ts-node
 
-import { 
-  getPrismaClient, 
-  testDatabaseConnection, 
-  connectDatabase, 
-  disconnectDatabase 
-} from '../src/utils/database';
-import { validateDatabaseConfig } from '../src/config/database';
-import { logger } from '../src/utils/logger';
+import { PrismaClient } from '../generated/prisma/index';
 
 /**
  * Verification script to test database setup
@@ -15,28 +8,24 @@ import { logger } from '../src/utils/logger';
 async function verifySetup() {
   console.log('🔍 Verifying database setup...\n');
 
-  try {
-    // 1. Validate configuration
-    console.log('1. Validating database configuration...');
-    validateDatabaseConfig();
-    console.log('   ✅ Configuration is valid\n');
+  const client = new PrismaClient();
+  let isConnected = false;
 
-    // 2. Test Prisma client creation
-    console.log('2. Testing Prisma client creation...');
-    const client = getPrismaClient();
+  try {
+    // 1. Test Prisma client creation
+    console.log('1. Testing Prisma client creation...');
     console.log('   ✅ Prisma client created successfully\n');
 
-    // 3. Test database connection
-    console.log('3. Testing database connection...');
-    const isConnected = await testDatabaseConnection();
-    if (isConnected) {
+    // 2. Test database connection
+    console.log('2. Testing database connection...');
+    try {
+      await client.$connect();
+      isConnected = true;
       console.log('   ✅ Database connection successful\n');
       
-      // 4. Test basic queries (if connected)
-      console.log('4. Testing basic database operations...');
+      // 3. Test basic queries (if connected)
+      console.log('3. Testing basic database operations...');
       try {
-        await connectDatabase();
-        
         // Test table access
         const userCount = await client.user.count();
         console.log(`   ✅ User table accessible (${userCount} users)\n`);
@@ -45,28 +34,24 @@ async function verifySetup() {
         console.log(`   ✅ AppConfig table accessible (${configCount} configs)\n`);
         
         // Test enum values
-        console.log('5. Testing enum definitions...');
-        const { PremiumStatus, PaymentType, PaymentStatus, PaymentModel } = await import('../src/generated/prisma');
+        console.log('4. Testing enum definitions...');
+        const { PremiumStatus, PaymentType, PaymentStatus, PaymentModel } = await import('../generated/prisma/index');
         console.log('   ✅ All enums imported successfully\n');
         
       } catch (error) {
         console.log('   ⚠️  Database operations failed (tables may not exist yet)');
         console.log('   💡 Run "npm run db:migrate" to create tables\n');
       }
-    } else {
+    } catch (error) {
       console.log('   ⚠️  Database connection failed');
-      console.log('   💡 Make sure MySQL is running and credentials are correct\n');
+      console.log('   💡 Make sure PostgreSQL is running and credentials are correct\n');
     }
 
     // 5. Summary
     console.log('📋 Setup Summary:');
     console.log('   • Prisma schema: ✅ Valid');
     console.log('   • Prisma client: ✅ Generated');
-    console.log('   • Database config: ✅ Valid');
     console.log(`   • Database connection: ${isConnected ? '✅ Working' : '⚠️  Failed'}`);
-    console.log('   • Database utilities: ✅ Available');
-    console.log('   • Error handling: ✅ Implemented');
-    console.log('   • Health checks: ✅ Available');
     console.log('   • Migration scripts: ✅ Ready');
     console.log('   • Seed scripts: ✅ Ready\n');
 
@@ -88,7 +73,7 @@ async function verifySetup() {
     console.error('❌ Setup verification failed:', error);
     process.exit(1);
   } finally {
-    await disconnectDatabase();
+    await client.$disconnect();
   }
 }
 
