@@ -43,3 +43,8 @@ export class GoogleLoginDto {
   @IsString()
   idToken: string;
 }
+
+export class ResendVerificationDto {
+  @IsEmail()
+  email: string;
+}

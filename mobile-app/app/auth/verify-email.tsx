@@ -3,7 +3,6 @@ import { View, StyleSheet } from 'react-native';
 import { Text, Card, ActivityIndicator, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { authService } from '../../src/services/authService';
 import { NetworkConfig } from '../../src/config/network';
 
 export default function VerifyEmailScreen(): React.JSX.Element {
@@ -29,19 +28,20 @@ export default function VerifyEmailScreen(): React.JSX.Element {
     setIsVerifying(true);
 
     try {
-      console.log('Verifying email with token:', verificationToken);
+      const apiUrl = `${NetworkConfig.getApiBaseUrl()}/auth/verify-email`;
 
-      // Call the backend verification endpoint
-      const response = await fetch(`${NetworkConfig.getNetworkApiUrl()}/auth/verify-email`, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ token: verificationToken }),
       });
 
       const result = await response.json();
-      console.log('Verification result:', result);
 
       if (response.ok && result.success) {
         setVerificationResult({
@@ -55,7 +55,6 @@ export default function VerifyEmailScreen(): React.JSX.Element {
         });
       }
     } catch (error) {
-      console.error('Email verification error:', error);
       setVerificationResult({
         success: false,
         message: 'Network error occurred. Please check your connection and try again.',

@@ -195,6 +195,45 @@ export class AuthService {
     };
   }
 
+  async resendVerificationEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (!user) {
+      // Return success even if user doesn't exist to prevent email enumeration
+      return {
+        success: true,
+        data: {
+          message: 'If an account exists with this email, a verification email has been sent.',
+        },
+      };
+    }
+
+    if (user.isVerified) {
+      throw new BadRequestException('Email is already verified');
+    }
+
+    // Generate a new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { verificationToken },
+    });
+
+    await this.emailService.sendVerificationEmail(user.email, user.nickname, verificationToken);
+
+    this.logger.log(`Verification email resent to: ${user.email}`);
+
+    return {
+      success: true,
+      data: {
+        message: 'If an account exists with this email, a verification email has been sent.',
+      },
+    };
+  }
+
   generateTokenPair(userId: string, email: string): TokenPair {
     const accessToken = this.generateAccessToken(userId, email);
     const refreshToken = this.jwtService.sign(

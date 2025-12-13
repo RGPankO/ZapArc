@@ -7,11 +7,13 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // Security middleware
-  app.use(helmet());
+  // CORS - must be configured before helmet
+  app.enableCors({
+    origin: '*',
+  });
 
-  // CORS
-  app.enableCors();
+  // Security headers
+  app.use(helmet());
 
   // Global prefix
   app.setGlobalPrefix('api');

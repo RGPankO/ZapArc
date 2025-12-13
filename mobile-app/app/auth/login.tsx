@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Text, HelperText, Divider } from 'react-native-paper';
 import { router } from 'expo-router';
@@ -8,6 +8,8 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { authService } from '../../src/services/authService';
 import GoogleSignInButton from '../../src/components/GoogleSignInButton';
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 interface LoginFormData {
   email: string;
@@ -28,6 +30,11 @@ export default function LoginScreen(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [showVerificationResend, setShowVerificationResend] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const unverifiedEmailRef = useRef<string>('');
 
   const {
     control,
@@ -38,10 +45,44 @@ export default function LoginScreen(): React.JSX.Element {
     mode: 'onBlur',
   });
 
+  // Cooldown timer effect
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => {
+        setResendCooldown(resendCooldown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  const handleResendVerification = async (): Promise<void> => {
+    if (resendCooldown > 0 || !unverifiedEmailRef.current) return;
+
+    setIsResending(true);
+    setResendSuccess(false);
+
+    try {
+      const result = await authService.resendVerificationEmail(unverifiedEmailRef.current);
+
+      if (result.success) {
+        setResendSuccess(true);
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      } else {
+        setLoginError(result.error?.message || 'Failed to resend verification email');
+      }
+    } catch {
+      setLoginError('Failed to resend verification email. Please try again.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const onSubmit = async (data: LoginFormData): Promise<void> => {
     setIsLoading(true);
     setLoginError(null);
-    
+    setShowVerificationResend(false);
+    setResendSuccess(false);
+
     try {
       console.log('Login: Starting login with data:', data);
       
@@ -81,18 +122,10 @@ export default function LoginScreen(): React.JSX.Element {
         }
       } else {
         // Handle different error types
-        if (result.error?.code === 'EMAIL_NOT_VERIFIED') {
-          Alert.alert(
-            'Email Not Verified',
-            'Please verify your email address before logging in.',
-            [
-              {
-                text: 'Verify Now',
-                onPress: () => router.push('/auth/email-verification'),
-              },
-              { text: 'Cancel', style: 'cancel' },
-            ]
-          );
+        if (result.error?.message?.toLowerCase().includes('verify your email')) {
+          unverifiedEmailRef.current = data.email;
+          setShowVerificationResend(true);
+          setLoginError('Please verify your email address before logging in.');
         } else {
           setLoginError(result.error?.message || 'Invalid email or password. Please try again.');
         }
@@ -140,6 +173,29 @@ export default function LoginScreen(): React.JSX.Element {
           {loginError && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{loginError}</Text>
+            </View>
+          )}
+
+          {showVerificationResend && (
+            <View style={styles.verificationContainer}>
+              {resendSuccess ? (
+                <View style={styles.successContainer}>
+                  <Text style={styles.successText}>
+                    Verification email sent! Please check your inbox.
+                  </Text>
+                </View>
+              ) : null}
+              <Button
+                mode="outlined"
+                onPress={handleResendVerification}
+                loading={isResending}
+                disabled={isResending || resendCooldown > 0}
+                style={styles.resendButton}
+              >
+                {resendCooldown > 0
+                  ? `Resend in ${resendCooldown}s`
+                  : 'Resend Verification Email'}
+              </Button>
             </View>
           )}
 
@@ -282,6 +338,24 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#c62828',
     fontSize: 14,
+  },
+  verificationContainer: {
+    marginBottom: 16,
+  },
+  successContainer: {
+    backgroundColor: '#e8f5e9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  successText: {
+    color: '#2e7d32',
+    fontSize: 14,
+  },
+  resendButton: {
+    borderColor: '#1976d2',
   },
   form: {
     marginTop: 16,
