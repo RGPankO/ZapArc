@@ -16,11 +16,7 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
   // Email
-  EMAIL_HOST: z.string().default('smtp.gmail.com'),
-  EMAIL_PORT: z.string().default('587').transform(Number),
-  EMAIL_SECURE: z.string().default('false').transform((v) => v === 'true'),
-  EMAIL_USER: z.string().default(''),
-  EMAIL_PASS: z.string().default(''),
+  RESEND_API_KEY: z.string().default(''),
   EMAIL_FROM: z.string().optional(),
 
   // App
@@ -62,12 +58,8 @@ export const environmentConfig = {
 
   // Email
   email: {
-    host: env.EMAIL_HOST,
-    port: env.EMAIL_PORT,
-    secure: env.EMAIL_SECURE,
-    user: env.EMAIL_USER,
-    pass: env.EMAIL_PASS,
-    from: env.EMAIL_FROM || env.EMAIL_USER,
+    apiKey: env.RESEND_API_KEY,
+    from: env.EMAIL_FROM || 'noreply@example.com',
   },
 
   // App

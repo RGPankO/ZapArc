@@ -1,6 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
+import { Resend } from 'resend';
 import { environmentConfig } from '../../config/config';
 
 interface EmailOptions {
@@ -13,50 +12,46 @@ interface EmailOptions {
 @Injectable()
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: Transporter | null = null;
+  private resend: Resend | null = null;
   private isConfigured = false;
 
   onModuleInit() {
-    this.initializeTransporter();
+    this.initializeResend();
   }
 
-  private initializeTransporter() {
-    const emailConfig = {
-      host: environmentConfig.email.host,
-      port: environmentConfig.email.port,
-      secure: environmentConfig.email.secure,
-      auth: {
-        user: environmentConfig.email.user,
-        pass: environmentConfig.email.pass,
-      },
-    };
+  private initializeResend() {
+    const apiKey = environmentConfig.email.apiKey;
 
-    if (emailConfig.auth.user && emailConfig.auth.pass) {
-      this.transporter = nodemailer.createTransport(emailConfig);
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
       this.isConfigured = true;
-      this.logger.log('Email service initialized successfully');
+      this.logger.log('Email service initialized successfully with Resend');
     } else {
-      this.logger.warn('Email service not configured - missing EMAIL_USER or EMAIL_PASS');
+      this.logger.warn('Email service not configured - missing RESEND_API_KEY');
     }
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    if (!this.isConfigured || !this.transporter) {
+    if (!this.isConfigured || !this.resend) {
       this.logger.error('Email service not configured');
       return false;
     }
 
     try {
-      const mailOptions = {
+      const { data, error } = await this.resend.emails.send({
         from: environmentConfig.email.from,
         to: options.to,
         subject: options.subject,
         html: options.html,
-        text: options.text || options.html.replace(/<[^>]*>/g, ''),
-      };
- 
-      const result = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Email sent successfully to ${options.to}: ${result.messageId}`);
+        text: options.text,
+      });
+
+      if (error) {
+        this.logger.error(`Failed to send email to ${options.to}: ${error.message}`);
+        return false;
+      }
+
+      this.logger.log(`Email sent successfully to ${options.to}: ${data?.id}`);
       return true;
     } catch (error) {
       this.logger.error(`Failed to send email to ${options.to}: ${error}`);
