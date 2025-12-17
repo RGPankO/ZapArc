@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, screen } from '@testing-library/react-native';
-import PaymentConfirmationModal from '../components/PaymentConfirmationModal';
-import { PaymentPlan } from '../types';
+import { PaymentConfirmationModal, PaymentPlan } from '../features/payments';
+
 
 describe('PaymentConfirmationModal', () => {
   const mockSubscriptionPlan: PaymentPlan = {

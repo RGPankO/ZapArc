@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
-import { StyleSheet, Alert } from 'react-native';
+import React from 'react';
+import { StyleSheet, Alert, ViewStyle } from 'react-native';
 import { Button } from 'react-native-paper';
-import { googleAuthService } from '../services/googleAuthService';
-import { tokenService } from '../services/tokenService';
+import { useGoogleSignIn, GoogleSignInError } from '../hooks/useGoogleAuth';
 import { router } from 'expo-router';
 
 interface GoogleSignInButtonProps {
   onSuccess?: () => void;
   onError?: (error: string) => void;
   mode?: 'contained' | 'outlined' | 'text';
-  style?: any;
+  style?: ViewStyle;
 }
 
 export default function GoogleSignInButton({
@@ -18,43 +17,26 @@ export default function GoogleSignInButton({
   mode = 'outlined',
   style,
 }: GoogleSignInButtonProps): React.JSX.Element {
-  const [isLoading, setIsLoading] = useState(false);
+  const googleSignIn = useGoogleSignIn();
 
   const handleGoogleSignIn = async (): Promise<void> => {
-    setIsLoading(true);
-    
     try {
-      const response = await googleAuthService.signIn();
+      await googleSignIn.mutateAsync();
       
-      if (response.success && response.data) {
-        // Store tokens
-        await tokenService.storeTokens({
-          accessToken: response.data.tokens.accessToken,
-          refreshToken: response.data.tokens.refreshToken,
-        });
-        
-        console.log('✅ Google login successful, tokens stored');
-        onSuccess?.();
-        // Navigate to main app
-        router.replace('/(main)');
-      } else {
-        const errorMessage = response.error?.message || 'Google sign-in failed';
-        console.error('Google sign-in error:', errorMessage);
-        
-        // Don't show alert for user cancellation
-        if (response.error?.code !== 'SIGN_IN_CANCELLED') {
-          Alert.alert('Sign-in Error', errorMessage);
-        }
-        
-        onError?.(errorMessage);
-      }
-    } catch (error: any) {
-      const errorMessage = error.message || 'An unexpected error occurred';
+      console.log('✅ Google login successful');
+      onSuccess?.();
+      // Navigate to main app
+      router.replace('/(main)');
+    } catch (error: unknown) {
+      const errorMessage = (error as GoogleSignInError).message || 'Google sign-in failed';
       console.error('Google sign-in error:', error);
-      Alert.alert('Sign-in Error', errorMessage);
+      
+      // Don't show alert for user cancellation
+      if ((error as GoogleSignInError).code !== 'SIGN_IN_CANCELLED') {
+        Alert.alert('Sign-in Error', errorMessage);
+      }
+      
       onError?.(errorMessage);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -62,12 +44,12 @@ export default function GoogleSignInButton({
     <Button
       mode={mode}
       onPress={handleGoogleSignIn}
-      loading={isLoading}
-      disabled={isLoading}
+      loading={googleSignIn.isPending}
+      disabled={googleSignIn.isPending}
       style={[styles.button, style]}
       icon="google"
     >
-      {isLoading ? 'Signing in...' : 'Continue with Google'}
+      {googleSignIn.isPending ? 'Signing in...' : 'Continue with Google'}
     </Button>
   );
 }

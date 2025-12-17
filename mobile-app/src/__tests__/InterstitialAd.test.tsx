@@ -1,54 +1,81 @@
 import React from 'react';
-import { render, waitFor, fireEvent } from '@testing-library/react-native';
-import { InterstitialAd } from '../components/InterstitialAd';
-import { adManager } from '../services/adManager';
+import { render, waitFor, fireEvent, cleanup, act } from '@testing-library/react-native';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { InterstitialAd } from '../features/ads';
+import { apiClient } from '../lib/apiClient';
 import { AdType } from '../types';
 
-// Mock the ad manager
-jest.mock('../services/adManager', () => ({
-  adManager: {
-    loadAd: jest.fn(),
-    trackImpression: jest.fn(),
-    trackClick: jest.fn(),
-    trackClose: jest.fn(),
+// Mock the apiClient
+jest.mock('../lib/apiClient', () => ({
+  apiClient: {
+    get: jest.fn(),
+    post: jest.fn(),
   },
 }));
 
-const mockAdManager = adManager as jest.Mocked<typeof adManager>;
+// Mock expo-navigation-bar
+jest.mock('expo-navigation-bar', () => ({
+  setBackgroundColorAsync: jest.fn().mockResolvedValue(undefined),
+  setButtonStyleAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockApiClient = apiClient as jest.Mocked<typeof apiClient>;
+
+// Helper to render with a fresh QueryClient for each test
+const renderWithClient = (ui: React.ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        gcTime: 0,
+      },
+    },
+  });
+  
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+};
 
 describe('InterstitialAd', () => {
-  const defaultProps = {
-    visible: true,
-    onClose: jest.fn(),
-    onAdLoaded: jest.fn(),
-    onAdError: jest.fn(),
-  };
-
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    jest.useRealTimers(); // Ensure timers are always real between tests
+    cleanup();
   });
 
-  it('should render loading state initially when visible', async () => {
-    mockAdManager.loadAd.mockImplementation(() => 
-      new Promise(resolve => setTimeout(() => resolve({
-        isLoading: false,
-        adConfig: null,
-        error: null,
-        shouldShow: false,
-      }), 100))
+  it('should not render when not visible', () => {
+    const onClose = jest.fn();
+    const { queryByText } = renderWithClient(
+      <InterstitialAd visible={false} onClose={onClose} />
     );
 
-    const { getByText } = render(<InterstitialAd {...defaultProps} />);
-    
+    expect(queryByText('Loading advertisement...')).toBeNull();
+    expect(queryByText('Sample Video Advertisement')).toBeNull();
+  });
+
+  it('should render loading state when visible', async () => {
+    const onClose = jest.fn();
+
+    // Make both API calls hang to show loading state
+    mockApiClient.get.mockImplementation(
+      () => new Promise(() => {}) // Hang forever
+    );
+
+    const { getByText } = renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} />
+    );
+
     expect(getByText('Loading advertisement...')).toBeTruthy();
   });
 
   it('should render ad when loaded successfully', async () => {
+    const onClose = jest.fn();
+    const onAdLoaded = jest.fn();
+
     const mockAdConfig = {
       id: '1',
       adType: AdType.INTERSTITIAL,
@@ -56,25 +83,55 @@ describe('InterstitialAd', () => {
       displayFrequency: 1,
     };
 
-    mockAdManager.loadAd.mockResolvedValue({
-      isLoading: false,
-      adConfig: mockAdConfig,
-      error: null,
-      shouldShow: true,
+    mockApiClient.get.mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/users/profile')) {
+        return Promise.resolve({ user: { premiumStatus: 'FREE' } });
+      }
+      if (typeof url === 'string' && url.includes('/ads/serve')) {
+        return Promise.resolve(mockAdConfig);
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 
-    const { getByText } = render(<InterstitialAd {...defaultProps} />);
+    mockApiClient.post.mockResolvedValue({ success: true });
+
+    const { getByText } = renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} onAdLoaded={onAdLoaded} />
+    );
 
     await waitFor(() => {
       expect(getByText('Sample Video Advertisement')).toBeTruthy();
       expect(getByText('Network: test-network')).toBeTruthy();
     });
 
-    expect(mockAdManager.loadAd).toHaveBeenCalledWith(AdType.INTERSTITIAL);
-    expect(mockAdManager.trackImpression).toHaveBeenCalledWith(mockAdConfig);
+    expect(onAdLoaded).toHaveBeenCalled();
   });
 
-  it('should show close button after video completes', async () => {
+  it('should close immediately for premium users', async () => {
+    const onClose = jest.fn();
+
+    mockApiClient.get.mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/users/profile')) {
+        return Promise.resolve({ user: { premiumStatus: 'PREMIUM_LIFETIME' } });
+      }
+      if (typeof url === 'string' && url.includes('/ads/serve')) {
+        return Promise.resolve({ id: '1', adType: AdType.INTERSTITIAL, adNetworkId: 'test', displayFrequency: 1 });
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+
+    renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} />
+    );
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
+
+  it('should track impression when ad is displayed', async () => {
+    const onClose = jest.fn();
+
     const mockAdConfig = {
       id: '1',
       adType: AdType.INTERSTITIAL,
@@ -82,14 +139,62 @@ describe('InterstitialAd', () => {
       displayFrequency: 1,
     };
 
-    mockAdManager.loadAd.mockResolvedValue({
-      isLoading: false,
-      adConfig: mockAdConfig,
-      error: null,
-      shouldShow: true,
+    mockApiClient.get.mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/users/profile')) {
+        return Promise.resolve({ user: { premiumStatus: 'FREE' } });
+      }
+      if (typeof url === 'string' && url.includes('/ads/serve')) {
+        return Promise.resolve(mockAdConfig);
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
+    
+    mockApiClient.post.mockResolvedValue({ success: true });
 
-    const { getByText, queryByText } = render(<InterstitialAd {...defaultProps} />);
+    renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} />
+    );
+
+    await waitFor(() => {
+      expect(mockApiClient.post).toHaveBeenCalledWith(
+        '/ads/track',
+        expect.objectContaining({
+          adType: AdType.INTERSTITIAL,
+          action: 'IMPRESSION',
+          adNetworkId: 'test-network',
+        }),
+        expect.any(Object)
+      );
+    });
+  });
+
+  it('should show close button after video completes', async () => {
+    jest.useFakeTimers();
+    
+    const onClose = jest.fn();
+
+    const mockAdConfig = {
+      id: '1',
+      adType: AdType.INTERSTITIAL,
+      adNetworkId: 'test-network',
+      displayFrequency: 1,
+    };
+
+    mockApiClient.get.mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/users/profile')) {
+        return Promise.resolve({ user: { premiumStatus: 'FREE' } });
+      }
+      if (typeof url === 'string' && url.includes('/ads/serve')) {
+        return Promise.resolve(mockAdConfig);
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    
+    mockApiClient.post.mockResolvedValue({ success: true });
+
+    const { getByText, queryByText } = renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} />
+    );
 
     await waitFor(() => {
       expect(getByText('Sample Video Advertisement')).toBeTruthy();
@@ -98,16 +203,23 @@ describe('InterstitialAd', () => {
     // Initially, close button should not be visible
     expect(queryByText('✕')).toBeNull();
 
-    // Fast forward time to complete the video
-    jest.advanceTimersByTime(5000);
+    // Fast-forward 5 seconds (video duration)
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
 
     await waitFor(() => {
       expect(getByText('✕')).toBeTruthy();
     });
+    
+    jest.useRealTimers();
   });
 
-  it('should call onClose when close button is pressed', async () => {
+  it('should track close when close button is pressed', async () => {
+    jest.useFakeTimers();
+    
     const onClose = jest.fn();
+
     const mockAdConfig = {
       id: '1',
       adType: AdType.INTERSTITIAL,
@@ -115,78 +227,126 @@ describe('InterstitialAd', () => {
       displayFrequency: 1,
     };
 
-    mockAdManager.loadAd.mockResolvedValue({
-      isLoading: false,
-      adConfig: mockAdConfig,
-      error: null,
-      shouldShow: true,
+    mockApiClient.get.mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/users/profile')) {
+        return Promise.resolve({ user: { premiumStatus: 'FREE' } });
+      }
+      if (typeof url === 'string' && url.includes('/ads/serve')) {
+        return Promise.resolve(mockAdConfig);
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 
-    const { getByText } = render(
-      <InterstitialAd {...defaultProps} onClose={onClose} />
+    mockApiClient.post.mockResolvedValue({ success: true });
+
+    const { getByText } = renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} />
     );
 
     await waitFor(() => {
       expect(getByText('Sample Video Advertisement')).toBeTruthy();
     });
 
-    // Fast forward time to show close button
-    jest.advanceTimersByTime(5000);
+    // Fast-forward to show close button
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
 
     await waitFor(() => {
       expect(getByText('✕')).toBeTruthy();
     });
 
+    // Clear previous calls (impression)
+    mockApiClient.post.mockClear();
+
     fireEvent.press(getByText('✕'));
 
-    expect(mockAdManager.trackClose).toHaveBeenCalledWith(mockAdConfig);
+    await waitFor(() => {
+      expect(mockApiClient.post).toHaveBeenCalledWith(
+        '/ads/track',
+        expect.objectContaining({
+          adType: AdType.INTERSTITIAL,
+          action: 'CLOSE',
+          adNetworkId: 'test-network',
+        }),
+        expect.any(Object)
+      );
+    });
+
     expect(onClose).toHaveBeenCalled();
+    
+    jest.useRealTimers();
   });
 
-  it('should call onClose when user should not see ads', async () => {
+  it('should track click when ad is pressed', async () => {
     const onClose = jest.fn();
 
-    mockAdManager.loadAd.mockResolvedValue({
-      isLoading: false,
-      adConfig: null,
-      error: null,
-      shouldShow: false,
+    const mockAdConfig = {
+      id: '1',
+      adType: AdType.INTERSTITIAL,
+      adNetworkId: 'test-network',
+      displayFrequency: 1,
+    };
+
+    mockApiClient.get.mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/users/profile')) {
+        return Promise.resolve({ user: { premiumStatus: 'FREE' } });
+      }
+      if (typeof url === 'string' && url.includes('/ads/serve')) {
+        return Promise.resolve(mockAdConfig);
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
 
-    render(<InterstitialAd {...defaultProps} onClose={onClose} />);
+    mockApiClient.post.mockResolvedValue({ success: true });
 
-    await waitFor(() => {
-      expect(onClose).toHaveBeenCalled();
-    });
-  });
-
-  it('should call onAdError and onClose when ad fails to load', async () => {
-    const onClose = jest.fn();
-    const onAdError = jest.fn();
-
-    mockAdManager.loadAd.mockResolvedValue({
-      isLoading: false,
-      adConfig: null,
-      error: 'Failed to load ad',
-      shouldShow: false,
-    });
-
-    render(
-      <InterstitialAd {...defaultProps} onClose={onClose} onAdError={onAdError} />
+    const { getByText } = renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} />
     );
 
     await waitFor(() => {
-      expect(onAdError).toHaveBeenCalledWith('Failed to load ad');
-      expect(onClose).toHaveBeenCalled();
+      expect(getByText('Tap to learn more')).toBeTruthy();
+    });
+
+    // Clear previous calls
+    mockApiClient.post.mockClear();
+
+    fireEvent.press(getByText('Tap to learn more'));
+
+    await waitFor(() => {
+      expect(mockApiClient.post).toHaveBeenCalledWith(
+        '/ads/track',
+        expect.objectContaining({
+          adType: AdType.INTERSTITIAL,
+          action: 'CLICK',
+          adNetworkId: 'test-network',
+        }),
+        expect.any(Object)
+      );
     });
   });
 
-  it('should not render when not visible', () => {
-    const { queryByText } = render(
-      <InterstitialAd {...defaultProps} visible={false} />
+  it('should use sample ad when API fails', async () => {
+    const onClose = jest.fn();
+
+    mockApiClient.get.mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('/users/profile')) {
+        return Promise.resolve({ user: { premiumStatus: 'FREE' } });
+      }
+      if (typeof url === 'string' && url.includes('/ads/serve')) {
+        return Promise.reject(new Error('Network error'));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    
+    mockApiClient.post.mockResolvedValue({ success: true });
+
+    const { getByText } = renderWithClient(
+      <InterstitialAd visible={true} onClose={onClose} />
     );
 
-    expect(queryByText('Loading advertisement...')).toBeNull();
-    expect(mockAdManager.loadAd).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(getByText('Network: sample-network-interstitial')).toBeTruthy();
+    });
   });
 });

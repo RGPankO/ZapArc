@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { PaperProvider } from 'react-native-paper';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../src/lib/queryClient';
 import { initializeDeepLinking } from '../src/utils/deepLinking';
 
 export default function RootLayout(): React.JSX.Element {
@@ -10,8 +12,9 @@ export default function RootLayout(): React.JSX.Element {
   }, []);
 
   return (
-    <PaperProvider>
-      <Stack>
+    <QueryClientProvider client={queryClient}>
+      <PaperProvider>
+        <Stack>
         <Stack.Screen
           name="index"
           options={{
@@ -29,7 +32,8 @@ export default function RootLayout(): React.JSX.Element {
           }}
         />
         <Stack.Screen name="(main)" options={{ headerShown: false }} />
-      </Stack>
-    </PaperProvider>
+        </Stack>
+      </PaperProvider>
+    </QueryClientProvider>
   );
 }

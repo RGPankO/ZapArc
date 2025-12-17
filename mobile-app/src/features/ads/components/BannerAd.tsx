@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, Dimensions } from 'react-native';
-import { adManager, AdDisplayState } from '../services/adManager';
+import { useAdManager } from '../hooks';
 import { AdType } from '../types';
-import { COLORS, SPACING } from '../utils/constants';
+import { COLORS, SPACING } from '../../../utils/constants';
 
 interface BannerAdProps {
   style?: any;
@@ -15,55 +15,30 @@ export const BannerAd: React.FC<BannerAdProps> = ({
   onAdLoaded,
   onAdError,
 }) => {
-  const [adState, setAdState] = useState<AdDisplayState>({
-    isLoading: true,
-    adConfig: null,
-    error: null,
-    shouldShow: false,
-  });
+  const { isLoading, adConfig, error, shouldShow, trackImpression, trackClick } = useAdManager(AdType.BANNER);
 
   useEffect(() => {
-    loadAd();
-  }, []);
-
-  const loadAd = async () => {
-    try {
-      const state = await adManager.loadAd(AdType.BANNER);
-      setAdState(state);
-
-      if (state.adConfig && state.shouldShow) {
-        // Track impression
-        await adManager.trackImpression(state.adConfig);
-        onAdLoaded?.();
-      } else if (state.error) {
-        onAdError?.(state.error);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load ad';
-      setAdState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-        shouldShow: false,
-      }));
-      onAdError?.(errorMessage);
+    if (adConfig && shouldShow) {
+      trackImpression();
+      onAdLoaded?.();
+    } else if (error) {
+      onAdError?.(error);
     }
-  };
+  }, [adConfig, shouldShow, error]);
 
-  const handleAdPress = async () => {
-    if (adState.adConfig) {
-      await adManager.trackClick(adState.adConfig);
-      // In a real implementation, this would open the ad URL or perform the ad action
-      console.log('Banner ad clicked:', adState.adConfig.adNetworkId);
+  const handleAdPress = () => {
+    if (adConfig) {
+      trackClick();
+      console.log('Banner ad clicked:', adConfig.adNetworkId);
     }
   };
 
   // Don't render anything if user shouldn't see ads or there's no ad
-  if (!adState.shouldShow || !adState.adConfig) {
+  if (!shouldShow || !adConfig) {
     return null;
   }
 
-  if (adState.isLoading) {
+  if (isLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer, style]}>
         <ActivityIndicator size="small" color={COLORS.primary} />
@@ -72,7 +47,7 @@ export const BannerAd: React.FC<BannerAdProps> = ({
     );
   }
 
-  if (adState.error) {
+  if (error) {
     return null; // Silently fail for better user experience
   }
 
@@ -86,7 +61,7 @@ export const BannerAd: React.FC<BannerAdProps> = ({
         <View style={styles.adContent}>
           <Text style={styles.adLabel}>Advertisement</Text>
           <Text style={styles.adText}>
-            Sample Banner Ad - Network: {adState.adConfig.adNetworkId}
+            Sample Banner Ad - Network: {adConfig.adNetworkId}
           </Text>
           <Text style={styles.adSubtext}>
             Tap to learn more

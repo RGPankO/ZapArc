@@ -1,11 +1,4 @@
-export interface User {
-  id: string;
-  email: string;
-  nickname: string;
-  isVerified: boolean;
-  premiumStatus: PremiumStatus;
-  premiumExpiry?: Date;
-}
+// Core shared types that are used across multiple features or are fundamental to the app
 
 export enum PremiumStatus {
   FREE = 'FREE',
@@ -21,40 +14,6 @@ export interface AppTheme {
   logoUrl?: string;
 }
 
-export interface PaymentPlan {
-  id: string;
-  type: 'subscription' | 'one-time';
-  price: number;
-  currency: string;
-  duration?: string;
-  features: string[];
-}
-
-export enum AdType {
-  BANNER = 'BANNER',
-  INTERSTITIAL = 'INTERSTITIAL',
-}
-
-export enum AdAction {
-  IMPRESSION = 'IMPRESSION',
-  CLICK = 'CLICK',
-  CLOSE = 'CLOSE',
-  ERROR = 'ERROR',
-}
-
-export interface AdConfig {
-  id: string;
-  adType: AdType;
-  adNetworkId: string;
-  displayFrequency: number;
-}
-
-export interface AdAnalyticsData {
-  adType: AdType;
-  action: AdAction;
-  adNetworkId: string;
-}
-
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
@@ -64,3 +23,8 @@ export interface ApiResponse<T = unknown> {
     details?: unknown;
   };
 }
+
+// Re-export feature-specific types for backwards compatibility
+export { AdType, AdAction, AdConfig, AdAnalyticsData } from '../features/ads/types';
+export { User } from '../features/profile/types';
+export { PaymentPlan } from '../features/payments/types';

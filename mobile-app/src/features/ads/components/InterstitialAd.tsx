@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as NavigationBar from 'expo-navigation-bar';
-import { adManager, AdDisplayState } from '../services/adManager';
+import { useAdManager } from '../hooks';
 import { AdType } from '../types';
-import { COLORS, SPACING } from '../utils/constants';
+import { COLORS, SPACING } from '../../../utils/constants';
 
 interface InterstitialAdProps {
   visible: boolean;
@@ -26,61 +26,52 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
   onAdLoaded,
   onAdError,
 }) => {
-  const [adState, setAdState] = useState<AdDisplayState>({
-    isLoading: true,
-    adConfig: null,
-    error: null,
-    shouldShow: false,
-  });
+  const { isLoading, adConfig, error, shouldShow, trackImpression, trackClick, trackClose } = useAdManager(AdType.INTERSTITIAL);
   const [showCloseButton, setShowCloseButton] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
+  const [hasTrackedImpression, setHasTrackedImpression] = useState(false);
 
   useEffect(() => {
-    loadAd();
     const setNavBar = async () => {
-      // set background color
       await NavigationBar.setBackgroundColorAsync('#000000');
-      // set style of icons (light or dark)
       await NavigationBar.setButtonStyleAsync('light');
     };
 
     setNavBar();
 
     return () => {
-      // Reset when leaving
       NavigationBar.setBackgroundColorAsync('#ffffff');
       NavigationBar.setButtonStyleAsync('dark');
     };
   }, []);
 
-  // useEffect(() => {
-  //   if (visible) {
-  //     loadAd();
-  //     // Set navigation bar to black background when ad is shown
-  //     NavigationBar.setBackgroundColorAsync('#000000').catch(() => {
-  //       console.log('NavigationBar setBackgroundColor API not available');
-  //     });
-  //     NavigationBar.setVisibilityAsync('hidden').catch(() => {
-  //       // Fallback: try to set black background if hiding fails
-  //       NavigationBar.setBackgroundColorAsync('#000000').catch(() => {
-  //         console.log('NavigationBar API not available');
-  //       });
-  //     });
-  //   } else {
-  //     // Restore navigation bar when ad is closed
-  //     NavigationBar.setVisibilityAsync('visible').catch(() => {
-  //       console.log('NavigationBar API not available');
-  //     });
-  //     // Restore original navigation bar color (you might want to adjust this)
-  //     NavigationBar.setBackgroundColorAsync('#FFFFFF').catch(() => {
-  //       console.log('NavigationBar setBackgroundColor API not available');
-  //     });
-  //   }
-  // }, [visible]);
-
+  // Track impression once when ad is ready
   useEffect(() => {
-    if (adState.adConfig && adState.shouldShow && visible) {
-      // Simulate video ad duration (5 seconds)
+    if (adConfig && shouldShow && visible && !hasTrackedImpression) {
+      trackImpression();
+      setHasTrackedImpression(true);
+      onAdLoaded?.();
+    } else if (error && visible) {
+      console.log('InterstitialAd: Ad loading failed:', error);
+      onClose();
+    } else if (!shouldShow && !isLoading && visible) {
+      console.log('InterstitialAd: User should not see ads (premium user)');
+      onClose();
+    }
+  }, [adConfig, shouldShow, visible, error, isLoading, hasTrackedImpression]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setShowCloseButton(false);
+      setVideoProgress(0);
+      setHasTrackedImpression(false);
+    }
+  }, [visible]);
+
+  // Video progress timer
+  useEffect(() => {
+    if (adConfig && shouldShow && visible) {
       const duration = 5000;
       const interval = 100;
       let elapsed = 0;
@@ -98,59 +89,19 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
 
       return () => clearInterval(timer);
     }
-  }, [adState.adConfig, adState.shouldShow, visible]);
+  }, [adConfig, shouldShow, visible]);
 
-  const loadAd = async () => {
-    try {
-      setAdState({
-        isLoading: true,
-        adConfig: null,
-        error: null,
-        shouldShow: false,
-      });
-      setShowCloseButton(false);
-      setVideoProgress(0);
-
-      const state = await adManager.loadAd(AdType.INTERSTITIAL);
-      setAdState(state);
-
-      if (state.adConfig && state.shouldShow) {
-        // Track impression
-        await adManager.trackImpression(state.adConfig);
-        onAdLoaded?.();
-      } else if (state.error) {
-        console.log('InterstitialAd: Ad loading failed, but not showing error to user:', state.error);
-        // Don't call onAdError to avoid showing error popups
-        onClose(); // Close modal if no ad to show
-      } else {
-        console.log('InterstitialAd: User should not see ads (premium user)');
-        onClose(); // Close modal if user shouldn't see ads
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load ad';
-      setAdState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: errorMessage,
-        shouldShow: false,
-      }));
-      onAdError?.(errorMessage);
-      onClose();
-    }
-  };
-
-  const handleClose = async () => {
-    if (adState.adConfig) {
-      await adManager.trackClose(adState.adConfig);
+  const handleClose = () => {
+    if (adConfig) {
+      trackClose();
     }
     onClose();
   };
 
-  const handleAdPress = async () => {
-    if (adState.adConfig) {
-      await adManager.trackClick(adState.adConfig);
-      // In a real implementation, this would open the ad URL or perform the ad action
-      console.log('Interstitial ad clicked:', adState.adConfig.adNetworkId);
+  const handleAdPress = () => {
+    if (adConfig) {
+      trackClick();
+      console.log('Interstitial ad clicked:', adConfig.adNetworkId);
     }
   };
 
@@ -173,19 +124,16 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
         <View style={styles.closeButtonPlaceholder} />
 
         <View style={styles.contentArea}>
-          {adState.isLoading ? (
+          {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={COLORS.primary} />
               <Text style={styles.loadingText}>Loading advertisement...</Text>
             </View>
-          ) : adState.error ? (
+          ) : error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>Failed to load advertisement</Text>
-              <Pressable style={styles.retryButton} onPress={loadAd}>
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </Pressable>
             </View>
-          ) : adState.adConfig && adState.shouldShow ? (
+          ) : adConfig && shouldShow ? (
             <View style={styles.adContainer}>
               {/* Video placeholder */}
               <Pressable style={styles.videoContainer} onPress={handleAdPress}>
@@ -193,7 +141,7 @@ export const InterstitialAd: React.FC<InterstitialAdProps> = ({
                   <Text style={styles.videoText}>🎥</Text>
                   <Text style={styles.videoTitle}>Sample Video Advertisement</Text>
                   <Text style={styles.videoSubtitle}>
-                    Network: {adState.adConfig.adNetworkId}
+                    Network: {adConfig.adNetworkId}
                   </Text>
                   <Text style={styles.tapToLearnMore}>Tap to learn more</Text>
                 </View>
