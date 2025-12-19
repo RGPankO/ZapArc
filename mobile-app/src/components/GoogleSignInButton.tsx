@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Alert, ViewStyle } from 'react-native';
 import { Button } from 'react-native-paper';
 import { useGoogleSignIn, GoogleSignInError } from '../hooks/useGoogleAuth';
@@ -17,39 +17,46 @@ export default function GoogleSignInButton({
   mode = 'outlined',
   style,
 }: GoogleSignInButtonProps): React.JSX.Element {
-  const googleSignIn = useGoogleSignIn();
+  const { signIn, isReady, isLoading } = useGoogleSignIn();
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   const handleGoogleSignIn = async (): Promise<void> => {
+    setIsSigningIn(true);
     try {
-      await googleSignIn.mutateAsync();
-      
-      console.log('✅ Google login successful');
+      await signIn();
+
+      console.log('Google login successful');
       onSuccess?.();
       // Navigate to main app
       router.replace('/(main)');
     } catch (error: unknown) {
-      const errorMessage = (error as GoogleSignInError).message || 'Google sign-in failed';
+      const googleError = error as GoogleSignInError;
+      const errorMessage = googleError.message || 'Google sign-in failed';
       console.error('Google sign-in error:', error);
-      
+
       // Don't show alert for user cancellation
-      if ((error as GoogleSignInError).code !== 'SIGN_IN_CANCELLED') {
+      if (googleError.code !== 'SIGN_IN_CANCELLED') {
         Alert.alert('Sign-in Error', errorMessage);
       }
-      
+
       onError?.(errorMessage);
+    } finally {
+      setIsSigningIn(false);
     }
   };
+
+  const loading = isLoading || isSigningIn;
 
   return (
     <Button
       mode={mode}
       onPress={handleGoogleSignIn}
-      loading={googleSignIn.isPending}
-      disabled={googleSignIn.isPending}
+      loading={loading}
+      disabled={loading || !isReady}
       style={[styles.button, style]}
       icon="google"
     >
-      {googleSignIn.isPending ? 'Signing in...' : 'Continue with Google'}
+      {loading ? 'Signing in...' : 'Continue with Google'}
     </Button>
   );
 }

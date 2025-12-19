@@ -1,6 +1,5 @@
 import { Controller, Get, Post, Put, Param, Body, Query, UseGuards, ParseEnumPipe } from '@nestjs/common';
 import { AdsService } from './ads.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdType } from '../../../generated/prisma';
 import { UpsertAdConfigDto, TrackAnalyticsDto } from './dto/ads.dto';
 import { CurrentUser } from '../../decorators/current-user.decorator';
@@ -41,8 +40,7 @@ export class AdsController {
   }
 
   @Post('track')
-  @UseGuards(JwtAuthGuard)
-  async trackAnalytics(@CurrentUser('id') userId: string, @Body() dto: TrackAnalyticsDto) {
+  async trackAnalytics(@CurrentUser('id') userId: string | undefined, @Body() dto: TrackAnalyticsDto) {
     await this.adsService.trackAdAnalytics({
       userId,
       adType: dto.adType,

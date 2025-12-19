@@ -7,13 +7,20 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // CORS - must be configured before helmet
-  app.enableCors({
-    origin: '*',
-  });
+  // Security headers - configure helmet to not interfere with CORS
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
-  // Security headers
-  app.use(helmet());
+  // CORS - allow all origins for development
+  app.enableCors({
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 
   // Global prefix
   app.setGlobalPrefix('api');
