@@ -1,73 +1,107 @@
-# Lightning Network Tipping Browser Extension
+# Lightning Tipping Extension (Tipmaster)
 
-A Chrome extension that enables seamless Bitcoin tipping via the Lightning Network on any website, powered by Breez SDK Spark.
+A non-custodial Bitcoin tipping browser extension powered by the Lightning Network and Breez SDK Spark.
 
 ## Features
 
-- **Universal Tip Detection**: Automatically detects tip requests in standardized format across all websites
-- **Built-in Lightning Wallet**: Non-custodial wallet powered by Breez SDK Spark
-- **Auto-Appending**: Automatically adds tip requests to posts on supported platforms
-- **QR Code Support**: Generate QR codes for external wallet payments
-- **Domain Management**: Control which websites can auto-append tip requests
-- **Privacy-First**: All data stored locally, no external tracking
+- **Non-Custodial Wallet** - Control your own Lightning funds with BIP39 mnemonic backup
+- **Universal Tip Detection** - Automatically detects tip requests on any website
+- **Standardized Format** - `[lntip:lnurl:<address>:<amount1>:<amount2>:<amount3>]`
+- **Floating Action Menu** - Quick access to deposit, withdraw, and copy tip strings
+- **Domain Management** - Whitelist/blacklist domains for automatic tip appending
+- **LNURL Blocking** - Block unwanted tip requests from specific addresses
+- **QR Code Generation** - Pay with external wallets via QR codes
+- **Platform Detection** - Smart posting detection for Facebook, Twitter, Reddit
 
-## Development Setup
+## Quick Start
 
-### Prerequisites
+```bash
+# Install dependencies
+npm install
 
-- Node.js 18+ 
-- npm or yarn
-- Chrome browser for testing
+# Development build with watch
+npm run dev
 
-### Installation
+# Production build
+npm run build
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+# Type check
+npm run type-check
+```
 
-3. Build the extension:
-   ```bash
-   npm run build
-   ```
-
-4. Load the extension in Chrome:
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select the `dist` folder
-
-### Development Commands
-
-- `npm run dev` - Build in development mode with watch
-- `npm run build` - Build for production
-- `npm run clean` - Clean build directory
-- `npm run type-check` - Run TypeScript type checking
+Load the extension:
+1. Open `chrome://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked" and select the `dist/` folder
 
 ## Project Structure
 
 ```
-├── src/
-│   ├── background/          # Background service worker
-│   ├── content/            # Content scripts for web pages
-│   └── popup/              # Extension popup interface
-├── icons/                  # Extension icons
-├── dist/                   # Built extension files
-├── manifest.json           # Chrome extension manifest
-├── webpack.config.js       # Build configuration
-└── tsconfig.json          # TypeScript configuration
+src/
+├── background/        # Service worker
+├── content/           # Content scripts (page injection)
+├── popup/             # Extension popup UI
+├── settings/          # Settings page
+├── types/             # TypeScript definitions
+└── utils/             # Shared utilities
+    ├── breez-sdk.ts       # Breez SDK integration
+    ├── wallet-manager.ts  # Wallet state management
+    ├── payment-processor.ts
+    ├── lnurl.ts
+    ├── floating-menu.ts
+    ├── tipping-ui.ts
+    └── ...
 ```
 
-## Architecture
+## Tip Format
 
-The extension uses Chrome Extension Manifest V3 with:
+Standard format for embedding tip requests:
 
-- **Background Service Worker**: Handles Breez SDK operations and storage
-- **Content Scripts**: Injected into web pages for tip detection and UI
-- **Popup Interface**: Main wallet dashboard and settings
-- **TypeScript**: For type safety and better development experience
-- **Webpack**: For bundling and build optimization
+```
+[lntip:lnurl:lnurl1dp68gurn...:100:500:1000]
+```
+
+- `lnurl1dp68gurn...` - Your LNURL-pay address
+- `100:500:1000` - Suggested tip amounts in sats
+
+Also supports HTML metadata:
+```html
+<meta name="lntip" content="lnurl:...:100:500:1000">
+```
+
+## Testing
+
+Use `test.html` to test tip detection functionality locally.
+
+## Development Resources
+
+- `.claude/docs/ARCHITECTURE_GUIDE.md` - Project architecture details
+- `.kiro/specs/lightning-tipping-extension/` - Kiro specification documents
+- `BREEZ_SDK_SETUP.md` - Breez SDK configuration notes
+- `CURRENT_FUNCTIONALITY_GUIDE.md` - Current feature status
+
+## Current Status
+
+**Working:**
+- Wallet setup with PIN encryption
+- Tip detection and parsing
+- QR code generation
+- Floating menu and tipping UI
+- Domain/LNURL management
+
+**In Progress:**
+- Multi-wallet support
+- Lightning address/LNURL-pay integration
+- Full Breez SDK connectivity
+
+## Tech Stack
+
+- TypeScript
+- Webpack
+- Chrome Extension APIs (Manifest V3)
+- Breez SDK Spark
+- LNURL protocol
 
 ## License
 
-MIT License - see LICENSE file for details
+Private - All rights reserved

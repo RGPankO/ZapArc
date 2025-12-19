@@ -46,3 +46,7 @@ tmp/
 temp/
 
 */settings.local.json
+
+# Tools ephemeral directories
+/tools/tmp/
+/tools/testing/results/
