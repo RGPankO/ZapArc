@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupModalListeners(); // Initialize modal system
 });
 
-// Clear session PIN when popup closes (security measure)
+// Clear popup instance on close
 window.addEventListener('beforeunload', () => {
     const currentInstance = sessionStorage.getItem(POPUP_INSTANCE_KEY);
 
@@ -246,7 +246,7 @@ window.addEventListener('beforeunload', () => {
         console.log('🧹 [Popup] Cleaning up instance:', popupInstanceId);
         sessionStorage.removeItem(POPUP_INSTANCE_KEY);
 
-        // Also clear session PIN for security
+        // Clear in-memory PIN variable (sessionStorage PIN persists for auto-reconnect)
         sessionPin = null;
     }
 });
@@ -304,6 +304,9 @@ async function initializePopup() {
                 await chrome.storage.local.set({ isUnlocked: false });
                 isUnlockedInStorage = false;
                 isWalletUnlocked = false;
+                // Clear session PIN on timeout
+                await chrome.storage.session.remove('walletSessionPin');
+                sessionPin = null;
             } else {
                 console.log(`✅ [Popup Init] Wallet still unlocked (${Math.floor(elapsed / 1000)}s / ${AUTO_LOCK_DELAY / 1000}s)`);
             }
@@ -311,13 +314,61 @@ async function initializePopup() {
 
         isWalletUnlocked = isUnlockedInStorage;
 
-        // Both locked and unlocked states need PIN to connect SDK
-        // The existing showUnlockPrompt() handles everything:
-        // - Shows PIN input
-        // - Decrypts mnemonic
-        // - Connects SDK
-        // - Loads balance and transactions
-        // - Shows main interface
+        // Try to auto-reconnect if wallet is unlocked and we have a stored session PIN
+        const sessionData = await chrome.storage.session.get('walletSessionPin');
+        const storedPin = sessionData.walletSessionPin;
+        
+        console.log('🔍 [Popup Init] Auto-reconnect check:', {
+            isWalletUnlocked,
+            hasStoredPin: !!storedPin
+        });
+        
+        if (isWalletUnlocked && storedPin) {
+            console.log('🔄 [Popup Init] Auto-reconnecting SDK with stored session PIN...');
+            try {
+                // Load wallet data with stored PIN
+                const walletDataResponse = await ExtensionMessaging.loadWallet(storedPin);
+                
+                if (walletDataResponse.success && walletDataResponse.data) {
+                    const mnemonic = walletDataResponse.data.mnemonic;
+                    
+                    if (mnemonic) {
+                        // Reconnect Breez SDK
+                        breezSDK = await connectBreezSDK(mnemonic);
+                        sessionPin = storedPin;
+                        
+                        // Show main interface directly
+                        const unlockInterface = document.getElementById('unlock-interface');
+                        if (unlockInterface) {
+                            unlockInterface.classList.add('hidden');
+                        }
+                        restoreMainInterface();
+                        
+                        // Update balance and load transactions
+                        await updateBalanceDisplay();
+                        await loadTransactionHistory();
+                        
+                        // Initialize multi-wallet UI
+                        await initializeMultiWalletUI();
+                        
+                        // Restart auto-lock alarm
+                        await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
+                        await chrome.storage.local.set({ lastActivity: Date.now() });
+                        
+                        console.log('✅ [Popup Init] Auto-reconnected successfully');
+                        return; // Skip showing unlock prompt
+                    }
+                }
+            } catch (error) {
+                console.error('❌ [Popup Init] Auto-reconnect failed:', error);
+                // Fall through to show unlock prompt
+            }
+        } else if (isWalletUnlocked && !storedPin) {
+            console.log('⚠️ [Popup Init] Wallet unlocked but no stored PIN - showing unlock prompt');
+        }
+
+        // If we get here, either wallet is locked or auto-reconnect failed
+        // Show unlock prompt for manual PIN entry
         console.log(`🔑 [Popup Init] Showing unlock prompt (wallet ${isWalletUnlocked ? 'unlocked but SDK disconnected' : 'locked'})`);
         showUnlockPrompt();
 
@@ -3161,7 +3212,9 @@ function showUnlockPrompt() {
 
             // Store PIN in session for wallet switching
             sessionPin = pin;
-            console.log('🔐 [Session] PIN stored in session memory');
+            // Also store in chrome.storage.session for auto-reconnect on popup reopen
+            await chrome.storage.session.set({ walletSessionPin: pin });
+            console.log('🔐 [Session] PIN stored in session memory and chrome.storage.session');
 
             console.log('✅ [Popup] Wallet unlocked and SDK connected');
             console.log('🔍 [Unlock] isWalletUnlocked AFTER unlock:', isWalletUnlocked);
@@ -4572,7 +4625,8 @@ async function lockWallet() {
 
     // Clear session PIN on lock
     sessionPin = null;
-    console.log('🔐 [Session] PIN cleared from session memory');
+    await chrome.storage.session.remove('walletSessionPin');
+    console.log('🔐 [Session] PIN cleared from session memory and chrome.storage.session');
 
     // Show lock screen
     showUnlockPrompt();
