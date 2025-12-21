@@ -99,9 +99,9 @@ async function updateBalanceDisplay() {
         setCurrentBalance(balance);
 
         // Update UI
-        const balanceElement = document.getElementById('balance-amount');
+        const balanceElement = document.getElementById('balance');
         if (balanceElement) {
-            balanceElement.textContent = balance.toLocaleString();
+            balanceElement.textContent = `${balance.toLocaleString()} sats`;
         }
 
         // Also update withdraw balance display if visible
@@ -212,8 +212,27 @@ function setupWizardListeners() {
     }
 
     // Setup Choice Step
-    const createWalletBtn = document.getElementById('create-wallet-btn');
+    const choiceBackBtn = document.getElementById('choice-back-btn');
+    const createWalletBtn = document.getElementById('create-new-wallet-btn');
     const importWalletBtn = document.getElementById('import-wallet-btn');
+
+    if (choiceBackBtn) {
+        choiceBackBtn.onclick = () => {
+            // If adding wallet (already have one), return to main interface
+            if (isAddingWallet) {
+                const wizard = document.getElementById('onboarding-wizard');
+                const mainInterface = document.getElementById('main-interface');
+                
+                if (wizard) wizard.classList.add('hidden');
+                if (mainInterface) mainInterface.classList.remove('hidden');
+                
+                setIsAddingWallet(false);
+            } else {
+                // Initial setup - go back to welcome
+                showWizardStep('welcome-step');
+            }
+        };
+    }
 
     if (createWalletBtn) {
         createWalletBtn.onclick = () => {
@@ -229,8 +248,13 @@ function setupWizardListeners() {
     }
 
     // Mnemonic Step
+    const mnemonicBackBtn = document.getElementById('mnemonic-back-btn');
     const copyMnemonicBtn = document.getElementById('copy-mnemonic-btn');
     const mnemonicContinueBtn = document.getElementById('mnemonic-continue-btn');
+
+    if (mnemonicBackBtn) {
+        mnemonicBackBtn.onclick = () => showWizardStep('setup-choice-step');
+    }
 
     if (copyMnemonicBtn) {
         copyMnemonicBtn.onclick = async () => {
@@ -1140,7 +1164,7 @@ function setupEventListeners() {
 }
 
 function handleSettings() {
-    chrome.runtime.openOptionsPage();
+    chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
 }
 
 // ========================================
@@ -1238,8 +1262,8 @@ async function initializePopup() {
                     // Load cached balance immediately
                     if (storageData.cachedBalance) {
                         setCurrentBalance(storageData.cachedBalance);
-                        const balanceElement = document.getElementById('balance-amount');
-                        if (balanceElement) balanceElement.textContent = storageData.cachedBalance.toLocaleString();
+                        const balanceElement = document.getElementById('balance');
+                        if (balanceElement) balanceElement.textContent = `${storageData.cachedBalance.toLocaleString()} sats`;
                     }
 
                     // Show loading indicators
