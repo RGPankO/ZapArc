@@ -238,7 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupModalListeners(); // Initialize modal system
 });
 
-// Clear session PIN when popup closes (security measure)
+// Clear popup instance on close
 window.addEventListener('beforeunload', () => {
     const currentInstance = sessionStorage.getItem(POPUP_INSTANCE_KEY);
 
@@ -246,7 +246,7 @@ window.addEventListener('beforeunload', () => {
         console.log('🧹 [Popup] Cleaning up instance:', popupInstanceId);
         sessionStorage.removeItem(POPUP_INSTANCE_KEY);
 
-        // Also clear session PIN for security
+        // Clear in-memory PIN variable (sessionStorage PIN persists for auto-reconnect)
         sessionPin = null;
     }
 });
@@ -304,6 +304,9 @@ async function initializePopup() {
                 await chrome.storage.local.set({ isUnlocked: false });
                 isUnlockedInStorage = false;
                 isWalletUnlocked = false;
+                // Clear session PIN on timeout
+                await chrome.storage.session.remove('walletSessionPin');
+                sessionPin = null;
             } else {
                 console.log(`✅ [Popup Init] Wallet still unlocked (${Math.floor(elapsed / 1000)}s / ${AUTO_LOCK_DELAY / 1000}s)`);
             }
@@ -311,13 +314,61 @@ async function initializePopup() {
 
         isWalletUnlocked = isUnlockedInStorage;
 
-        // Both locked and unlocked states need PIN to connect SDK
-        // The existing showUnlockPrompt() handles everything:
-        // - Shows PIN input
-        // - Decrypts mnemonic
-        // - Connects SDK
-        // - Loads balance and transactions
-        // - Shows main interface
+        // Try to auto-reconnect if wallet is unlocked and we have a stored session PIN
+        const sessionData = await chrome.storage.session.get('walletSessionPin');
+        const storedPin = sessionData.walletSessionPin;
+        
+        console.log('🔍 [Popup Init] Auto-reconnect check:', {
+            isWalletUnlocked,
+            hasStoredPin: !!storedPin
+        });
+        
+        if (isWalletUnlocked && storedPin) {
+            console.log('🔄 [Popup Init] Auto-reconnecting SDK with stored session PIN...');
+            try {
+                // Load wallet data with stored PIN
+                const walletDataResponse = await ExtensionMessaging.loadWallet(storedPin);
+                
+                if (walletDataResponse.success && walletDataResponse.data) {
+                    const mnemonic = walletDataResponse.data.mnemonic;
+                    
+                    if (mnemonic) {
+                        // Reconnect Breez SDK
+                        breezSDK = await connectBreezSDK(mnemonic);
+                        sessionPin = storedPin;
+                        
+                        // Show main interface directly
+                        const unlockInterface = document.getElementById('unlock-interface');
+                        if (unlockInterface) {
+                            unlockInterface.classList.add('hidden');
+                        }
+                        restoreMainInterface();
+                        
+                        // Update balance and load transactions
+                        await updateBalanceDisplay();
+                        await loadTransactionHistory();
+                        
+                        // Initialize multi-wallet UI
+                        await initializeMultiWalletUI();
+                        
+                        // Restart auto-lock alarm
+                        await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
+                        await chrome.storage.local.set({ lastActivity: Date.now() });
+                        
+                        console.log('✅ [Popup Init] Auto-reconnected successfully');
+                        return; // Skip showing unlock prompt
+                    }
+                }
+            } catch (error) {
+                console.error('❌ [Popup Init] Auto-reconnect failed:', error);
+                // Fall through to show unlock prompt
+            }
+        } else if (isWalletUnlocked && !storedPin) {
+            console.log('⚠️ [Popup Init] Wallet unlocked but no stored PIN - showing unlock prompt');
+        }
+
+        // If we get here, either wallet is locked or auto-reconnect failed
+        // Show unlock prompt for manual PIN entry
         console.log(`🔑 [Popup Init] Showing unlock prompt (wallet ${isWalletUnlocked ? 'unlocked but SDK disconnected' : 'locked'})`);
         showUnlockPrompt();
 
@@ -3161,7 +3212,9 @@ function showUnlockPrompt() {
 
             // Store PIN in session for wallet switching
             sessionPin = pin;
-            console.log('🔐 [Session] PIN stored in session memory');
+            // Also store in chrome.storage.session for auto-reconnect on popup reopen
+            await chrome.storage.session.set({ walletSessionPin: pin });
+            console.log('🔐 [Session] PIN stored in session memory and chrome.storage.session');
 
             console.log('✅ [Popup] Wallet unlocked and SDK connected');
             console.log('🔍 [Unlock] isWalletUnlocked AFTER unlock:', isWalletUnlocked);
@@ -3711,7 +3764,9 @@ function showPinInputDialog(message: string): Promise<string | null> {
 
 function showConfirmDialog(title: string, message: string): Promise<boolean> {
     return new Promise((resolve) => {
+        // Use unique class name to identify this dialog's overlay
         const overlay = document.createElement('div');
+        overlay.className = 'confirm-dialog-overlay';
         // Z-index 10001 to appear above withdraw modal (z-index 10000)
         overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;';
 
@@ -3730,24 +3785,54 @@ function showConfirmDialog(title: string, message: string): Promise<boolean> {
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
-        // Query buttons from the dialog element (not document) to avoid race condition
+        // Query buttons from the dialog element (scoped query, IDs are unique within this dialog)
         const yesBtn = dialog.querySelector('#confirm-dialog-yes') as HTMLButtonElement;
         const noBtn = dialog.querySelector('#confirm-dialog-no') as HTMLButtonElement;
 
         console.log('🔍 [Dialog] Buttons attached:', { yesBtn: !!yesBtn, noBtn: !!noBtn });
 
+        let cleaned = false;
         const cleanup = (value: boolean) => {
+            if (cleaned) {
+                console.log('⚠️ [Dialog] Cleanup already called, skipping');
+                return;
+            }
+            cleaned = true;
             console.log('🔵 [Dialog] Cleanup called with:', value);
-            overlay.remove();
+
+            // Ensure overlay is removed
+            if (overlay.parentNode) {
+                overlay.remove();
+                console.log('✅ [Dialog] Overlay removed from DOM');
+            } else {
+                console.warn('⚠️ [Dialog] Overlay already removed');
+            }
+
+            // Also remove any stale overlays with this class
+            document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+                console.log('🧹 [Dialog] Removing stale overlay');
+                el.remove();
+            });
+
             resolve(value);
         };
 
         if (yesBtn && noBtn) {
-            yesBtn.addEventListener('click', () => cleanup(true));
-            noBtn.addEventListener('click', () => cleanup(false));
+            yesBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(true);
+            });
+            noBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(false);
+            });
             console.log('✅ [Dialog] Event listeners attached successfully');
         } else {
             console.error('❌ [Dialog] Failed to attach event listeners - buttons not found');
+            // Fallback: resolve with false to not block
+            cleanup(false);
         }
     });
 }
@@ -4494,6 +4579,12 @@ async function sendPayment() {
         // Clear prepared payment
         preparedPayment = null;
 
+        // Ensure any stale confirm dialogs are removed
+        document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+            console.log('🧹 [Withdraw] Removing stale confirm dialog');
+            el.remove();
+        });
+
         if (statusText) {
             statusText.textContent = '✅ Payment sent successfully!';
             statusText.className = 'status-indicator success';
@@ -4507,13 +4598,22 @@ async function sendPayment() {
         // Refresh transaction history to show the new withdraw transaction
         await loadTransactionHistory();
 
-        // Auto-close interface after 3 seconds
+        // Auto-close interface after 2 seconds
+        console.log('[Withdraw] Scheduling auto-close in 2 seconds...');
         setTimeout(() => {
+            console.log('[Withdraw] Auto-close timer fired, hiding interface');
             hideWithdrawInterface();
-        }, 3000);
+        }, 2000);
 
     } catch (error) {
         console.error('❌ [Popup] Send payment error:', error);
+
+        // Ensure any stale confirm dialogs are removed on error too
+        document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+            console.log('🧹 [Withdraw] Removing stale confirm dialog on error');
+            el.remove();
+        });
+
         if (statusText) {
             statusText.textContent = `❌ ${error instanceof Error ? error.message : 'Payment failed'}`;
             statusText.className = 'status-indicator error';
@@ -4522,6 +4622,12 @@ async function sendPayment() {
     } finally {
         sendBtn.disabled = false;
         sendBtn.textContent = 'Send Payment';
+
+        // Final cleanup: ensure no confirm dialogs are left
+        document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+            console.log('🧹 [Withdraw] Final cleanup - removing confirm dialog');
+            el.remove();
+        });
     }
 }
 
@@ -4572,7 +4678,8 @@ async function lockWallet() {
 
     // Clear session PIN on lock
     sessionPin = null;
-    console.log('🔐 [Session] PIN cleared from session memory');
+    await chrome.storage.session.remove('walletSessionPin');
+    console.log('🔐 [Session] PIN cleared from session memory and chrome.storage.session');
 
     // Show lock screen
     showUnlockPrompt();

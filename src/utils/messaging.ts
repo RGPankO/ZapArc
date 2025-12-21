@@ -163,9 +163,24 @@ export class ExtensionMessaging {
   }
 
   /**
-   * Pay LNURL
+   * Pay LNURL - waits for payment confirmation before resolving
+   * Returns rich payment result with transaction details
    */
-  static async payLnurl(reqData: any, amount: number, comment?: string): Promise<MessageResponse<boolean>> {
+  static async payLnurl(reqData: any, amount: number, comment?: string): Promise<MessageResponse<{
+    success: boolean;
+    paymentId?: string;
+    paymentHash?: string;
+    preimage?: string;
+    amountSats?: number;
+    feeSats?: number;
+    successAction?: {
+      type: 'message' | 'url' | 'aes';
+      message?: string;
+      url?: string;
+      description?: string;
+    };
+    error?: string;
+  }>> {
     return this.sendToBackground({
       type: 'PAY_LNURL',
       reqData,

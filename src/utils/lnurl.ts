@@ -2,6 +2,60 @@
 // Handles LNURL parsing, validation, and operations using Breez SDK
 
 import { WalletManager } from './wallet-manager';
+import { LnurlPayResult } from './breez-sdk';
+
+/**
+ * Converts Lightning address to LNURL endpoint URL, or returns input unchanged if already LNURL.
+ * Lightning address format: user@domain → https://domain/.well-known/lnurlp/user
+ * @param input - Lightning address (user@domain) or LNURL string
+ * @returns LNURL endpoint URL or original input
+ */
+export function convertToLnurl(input: string): string {
+  const trimmed = input.trim();
+
+  // Lightning address format: user@domain (but not if it starts with lnurl)
+  if (trimmed.includes('@') && !trimmed.toLowerCase().startsWith('lnurl')) {
+    const [username, domain] = trimmed.split('@');
+    if (username && domain && domain.includes('.')) {
+      return `https://${domain}/.well-known/lnurlp/${username}`;
+    }
+  }
+
+  return trimmed;
+}
+
+/**
+ * Validates if input is a valid Lightning address format.
+ * @param input - String to validate
+ * @returns true if valid Lightning address format (user@domain.tld)
+ */
+export function isLightningAddress(input: string): boolean {
+  const trimmed = input.trim();
+
+  // Must contain @ but not start with lnurl
+  if (!trimmed.includes('@') || trimmed.toLowerCase().startsWith('lnurl')) {
+    return false;
+  }
+
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) {
+    return false;
+  }
+
+  const [username, domain] = parts;
+
+  // Username must be non-empty and alphanumeric (with dots, dashes, underscores)
+  if (!username || !/^[a-zA-Z0-9._-]+$/.test(username)) {
+    return false;
+  }
+
+  // Domain must contain at least one dot and be valid
+  if (!domain || !domain.includes('.') || !/^[a-zA-Z0-9.-]+$/.test(domain)) {
+    return false;
+  }
+
+  return true;
+}
 
 export interface LnurlPayData {
   callback: string;
@@ -36,18 +90,21 @@ export class LnurlManager {
   }
 
   /**
-   * Parse and validate LNURL
+   * Parse and validate LNURL or Lightning address
    */
   async parseLnurl(lnurl: string): Promise<any> {
     try {
-      // Validate LNURL format
-      if (!this.isValidLnurlFormat(lnurl)) {
-        throw new Error('Invalid LNURL format');
+      // Validate LNURL or Lightning address format
+      if (!this.isValidLnurlFormat(lnurl) && !isLightningAddress(lnurl)) {
+        throw new Error('Invalid LNURL or Lightning address format');
       }
 
+      // Convert Lightning address to LNURL endpoint if needed
+      const resolvedLnurl = convertToLnurl(lnurl);
+
       // Use Breez SDK to parse LNURL
-      const parsed = await this.walletManager.parseLnurl(lnurl);
-      
+      const parsed = await this.walletManager.parseLnurl(resolvedLnurl);
+
       return parsed;
     } catch (error) {
       console.error('LNURL parsing failed:', error);
@@ -57,12 +114,13 @@ export class LnurlManager {
 
   /**
    * Pay LNURL with amount and optional comment
+   * Returns confirmed payment result - waits for payment to complete
    */
-  async payLnurl(lnurl: string, amount: number, comment?: string): Promise<boolean> {
+  async payLnurl(lnurl: string, amount: number, comment?: string): Promise<LnurlPayResult> {
     try {
       // Parse LNURL first
       const reqData = await this.parseLnurl(lnurl);
-      
+
       if (reqData.type !== 'pay') {
         throw new Error('LNURL is not a pay request');
       }
@@ -70,7 +128,7 @@ export class LnurlManager {
       // Validate amount is within bounds
       const payData = reqData.data as LnurlPayData;
       const amountMsat = amount * 1000;
-      
+
       if (amountMsat < payData.minSendable || amountMsat > payData.maxSendable) {
         throw new Error(`Amount must be between ${payData.minSendable / 1000} and ${payData.maxSendable / 1000} sats`);
       }
@@ -83,16 +141,22 @@ export class LnurlManager {
       // Check sufficient balance
       const hasSufficientBalance = await this.walletManager.hasSufficientBalance(amount);
       if (!hasSufficientBalance) {
-        throw new Error('Insufficient balance for payment');
+        return {
+          success: false,
+          error: 'Insufficient balance for payment'
+        };
       }
 
-      // Execute payment
-      const success = await this.walletManager.payLnurl(reqData.data, amount, comment);
-      
-      return success;
+      // Execute payment and wait for confirmation
+      const result = await this.walletManager.payLnurl(reqData.data, amount, comment);
+
+      return result;
     } catch (error) {
       console.error('LNURL payment failed:', error);
-      throw new Error(`LNURL payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'LNURL payment failed'
+      };
     }
   }
 
@@ -242,7 +306,7 @@ export class LnurlManager {
   }
 
   /**
-   * Extract LNURL from various formats (QR codes, lightning: URIs, etc.)
+   * Extract LNURL or Lightning address from various formats (QR codes, lightning: URIs, etc.)
    */
   extractLnurl(input: string): string | null {
     try {
@@ -252,6 +316,11 @@ export class LnurlManager {
       // Handle lightning: URI
       if (input.toLowerCase().startsWith('lightning:')) {
         input = input.substring(10);
+      }
+
+      // Handle Lightning address (user@domain)
+      if (isLightningAddress(input)) {
+        return input;
       }
 
       // Handle direct LNURL

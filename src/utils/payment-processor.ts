@@ -4,6 +4,7 @@
 import { ExtensionMessaging, MessageResponse } from './messaging';
 import { TipRequest, UserSettings, Transaction } from '../types';
 import { TippingUI } from './tipping-ui';
+import { convertToLnurl, isLightningAddress } from './lnurl';
 
 export interface PaymentOptions {
   lnurl: string;
@@ -15,6 +16,16 @@ export interface PaymentOptions {
 export interface PaymentResult {
   success: boolean;
   transactionId?: string;
+  paymentHash?: string;
+  preimage?: string;
+  amountSats?: number;
+  feeSats?: number;
+  successAction?: {
+    type: 'message' | 'url' | 'aes';
+    message?: string;
+    url?: string;
+    description?: string;
+  };
   error?: string;
   retryable?: boolean;
 }
@@ -311,16 +322,19 @@ export class PaymentProcessor {
   }
 
   /**
-   * Parse LNURL with comprehensive validation
+   * Parse LNURL or Lightning address with comprehensive validation
    */
   private async parseLnurlWithValidation(lnurl: string): Promise<MessageResponse<any>> {
     try {
-      const response = await ExtensionMessaging.parseLnurl(lnurl);
-      
+      // Convert Lightning address to LNURL endpoint if needed
+      const resolvedLnurl = convertToLnurl(lnurl);
+
+      const response = await ExtensionMessaging.parseLnurl(resolvedLnurl);
+
       if (!response.success || !response.data) {
         return {
           success: false,
-          error: 'Invalid LNURL or service unavailable'
+          error: 'Invalid LNURL/Lightning address or service unavailable'
         };
       }
 
@@ -487,6 +501,7 @@ export class PaymentProcessor {
 
   /**
    * Perform the actual payment via Breez SDK
+   * The SDK waits for payment confirmation before resolving
    */
   private async performPayment(lnurlData: any, options: PaymentOptions): Promise<PaymentResult> {
     try {
@@ -496,10 +511,17 @@ export class PaymentProcessor {
         options.comment
       );
 
-      if (response.success) {
+      if (response.success && response.data) {
+        // Payment confirmed - extract rich result data
+        const paymentData = response.data;
         return {
           success: true,
-          transactionId: `lnurl_${Date.now()}` // Generate transaction ID
+          transactionId: paymentData.paymentId,
+          paymentHash: paymentData.paymentHash,
+          preimage: paymentData.preimage,
+          amountSats: paymentData.amountSats,
+          feeSats: paymentData.feeSats,
+          successAction: paymentData.successAction
         };
       } else {
         return {
