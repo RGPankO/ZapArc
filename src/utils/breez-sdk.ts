@@ -24,6 +24,22 @@ export interface LnurlPayRequest {
   comment?: string;
 }
 
+export interface LnurlPayResult {
+  success: boolean;
+  paymentId?: string;
+  paymentHash?: string;
+  preimage?: string;
+  amountSats?: number;
+  feeSats?: number;
+  successAction?: {
+    type: 'message' | 'url' | 'aes';
+    message?: string;
+    url?: string;
+    description?: string;
+  };
+  error?: string;
+}
+
 export class BreezSDKWrapper {
   private sdk: any = null;
   private isInitialized = false;
@@ -177,21 +193,73 @@ export class BreezSDKWrapper {
   }
 
   /**
-   * Pay LNURL-pay request
+   * Pay LNURL-pay request using the two-step flow (prepareLnurlPay → lnurlPay)
+   * Returns confirmed payment result - the promise resolves only after payment is confirmed
    */
-  async payLnurl(request: LnurlPayRequest): Promise<boolean> {
+  async payLnurl(request: LnurlPayRequest): Promise<LnurlPayResult> {
     this.ensureConnected();
 
     try {
-      await this.sdk.payLnurl({
-        reqData: request.reqData,
+      // Step 1: Prepare the LNURL payment (gets invoice, calculates fees)
+      console.log('[BreezSDK] Preparing LNURL payment...', {
         amountSats: request.amountSats,
-        comment: request.comment || ''
+        hasComment: !!request.comment
       });
-      return true;
+
+      const prepareResponse = await this.sdk.prepareLnurlPay({
+        amountSats: request.amountSats,
+        payRequest: request.reqData,
+        comment: request.comment || undefined,
+        validateSuccessActionUrl: true
+      });
+
+      console.log('[BreezSDK] Payment prepared:', {
+        amountSats: prepareResponse.amountSats,
+        feeSats: prepareResponse.feeSats,
+        hasSuccessAction: !!prepareResponse.successAction
+      });
+
+      // Step 2: Execute the payment - this waits for confirmation
+      console.log('[BreezSDK] Executing LNURL payment...');
+      const result = await this.sdk.lnurlPay({
+        prepareResponse: prepareResponse
+      });
+
+      // Payment confirmed! Extract result details
+      console.log('[BreezSDK] Payment confirmed:', {
+        paymentId: result.payment?.id,
+        status: result.payment?.status,
+        hasSuccessAction: !!result.successAction
+      });
+
+      // Build success result with payment details
+      const payResult: LnurlPayResult = {
+        success: true,
+        paymentId: result.payment?.id,
+        paymentHash: result.payment?.details?.paymentHash,
+        preimage: result.payment?.details?.preimage,
+        amountSats: result.payment?.amountSats || request.amountSats,
+        feeSats: result.payment?.fees || prepareResponse.feeSats
+      };
+
+      // Include success action if present
+      if (result.successAction) {
+        payResult.successAction = {
+          type: result.successAction.type,
+          message: result.successAction.data?.message,
+          url: result.successAction.data?.url,
+          description: result.successAction.data?.description
+        };
+      }
+
+      return payResult;
+
     } catch (error) {
-      console.error('Failed to pay LNURL:', error);
-      throw new Error(`LNURL payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[BreezSDK] LNURL payment failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'LNURL payment failed'
+      };
     }
   }
 

@@ -16,6 +16,16 @@ export interface PaymentOptions {
 export interface PaymentResult {
   success: boolean;
   transactionId?: string;
+  paymentHash?: string;
+  preimage?: string;
+  amountSats?: number;
+  feeSats?: number;
+  successAction?: {
+    type: 'message' | 'url' | 'aes';
+    message?: string;
+    url?: string;
+    description?: string;
+  };
   error?: string;
   retryable?: boolean;
 }
@@ -491,6 +501,7 @@ export class PaymentProcessor {
 
   /**
    * Perform the actual payment via Breez SDK
+   * The SDK waits for payment confirmation before resolving
    */
   private async performPayment(lnurlData: any, options: PaymentOptions): Promise<PaymentResult> {
     try {
@@ -500,10 +511,17 @@ export class PaymentProcessor {
         options.comment
       );
 
-      if (response.success) {
+      if (response.success && response.data) {
+        // Payment confirmed - extract rich result data
+        const paymentData = response.data;
         return {
           success: true,
-          transactionId: `lnurl_${Date.now()}` // Generate transaction ID
+          transactionId: paymentData.paymentId,
+          paymentHash: paymentData.paymentHash,
+          preimage: paymentData.preimage,
+          amountSats: paymentData.amountSats,
+          feeSats: paymentData.feeSats,
+          successAction: paymentData.successAction
         };
       } else {
         return {

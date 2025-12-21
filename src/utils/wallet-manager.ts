@@ -2,7 +2,7 @@
 // Combines Breez SDK operations with local storage and state management
 
 import * as bip39 from 'bip39';
-import { BreezSDKWrapper, BreezConfig } from './breez-sdk';
+import { BreezSDKWrapper, BreezConfig, LnurlPayResult } from './breez-sdk';
 import { ChromeStorageManager } from './storage';
 import { WalletData, Transaction, UserSettings } from '../types';
 
@@ -336,23 +336,27 @@ export class WalletManager {
 
   /**
    * Pay LNURL with amount and optional comment
+   * Returns confirmed payment result - waits for payment to complete before resolving
    */
-  async payLnurl(reqData: any, amount: number, comment?: string): Promise<boolean> {
+  async payLnurl(reqData: any, amount: number, comment?: string): Promise<LnurlPayResult> {
     this.ensureWalletReady();
 
     try {
-      const success = await this.breezSDK.payLnurl({ reqData, amountSats: amount, comment });
-      
-      if (success) {
-        // Update balance and activity
+      const result = await this.breezSDK.payLnurl({ reqData, amountSats: amount, comment });
+
+      if (result.success) {
+        // Update balance and activity after confirmed payment
         await this.updateWalletStatus();
         await this.storage.updateActivity();
       }
-      
-      return success;
+
+      return result;
     } catch (error) {
       console.error('LNURL payment failed:', error);
-      throw new Error(`LNURL payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'LNURL payment failed'
+      };
     }
   }
 

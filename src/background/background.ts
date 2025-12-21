@@ -165,25 +165,45 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         break;
 
       case 'PAY_LNURL':
-        const paySuccess = await walletManager.payLnurl(message.reqData, message.amount, message.comment);
-        sendResponse({ success: paySuccess });
+        const payResult = await walletManager.payLnurl(message.reqData, message.amount, message.comment);
+        sendResponse({
+          success: payResult.success,
+          data: payResult,
+          error: payResult.error
+        });
         break;
 
       case 'PROCESS_PAYMENT':
         try {
-          // This would integrate with the payment processor
+          // Process payment and wait for confirmed result
           const paymentResult = await walletManager.payLnurl(
-            message.lnurlData, 
-            message.amount, 
+            message.lnurlData,
+            message.amount,
             message.comment
           );
-          sendResponse({ 
-            success: paymentResult,
-            transactionId: paymentResult ? `tx_${Date.now()}` : undefined
-          });
+
+          if (paymentResult.success) {
+            sendResponse({
+              success: true,
+              data: {
+                transactionId: paymentResult.paymentId,
+                paymentHash: paymentResult.paymentHash,
+                preimage: paymentResult.preimage,
+                amountSats: paymentResult.amountSats,
+                feeSats: paymentResult.feeSats,
+                successAction: paymentResult.successAction
+              }
+            });
+          } else {
+            sendResponse({
+              success: false,
+              error: paymentResult.error || 'Payment failed',
+              retryable: true
+            });
+          }
         } catch (error) {
-          sendResponse({ 
-            success: false, 
+          sendResponse({
+            success: false,
             error: error instanceof Error ? error.message : 'Payment processing failed',
             retryable: true
           });

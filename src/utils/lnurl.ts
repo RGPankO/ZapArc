@@ -2,6 +2,7 @@
 // Handles LNURL parsing, validation, and operations using Breez SDK
 
 import { WalletManager } from './wallet-manager';
+import { LnurlPayResult } from './breez-sdk';
 
 /**
  * Converts Lightning address to LNURL endpoint URL, or returns input unchanged if already LNURL.
@@ -113,12 +114,13 @@ export class LnurlManager {
 
   /**
    * Pay LNURL with amount and optional comment
+   * Returns confirmed payment result - waits for payment to complete
    */
-  async payLnurl(lnurl: string, amount: number, comment?: string): Promise<boolean> {
+  async payLnurl(lnurl: string, amount: number, comment?: string): Promise<LnurlPayResult> {
     try {
       // Parse LNURL first
       const reqData = await this.parseLnurl(lnurl);
-      
+
       if (reqData.type !== 'pay') {
         throw new Error('LNURL is not a pay request');
       }
@@ -126,7 +128,7 @@ export class LnurlManager {
       // Validate amount is within bounds
       const payData = reqData.data as LnurlPayData;
       const amountMsat = amount * 1000;
-      
+
       if (amountMsat < payData.minSendable || amountMsat > payData.maxSendable) {
         throw new Error(`Amount must be between ${payData.minSendable / 1000} and ${payData.maxSendable / 1000} sats`);
       }
@@ -139,16 +141,22 @@ export class LnurlManager {
       // Check sufficient balance
       const hasSufficientBalance = await this.walletManager.hasSufficientBalance(amount);
       if (!hasSufficientBalance) {
-        throw new Error('Insufficient balance for payment');
+        return {
+          success: false,
+          error: 'Insufficient balance for payment'
+        };
       }
 
-      // Execute payment
-      const success = await this.walletManager.payLnurl(reqData.data, amount, comment);
-      
-      return success;
+      // Execute payment and wait for confirmation
+      const result = await this.walletManager.payLnurl(reqData.data, amount, comment);
+
+      return result;
     } catch (error) {
       console.error('LNURL payment failed:', error);
-      throw new Error(`LNURL payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'LNURL payment failed'
+      };
     }
   }
 

@@ -3764,7 +3764,9 @@ function showPinInputDialog(message: string): Promise<string | null> {
 
 function showConfirmDialog(title: string, message: string): Promise<boolean> {
     return new Promise((resolve) => {
+        // Use unique class name to identify this dialog's overlay
         const overlay = document.createElement('div');
+        overlay.className = 'confirm-dialog-overlay';
         // Z-index 10001 to appear above withdraw modal (z-index 10000)
         overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;';
 
@@ -3783,24 +3785,54 @@ function showConfirmDialog(title: string, message: string): Promise<boolean> {
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
-        // Query buttons from the dialog element (not document) to avoid race condition
+        // Query buttons from the dialog element (scoped query, IDs are unique within this dialog)
         const yesBtn = dialog.querySelector('#confirm-dialog-yes') as HTMLButtonElement;
         const noBtn = dialog.querySelector('#confirm-dialog-no') as HTMLButtonElement;
 
         console.log('🔍 [Dialog] Buttons attached:', { yesBtn: !!yesBtn, noBtn: !!noBtn });
 
+        let cleaned = false;
         const cleanup = (value: boolean) => {
+            if (cleaned) {
+                console.log('⚠️ [Dialog] Cleanup already called, skipping');
+                return;
+            }
+            cleaned = true;
             console.log('🔵 [Dialog] Cleanup called with:', value);
-            overlay.remove();
+
+            // Ensure overlay is removed
+            if (overlay.parentNode) {
+                overlay.remove();
+                console.log('✅ [Dialog] Overlay removed from DOM');
+            } else {
+                console.warn('⚠️ [Dialog] Overlay already removed');
+            }
+
+            // Also remove any stale overlays with this class
+            document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+                console.log('🧹 [Dialog] Removing stale overlay');
+                el.remove();
+            });
+
             resolve(value);
         };
 
         if (yesBtn && noBtn) {
-            yesBtn.addEventListener('click', () => cleanup(true));
-            noBtn.addEventListener('click', () => cleanup(false));
+            yesBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(true);
+            });
+            noBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                cleanup(false);
+            });
             console.log('✅ [Dialog] Event listeners attached successfully');
         } else {
             console.error('❌ [Dialog] Failed to attach event listeners - buttons not found');
+            // Fallback: resolve with false to not block
+            cleanup(false);
         }
     });
 }
@@ -4547,6 +4579,12 @@ async function sendPayment() {
         // Clear prepared payment
         preparedPayment = null;
 
+        // Ensure any stale confirm dialogs are removed
+        document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+            console.log('🧹 [Withdraw] Removing stale confirm dialog');
+            el.remove();
+        });
+
         if (statusText) {
             statusText.textContent = '✅ Payment sent successfully!';
             statusText.className = 'status-indicator success';
@@ -4569,6 +4607,13 @@ async function sendPayment() {
 
     } catch (error) {
         console.error('❌ [Popup] Send payment error:', error);
+
+        // Ensure any stale confirm dialogs are removed on error too
+        document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+            console.log('🧹 [Withdraw] Removing stale confirm dialog on error');
+            el.remove();
+        });
+
         if (statusText) {
             statusText.textContent = `❌ ${error instanceof Error ? error.message : 'Payment failed'}`;
             statusText.className = 'status-indicator error';
@@ -4577,6 +4622,12 @@ async function sendPayment() {
     } finally {
         sendBtn.disabled = false;
         sendBtn.textContent = 'Send Payment';
+
+        // Final cleanup: ensure no confirm dialogs are left
+        document.querySelectorAll('.confirm-dialog-overlay').forEach(el => {
+            console.log('🧹 [Withdraw] Final cleanup - removing confirm dialog');
+            el.remove();
+        });
     }
 }
 
