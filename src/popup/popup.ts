@@ -4560,10 +4560,12 @@ async function sendPayment() {
         // Refresh transaction history to show the new withdraw transaction
         await loadTransactionHistory();
 
-        // Auto-close interface after 3 seconds
+        // Auto-close interface after 2 seconds
+        console.log('[Withdraw] Scheduling auto-close in 2 seconds...');
         setTimeout(() => {
+            console.log('[Withdraw] Auto-close timer fired, hiding interface');
             hideWithdrawInterface();
-        }, 3000);
+        }, 2000);
 
     } catch (error) {
         console.error('❌ [Popup] Send payment error:', error);

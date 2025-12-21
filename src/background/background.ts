@@ -4,7 +4,7 @@
 import { WalletData, UserSettings } from '../types';
 import { WalletManager } from '../utils/wallet-manager';
 import { ChromeStorageManager } from '../utils/storage';
-import { LnurlManager } from '../utils/lnurl';
+import { LnurlManager, convertToLnurl } from '../utils/lnurl';
 import * as bip39 from 'bip39';
 
 // Breez SDK API key (client certificate for Spark implementation)
@@ -158,7 +158,9 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         break;
 
       case 'PARSE_LNURL':
-        const parsed = await walletManager.parseLnurl(message.lnurl);
+        // Convert Lightning address to LNURL endpoint if needed
+        const resolvedLnurl = convertToLnurl(message.lnurl);
+        const parsed = await walletManager.parseLnurl(resolvedLnurl);
         sendResponse({ success: true, data: parsed });
         break;
 

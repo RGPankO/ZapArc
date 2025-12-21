@@ -4,6 +4,7 @@
 import { ExtensionMessaging, MessageResponse } from './messaging';
 import { TipRequest, UserSettings, Transaction } from '../types';
 import { TippingUI } from './tipping-ui';
+import { convertToLnurl, isLightningAddress } from './lnurl';
 
 export interface PaymentOptions {
   lnurl: string;
@@ -311,16 +312,19 @@ export class PaymentProcessor {
   }
 
   /**
-   * Parse LNURL with comprehensive validation
+   * Parse LNURL or Lightning address with comprehensive validation
    */
   private async parseLnurlWithValidation(lnurl: string): Promise<MessageResponse<any>> {
     try {
-      const response = await ExtensionMessaging.parseLnurl(lnurl);
-      
+      // Convert Lightning address to LNURL endpoint if needed
+      const resolvedLnurl = convertToLnurl(lnurl);
+
+      const response = await ExtensionMessaging.parseLnurl(resolvedLnurl);
+
       if (!response.success || !response.data) {
         return {
           success: false,
-          error: 'Invalid LNURL or service unavailable'
+          error: 'Invalid LNURL/Lightning address or service unavailable'
         };
       }
 

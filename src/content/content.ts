@@ -18,7 +18,10 @@ console.log('🔵 [ContentScript] LIGHTNING TIPPING EXTENSION LOADED', {
 
 // Tip detection system
 class TipDetector {
+  // Standard LNURL tip format
   private static readonly TIP_REGEX = /\[lntip:lnurl:([^:]+):(\d+):(\d+):(\d+)\]/g;
+  // Lightning address tip format (user@domain)
+  private static readonly TIP_LNADDR_REGEX = /\[lntip:lnaddr:([^:]+@[^:]+):(\d+):(\d+):(\d+)\]/g;
   private static readonly SCAN_THROTTLE_MS = 1000;
   private static readonly METADATA_SELECTOR = 'meta[name="lntip"]';
   
@@ -502,7 +505,7 @@ class TipDetector {
   }
 
   /**
-   * Scan text content for tip requests
+   * Scan text content for tip requests (supports both LNURL and Lightning address formats)
    */
   private scanTextContent(): TipRequest[] {
     const tips: TipRequest[] = [];
@@ -514,17 +517,34 @@ class TipDetector {
     let node: Node | null;
     while ((node = walker.nextNode())) {
       const textContent = node.textContent || '';
-      const matches = Array.from(textContent.matchAll(TipDetector.TIP_REGEX));
 
-      for (const match of matches) {
+      // Scan for standard LNURL format
+      const lnurlMatches = Array.from(textContent.matchAll(TipDetector.TIP_REGEX));
+      for (const match of lnurlMatches) {
         const [fullMatch, lnurl, amount1, amount2, amount3] = match;
-        
+
         const tip: TipRequest = {
           lnurl,
           suggestedAmounts: [parseInt(amount1), parseInt(amount2), parseInt(amount3)],
           source: 'text',
           element: node.parentElement || undefined,
           isBlacklisted: this.blacklistManager.isBlacklisted(lnurl)
+        };
+
+        tips.push(tip);
+      }
+
+      // Scan for Lightning address format
+      const lnaddrMatches = Array.from(textContent.matchAll(TipDetector.TIP_LNADDR_REGEX));
+      for (const match of lnaddrMatches) {
+        const [fullMatch, lightningAddress, amount1, amount2, amount3] = match;
+
+        const tip: TipRequest = {
+          lnurl: lightningAddress, // Store Lightning address in lnurl field - will be converted later
+          suggestedAmounts: [parseInt(amount1), parseInt(amount2), parseInt(amount3)],
+          source: 'text',
+          element: node.parentElement || undefined,
+          isBlacklisted: this.blacklistManager.isBlacklisted(lightningAddress)
         };
 
         tips.push(tip);
@@ -611,7 +631,7 @@ class TipDetector {
   }
 
   /**
-   * Validate tip request
+   * Validate tip request (supports both LNURL and Lightning address formats)
    */
   private async validateTip(tip: TipRequest): Promise<boolean> {
     try {
@@ -620,8 +640,11 @@ class TipDetector {
         return false;
       }
 
-      // Validate LNURL format
-      if (!tip.lnurl.toLowerCase().startsWith('lnurl')) {
+      // Validate LNURL format OR Lightning address format
+      const isLnurl = tip.lnurl.toLowerCase().startsWith('lnurl');
+      const isLightningAddress = tip.lnurl.includes('@') && tip.lnurl.includes('.');
+
+      if (!isLnurl && !isLightningAddress) {
         return false;
       }
 

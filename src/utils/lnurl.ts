@@ -3,6 +3,59 @@
 
 import { WalletManager } from './wallet-manager';
 
+/**
+ * Converts Lightning address to LNURL endpoint URL, or returns input unchanged if already LNURL.
+ * Lightning address format: user@domain → https://domain/.well-known/lnurlp/user
+ * @param input - Lightning address (user@domain) or LNURL string
+ * @returns LNURL endpoint URL or original input
+ */
+export function convertToLnurl(input: string): string {
+  const trimmed = input.trim();
+
+  // Lightning address format: user@domain (but not if it starts with lnurl)
+  if (trimmed.includes('@') && !trimmed.toLowerCase().startsWith('lnurl')) {
+    const [username, domain] = trimmed.split('@');
+    if (username && domain && domain.includes('.')) {
+      return `https://${domain}/.well-known/lnurlp/${username}`;
+    }
+  }
+
+  return trimmed;
+}
+
+/**
+ * Validates if input is a valid Lightning address format.
+ * @param input - String to validate
+ * @returns true if valid Lightning address format (user@domain.tld)
+ */
+export function isLightningAddress(input: string): boolean {
+  const trimmed = input.trim();
+
+  // Must contain @ but not start with lnurl
+  if (!trimmed.includes('@') || trimmed.toLowerCase().startsWith('lnurl')) {
+    return false;
+  }
+
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) {
+    return false;
+  }
+
+  const [username, domain] = parts;
+
+  // Username must be non-empty and alphanumeric (with dots, dashes, underscores)
+  if (!username || !/^[a-zA-Z0-9._-]+$/.test(username)) {
+    return false;
+  }
+
+  // Domain must contain at least one dot and be valid
+  if (!domain || !domain.includes('.') || !/^[a-zA-Z0-9.-]+$/.test(domain)) {
+    return false;
+  }
+
+  return true;
+}
+
 export interface LnurlPayData {
   callback: string;
   maxSendable: number;
@@ -36,18 +89,21 @@ export class LnurlManager {
   }
 
   /**
-   * Parse and validate LNURL
+   * Parse and validate LNURL or Lightning address
    */
   async parseLnurl(lnurl: string): Promise<any> {
     try {
-      // Validate LNURL format
-      if (!this.isValidLnurlFormat(lnurl)) {
-        throw new Error('Invalid LNURL format');
+      // Validate LNURL or Lightning address format
+      if (!this.isValidLnurlFormat(lnurl) && !isLightningAddress(lnurl)) {
+        throw new Error('Invalid LNURL or Lightning address format');
       }
 
+      // Convert Lightning address to LNURL endpoint if needed
+      const resolvedLnurl = convertToLnurl(lnurl);
+
       // Use Breez SDK to parse LNURL
-      const parsed = await this.walletManager.parseLnurl(lnurl);
-      
+      const parsed = await this.walletManager.parseLnurl(resolvedLnurl);
+
       return parsed;
     } catch (error) {
       console.error('LNURL parsing failed:', error);
@@ -242,7 +298,7 @@ export class LnurlManager {
   }
 
   /**
-   * Extract LNURL from various formats (QR codes, lightning: URIs, etc.)
+   * Extract LNURL or Lightning address from various formats (QR codes, lightning: URIs, etc.)
    */
   extractLnurl(input: string): string | null {
     try {
@@ -252,6 +308,11 @@ export class LnurlManager {
       // Handle lightning: URI
       if (input.toLowerCase().startsWith('lightning:')) {
         input = input.substring(10);
+      }
+
+      // Handle Lightning address (user@domain)
+      if (isLightningAddress(input)) {
+        return input;
       }
 
       // Handle direct LNURL
