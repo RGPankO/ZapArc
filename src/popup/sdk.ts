@@ -1,19 +1,15 @@
 // Breez SDK connection and management
 // All SDK operations must occur in popup context (WASM limitation)
 
-import init, { 
-    connect, 
-    defaultConfig, 
-    type BreezSdk, 
-    type Config, 
-    type ConnectRequest, 
-    type SdkEvent 
+import init, {
+    connect,
+    defaultConfig,
+    type BreezSdk,
+    type Config,
+    type ConnectRequest,
+    type SdkEvent
 } from '@breeztech/breez-sdk-spark/web';
-import { 
-    BREEZ_API_KEY, 
-    breezSDK, 
-    setBreezSDK 
-} from './state';
+import { BREEZ_API_KEY, breezSDK, setBreezSDK } from './state';
 
 // Callback type for SDK events
 export type SdkEventCallback = {
@@ -31,6 +27,8 @@ export function setSdkEventCallbacks(callbacks: SdkEventCallback): void {
 /**
  * Connect to Breez SDK with mnemonic
  * CRITICAL: This must run in popup context (has DOM access for WASM)
+ * NOTE: This function returns the SDK but does NOT store it in state.
+ * The caller is responsible for storing the SDK via setBreezSDK() if needed.
  */
 export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
     console.log('🔵 [Popup-SDK] CONNECT_BREEZ_SDK ENTRY', {
@@ -98,9 +96,6 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                 }
             }
         });
-
-        // Store in state
-        setBreezSDK(sdk);
 
         return sdk;
     } catch (error) {

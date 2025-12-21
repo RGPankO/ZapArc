@@ -2,10 +2,10 @@
 // Handles wallet selector, switching, rename, delete, and management interface
 
 import { ExtensionMessaging } from '../utils/messaging';
-import { 
-    currentWallets, 
-    setCurrentWallets, 
-    isWalletSelectorOpen, 
+import {
+    currentWallets,
+    setCurrentWallets,
+    isWalletSelectorOpen,
     setIsWalletSelectorOpen,
     sessionPin,
     breezSDK,
@@ -17,7 +17,8 @@ import {
     renameWalletCurrentName,
     setRenameWalletCurrentName,
     isRenameSaving,
-    setIsRenameSaving
+    setIsRenameSaving,
+    setIsAddingWallet
 } from './state';
 import { connectBreezSDK } from './sdk';
 import { showError, showSuccess, showInfo } from './notifications';
@@ -26,9 +27,34 @@ import { showPINModal, showModal, hideModal } from './modals';
 // Callback type for wallet operations that need main popup functions
 export type WalletManagementCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
-    initializeMultiWalletUI: () => Promise<void>;
-    showAddWalletModal: () => Promise<void>;
+    loadTransactionHistory: () => Promise<void>;
+    showWizardStep: (step: string) => void;
+    setupWizardListeners: () => void;
+    showSuccess: (message: string) => void;
+    showError: (message: string) => void;
+    showInfo: (message: string) => void;
 };
+
+// Show add wallet flow (sets isAddingWallet and shows wizard)
+function showAddWalletFlow(): void {
+    console.log('[Wallet Management] Starting add wallet flow');
+    setIsAddingWallet(true);
+
+    // Hide management interface
+    hideWalletManagementInterface();
+
+    // Hide main interface, show wizard
+    const mainInterface = document.getElementById('main-interface');
+    const wizard = document.getElementById('onboarding-wizard');
+
+    if (mainInterface) mainInterface.classList.add('hidden');
+    if (wizard) {
+        wizard.classList.remove('hidden');
+        // Trigger the wizard to show setup-choice-step
+        callbacks?.showWizardStep('setup-choice-step');
+        callbacks?.setupWizardListeners();
+    }
+}
 
 let callbacks: WalletManagementCallbacks | null = null;
 
@@ -147,7 +173,7 @@ export function setupWalletSelectorListeners(): void {
     // Add wallet
     if (addWalletBtn) {
         addWalletBtn.onclick = () => {
-            callbacks?.showAddWalletModal();
+            showAddWalletFlow();
         };
     }
 
@@ -222,10 +248,10 @@ export async function handleWalletSwitch(walletId: string): Promise<void> {
             throw new Error(switchResponse.error || 'Wallet switch failed');
         }
 
-        // Connect new SDK
+        // Connect new SDK and store in state
         console.log('[Multi-Wallet] Connecting to new wallet SDK');
         const sdk = await connectBreezSDK(switchResponse.data.mnemonic);
-        setBreezSDK(sdk);
+        setBreezSDK(sdk); // Store in shared state
 
         // Query fresh balance from SDK
         await callbacks?.updateBalanceDisplay();
@@ -315,7 +341,7 @@ export async function showWalletManagementInterface(): Promise<void> {
     if (addBtn) {
         addBtn.onclick = () => {
             console.log('[Wallet Management] Add wallet button clicked');
-            callbacks?.showAddWalletModal();
+            showAddWalletFlow();
         };
     }
 }
@@ -534,7 +560,7 @@ export async function handleRenameSave(): Promise<void> {
             hideRenameInterface();
 
             await loadWalletManagementList();
-            await callbacks?.initializeMultiWalletUI();
+            await initializeMultiWalletUI();
         } else {
             if (errorEl) {
                 errorEl.textContent = response.error || 'Failed to rename wallet';
@@ -595,7 +621,7 @@ export async function handleDeleteWallet(walletId: string): Promise<void> {
             showSuccess('Wallet deleted successfully!');
 
             await loadWalletManagementList();
-            await callbacks?.initializeMultiWalletUI();
+            await initializeMultiWalletUI();
         } else {
             showError(response.error || 'Failed to delete wallet');
         }

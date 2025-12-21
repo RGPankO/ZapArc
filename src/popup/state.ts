@@ -48,7 +48,7 @@ export let isSDKInitialized = false;
 // Wizard state
 export let generatedMnemonic: string = '';
 export let mnemonicWords: string[] = [];
-export let selectedWords: string[] = [];
+export let selectedWords: number[] = [];
 export let userPin: string = '';
 export let sessionPin: string | null = null;
 export let isAddingWallet: boolean = false;
@@ -129,7 +129,7 @@ export function setMnemonicWords(words: string[]): void {
     mnemonicWords = words;
 }
 
-export function setSelectedWords(words: string[]): void {
+export function setSelectedWords(words: number[]): void {
     selectedWords = words;
 }
 
