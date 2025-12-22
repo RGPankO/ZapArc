@@ -211,6 +211,12 @@ function setupWizardListeners() {
         startBtn.onclick = () => showWizardStep('setup-choice-step');
     }
 
+    // Skip Setup - show existing wallet (unlock prompt)
+    const skipSetupBtn = document.getElementById('skip-setup-btn');
+    if (skipSetupBtn) {
+        skipSetupBtn.onclick = () => showUnlockPrompt();
+    }
+
     // Setup Choice Step
     const choiceBackBtn = document.getElementById('choice-back-btn');
     const createWalletBtn = document.getElementById('create-new-wallet-btn');
@@ -1200,6 +1206,12 @@ function setupEventListeners() {
     const lockBtn = document.getElementById('lock-btn');
     if (lockBtn) {
         lockBtn.onclick = lockWallet;
+    }
+
+    // Delete wallet button - shows reset/delete confirmation modal
+    const deleteWalletBtn = document.getElementById('delete-wallet-btn');
+    if (deleteWalletBtn) {
+        deleteWalletBtn.onclick = showForgotPinModal;
     }
 
     // Modal listeners
