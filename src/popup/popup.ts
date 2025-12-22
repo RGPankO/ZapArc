@@ -152,12 +152,46 @@ async function loadTransactionHistory() {
         );
 
         // Render transactions (show up to 10)
-        transactionList.innerHTML = sortedPayments.slice(0, 10).map((payment: any) => {
+        const displayTransactions = sortedPayments.slice(0, 10).map((payment: any) => {
             const isReceive = payment.paymentType === 'receive';
             const amount = payment.amount || payment.amountSats || 0;
             const timestamp = payment.timestamp ? new Date(payment.timestamp * 1000).toLocaleString() : 'Unknown';
             const status = payment.status || 'completed';
 
+            return {
+                type: isReceive ? 'receive' : 'send',
+                amount,
+                timestamp: payment.timestamp * 1000, // Store as milliseconds
+                status
+            };
+        });
+
+        // Cache transactions for faster loading next time (wallet-specific)
+        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+        let activeWalletId = null;
+        
+        if (multiWalletResult.multiWalletData) {
+            try {
+                const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+                activeWalletId = multiWalletData.activeWalletId;
+            } catch (e) {
+                console.error('⚠️ [Popup] Failed to parse multiWalletData for caching:', e);
+            }
+        }
+        
+        if (activeWalletId) {
+            const cacheKey = `cachedTransactions_${activeWalletId}`;
+            await chrome.storage.local.set({ [cacheKey]: displayTransactions });
+            console.log('💾 [Popup] Cached', displayTransactions.length, 'transactions for wallet:', activeWalletId);
+        } else {
+            console.warn('⚠️ [Popup] No active wallet ID - skipping transaction cache');
+        }
+
+        // Render to UI
+        transactionList.innerHTML = displayTransactions.map(tx => {
+            const isReceive = tx.type === 'receive';
+            const timestamp = new Date(tx.timestamp).toLocaleString();
+            
             return `
                 <div class="transaction-item ${isReceive ? 'receive' : 'send'}">
                     <div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
@@ -166,7 +200,7 @@ async function loadTransactionHistory() {
                         <div class="transaction-time">${timestamp}</div>
                     </div>
                     <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
-                        ${isReceive ? '+' : '-'}${amount.toLocaleString()} sats
+                        ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
                     </div>
                 </div>
             `;
@@ -1431,20 +1465,80 @@ async function initializePopup() {
                     // Show main interface
                     restoreMainInterface();
 
-                    // Load cached balance immediately
-                    if (storageData.cachedBalance) {
+                    // Load cached balance immediately for instant UI
+                    const hasCachedBalance = storageData.cachedBalance !== undefined && storageData.cachedBalance !== null;
+                    if (hasCachedBalance) {
+                        console.log('💾 [Popup] Using cached balance:', storageData.cachedBalance);
                         setCurrentBalance(storageData.cachedBalance);
                         const balanceElement = document.getElementById('balance');
-                        if (balanceElement) balanceElement.textContent = `${storageData.cachedBalance.toLocaleString()} sats`;
+                        if (balanceElement) {
+                            balanceElement.textContent = `${storageData.cachedBalance.toLocaleString()} sats`;
+                        }
+                        
+                        // Also update withdraw balance if visible
+                        const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
+                        if (withdrawBalanceElement) {
+                            withdrawBalanceElement.textContent = storageData.cachedBalance.toLocaleString();
+                        }
+                    } else {
+                        console.log('⚠️ [Popup] No cached balance found - will fetch from SDK');
                     }
 
-                    // Show loading indicators
+                    // Only show loading indicator if we don't have cached data
                     const balanceLoading = document.getElementById('balance-loading');
-                    if (balanceLoading) balanceLoading.classList.remove('hidden');
+                    if (balanceLoading && !hasCachedBalance) {
+                        balanceLoading.classList.remove('hidden');
+                    }
 
+                    // Load cached transactions or show loading
                     const transactionList = document.getElementById('transaction-list');
                     if (transactionList) {
-                        transactionList.innerHTML = '<div class="no-transactions">⏳ Loading...</div>';
+                        // Get active wallet ID from multi-wallet data structure
+                        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+                        let activeWalletId = null;
+                        
+                        if (multiWalletResult.multiWalletData) {
+                            try {
+                                const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+                                activeWalletId = multiWalletData.activeWalletId;
+                                console.log('🔍 [Popup] Active wallet ID from multiWalletData:', activeWalletId);
+                            } catch (e) {
+                                console.error('⚠️ [Popup] Failed to parse multiWalletData:', e);
+                            }
+                        }
+                        
+                        // Check if we have cached transactions for this specific wallet
+                        let cachedTransactions = null;
+                        if (activeWalletId) {
+                            const cacheKey = `cachedTransactions_${activeWalletId}`;
+                            const cachedTxData = await chrome.storage.local.get([cacheKey]);
+                            cachedTransactions = cachedTxData[cacheKey];
+                        }
+                        
+                        if (cachedTransactions && cachedTransactions.length > 0) {
+                            console.log('💾 [Popup] Using cached transactions for wallet', activeWalletId, ':', cachedTransactions.length);
+                            // Display cached transactions
+                            transactionList.innerHTML = cachedTransactions.map((tx: any) => {
+                                const isReceive = tx.type === 'receive';
+                                const timestamp = new Date(tx.timestamp).toLocaleString();
+                                const amount = tx.amount;
+                                return `
+                                    <div class="transaction-item ${isReceive ? 'receive' : 'send'}">
+                                        <div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
+                                        <div class="transaction-details">
+                                            <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
+                                            <div class="transaction-time">${timestamp}</div>
+                                        </div>
+                                        <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
+                                            ${isReceive ? '+' : '-'}${amount.toLocaleString()} sats
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                        } else {
+                            console.log('⚠️ [Popup] No cached transactions for wallet', activeWalletId);
+                            transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transactions...</div>';
+                        }
                     }
 
                     enableWalletControls();
@@ -1453,7 +1547,7 @@ async function initializePopup() {
                     // Start auto-lock
                     await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
 
-                    console.log('✅ [Popup] Auto-reconnect successful');
+                    console.log('✅ [Popup] Auto-reconnect successful - SDK will sync in background');
                     return;
                 }
             } catch (error) {
