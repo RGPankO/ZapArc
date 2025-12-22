@@ -424,56 +424,126 @@ async function handleCreateWallet() {
     }
 }
 
+// Setup Confirmation Step with Shuffled Words
 function setupWordConfirmation() {
-    const container = document.getElementById('word-confirmation-container');
-    if (!container) return;
+    // Reset selected words
+    setSelectedWords([]);
 
-    // Select 3 random word positions to verify
-    const positions: number[] = [];
-    while (positions.length < 3) {
-        const pos = Math.floor(Math.random() * 12);
-        if (!positions.includes(pos)) {
-            positions.push(pos);
-        }
+    // Shuffle words
+    const shuffledWords = [...mnemonicWords].sort(() => Math.random() - 0.5);
+
+    // Display selected words area
+    const selectedWordsDiv = document.getElementById('selected-words');
+    if (selectedWordsDiv) {
+        selectedWordsDiv.innerHTML = '<p style="color: #666; font-size: 14px;">Select words in order:</p>';
     }
-    positions.sort((a, b) => a - b);
 
-    setSelectedWords(positions);
+    // Display word options
+    const wordOptionsDiv = document.getElementById('word-options');
+    if (!wordOptionsDiv) return;
 
-    container.innerHTML = positions.map(pos => `
-        <div class="word-confirm-input">
-            <label>Word ${pos + 1}:</label>
-            <input type="text" id="confirm-word-${pos}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Enter word ${pos + 1}">
-        </div>
-    `).join('');
+    wordOptionsDiv.innerHTML = '';
 
-    // Setup validation
-    positions.forEach(pos => {
-        const input = document.getElementById(`confirm-word-${pos}`) as HTMLInputElement;
-        if (input) {
-            input.oninput = validateWordConfirmation;
-        }
+    shuffledWords.forEach((word, index) => {
+        const wordBtn = document.createElement('button');
+        wordBtn.className = 'word-button';
+        wordBtn.textContent = word;
+        wordBtn.dataset.word = word;
+
+        wordBtn.onclick = () => {
+            handleWordSelection(word, wordBtn);
+        };
+
+        wordOptionsDiv.appendChild(wordBtn);
     });
+
+    // Disable continue button initially
+    const confirmContinueBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
+    if (confirmContinueBtn) {
+        confirmContinueBtn.disabled = true;
+    }
 }
 
-function validateWordConfirmation() {
-    const confirmBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
-    if (!confirmBtn) return;
+// Handle Word Selection
+function handleWordSelection(word: string, button: HTMLButtonElement) {
+    // Add word to selected list
+    const newSelectedWords = [...selectedWords, word];
+    setSelectedWords(newSelectedWords);
 
-    let allValid = true;
+    // Disable the button
+    button.disabled = true;
+    button.style.opacity = '0.5';
 
-    selectedWords.forEach(pos => {
-        const input = document.getElementById(`confirm-word-${pos}`) as HTMLInputElement;
-        if (input) {
-            const value = input.value.toLowerCase().trim();
-            const expected = mnemonicWords[pos];
-            if (value !== expected) {
-                allValid = false;
-            }
-        }
+    // Update selected words display
+    updateSelectedWordsDisplay();
+
+    // Check if all words selected
+    if (selectedWords.length === mnemonicWords.length) {
+        checkConfirmation();
+    }
+}
+
+// Update Selected Words Display
+function updateSelectedWordsDisplay() {
+    const selectedWordsDiv = document.getElementById('selected-words');
+    if (!selectedWordsDiv) return;
+
+    selectedWordsDiv.innerHTML = '<p style="color: #666; font-size: 14px; margin-bottom: 10px;">Selected words:</p>';
+
+    const wordsContainer = document.createElement('div');
+    wordsContainer.style.display = 'flex';
+    wordsContainer.style.flexWrap = 'wrap';
+    wordsContainer.style.gap = '8px';
+    wordsContainer.style.marginBottom = '16px';
+
+    selectedWords.forEach((word, index) => {
+        const wordSpan = document.createElement('span');
+        wordSpan.style.padding = '6px 12px';
+        wordSpan.style.background = '#f0f0f0';
+        wordSpan.style.borderRadius = '4px';
+        wordSpan.style.fontSize = '14px';
+        wordSpan.textContent = `${index + 1}. ${word}`;
+        wordsContainer.appendChild(wordSpan);
     });
 
-    confirmBtn.disabled = !allValid;
+    selectedWordsDiv.appendChild(wordsContainer);
+}
+
+// Check if confirmation is correct
+function checkConfirmation() {
+    const isCorrect = selectedWords.every((word, index) => word === mnemonicWords[index]);
+
+    const confirmContinueBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
+    const selectedWordsDiv = document.getElementById('selected-words');
+
+    if (isCorrect) {
+        if (confirmContinueBtn) {
+            confirmContinueBtn.disabled = false;
+        }
+
+        if (selectedWordsDiv) {
+            const successMsg = document.createElement('p');
+            successMsg.style.color = '#28a745';
+            successMsg.style.fontWeight = 'bold';
+            successMsg.style.marginTop = '10px';
+            successMsg.textContent = '✓ Correct! You can continue.';
+            selectedWordsDiv.appendChild(successMsg);
+        }
+    } else {
+        if (selectedWordsDiv) {
+            const errorMsg = document.createElement('p');
+            errorMsg.style.color = '#dc3545';
+            errorMsg.style.fontWeight = 'bold';
+            errorMsg.style.marginTop = '10px';
+            errorMsg.textContent = 'Incorrect order. Please try again.';
+            selectedWordsDiv.appendChild(errorMsg);
+
+            // Reset after 2 seconds
+            setTimeout(() => {
+                setupWordConfirmation();
+            }, 2000);
+        }
+    }
 }
 
 function validatePinInputs() {
