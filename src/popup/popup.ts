@@ -622,7 +622,8 @@ async function handlePinConfirm() {
         showWizardStep('setup-complete-step');
     } catch (error) {
         console.error('[Wizard] Error saving wallet:', error);
-        showError('Failed to create wallet');
+        const errorMessage = error instanceof Error ? error.message : 'Failed to create wallet';
+        showError(errorMessage);
         if (pinContinueBtn) {
             pinContinueBtn.disabled = false;
             pinContinueBtn.textContent = 'Create Wallet';
