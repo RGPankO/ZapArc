@@ -665,7 +665,6 @@ chrome.runtime.onStartup.addListener(async () => {
 // Chrome extension Manifest V3 service workers cannot use persistent setTimeout/setInterval
 // Must use chrome.alarms API which survives service worker sleep cycles
 
-const AUTO_LOCK_DELAY_MS = 15 * 60 * 1000; // 15 minutes
 const ALARM_NAME = 'wallet-auto-lock';
 
 // Create alarm when wallet is unlocked
@@ -699,14 +698,19 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       return;
     }
 
+    // Get user's configured auto-lock timeout from settings
+    const settings = await storageManager.getUserSettings();
+    const autoLockTimeoutSeconds = settings.autoLockTimeout || 900; // Default to 15 minutes if not set
+    const AUTO_LOCK_DELAY_MS = autoLockTimeoutSeconds * 1000; // Convert seconds to milliseconds
+
     const lastActivity = data.lastActivity || 0;
     const elapsed = Date.now() - lastActivity;
 
-    console.log(`[AutoLock] Alarm check - elapsed: ${Math.floor(elapsed / 1000)}s / ${AUTO_LOCK_DELAY_MS / 1000}s`);
+    console.log(`[AutoLock] Alarm check - elapsed: ${Math.floor(elapsed / 1000)}s / ${AUTO_LOCK_DELAY_MS / 1000}s (configured: ${autoLockTimeoutSeconds}s)`);
 
-    // Check if 15 minutes have elapsed since last activity
+    // Check if configured timeout has elapsed since last activity
     if (elapsed > AUTO_LOCK_DELAY_MS) {
-      console.log('⏰ [AutoLock] 15 MINUTES ELAPSED - locking wallet');
+      console.log(`⏰ [AutoLock] ${autoLockTimeoutSeconds}s TIMEOUT ELAPSED - locking wallet`);
 
       // Lock the wallet
       await chrome.storage.local.set({ isUnlocked: false });
