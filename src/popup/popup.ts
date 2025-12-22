@@ -809,20 +809,26 @@ function showUnlockPrompt() {
     const newUnlockBtn = unlockBtn.cloneNode(true) as HTMLButtonElement;
     unlockBtn.parentNode?.replaceChild(newUnlockBtn, unlockBtn);
 
-    // Setup unlock handler
-    newUnlockBtn.onclick = async () => {
-        const pin = pinInput.value;
+    // Track if unlock is in progress to prevent multiple attempts
+    let isUnlocking = false;
+
+    // Core unlock logic - extracted so it can be called from button or auto-unlock
+    async function attemptUnlock(pin: string, isAutoAttempt: boolean = false): Promise<boolean> {
+        if (isUnlocking) return false;
 
         if (!pin || pin.length < 4) {
-            showError('Please enter your PIN');
-            if (unlockError) {
-                unlockError.textContent = 'Please enter your PIN';
-                unlockError.classList.remove('hidden');
+            if (!isAutoAttempt) {
+                showError('Please enter your PIN');
+                if (unlockError) {
+                    unlockError.textContent = 'Please enter your PIN';
+                    unlockError.classList.remove('hidden');
+                }
             }
-            return;
+            return false;
         }
 
         try {
+            isUnlocking = true;
             newUnlockBtn.disabled = true;
             newUnlockBtn.textContent = 'Unlocking...';
             if (unlockError) unlockError.classList.add('hidden');
@@ -838,15 +844,19 @@ function showUnlockPrompt() {
             const walletResponse = await ExtensionMessaging.loadWallet(pin);
 
             if (!walletResponse.success || !walletResponse.data) {
-                const errorMsg = walletResponse.error || 'Invalid PIN';
-                showError(errorMsg);
-                if (unlockError) {
-                    unlockError.textContent = errorMsg;
-                    unlockError.classList.remove('hidden');
+                // Only show error for manual attempts or if PIN looks complete
+                if (!isAutoAttempt) {
+                    const errorMsg = walletResponse.error || 'Invalid PIN';
+                    showError(errorMsg);
+                    if (unlockError) {
+                        unlockError.textContent = errorMsg;
+                        unlockError.classList.remove('hidden');
+                    }
                 }
                 newUnlockBtn.disabled = false;
                 newUnlockBtn.textContent = 'Unlock';
-                return;
+                isUnlocking = false;
+                return false;
             }
 
             // Disconnect existing SDK if any
@@ -893,24 +903,57 @@ function showUnlockPrompt() {
             await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
             await chrome.storage.local.set({ lastActivity: Date.now() });
 
+            isUnlocking = false;
+            return true;
+
         } catch (error) {
             console.error('❌ [Unlock] Failed:', error);
             const errorMsg = error instanceof Error ? error.message : 'Failed to unlock';
-            showError(errorMsg);
-            if (unlockError) {
-                unlockError.textContent = errorMsg;
-                unlockError.classList.remove('hidden');
+            if (!isAutoAttempt) {
+                showError(errorMsg);
+                if (unlockError) {
+                    unlockError.textContent = errorMsg;
+                    unlockError.classList.remove('hidden');
+                }
             }
             newUnlockBtn.disabled = false;
             newUnlockBtn.textContent = 'Unlock';
-            pinInput.value = '';
-            pinInput.focus();
+            if (!isAutoAttempt) {
+                pinInput.value = '';
+                pinInput.focus();
+            }
+            isUnlocking = false;
+            return false;
         }
-    };
+    }
+
+    // Setup button click handler
+    newUnlockBtn.onclick = () => attemptUnlock(pinInput.value, false);
 
     // Enter key to unlock
     pinInput.onkeypress = (e) => {
-        if (e.key === 'Enter') newUnlockBtn.click();
+        if (e.key === 'Enter') attemptUnlock(pinInput.value, false);
+    };
+
+    // Auto-unlock: try to unlock when PIN reaches valid length (4+ digits)
+    // Uses debounce to avoid attempting on every keystroke
+    let autoUnlockTimeout: ReturnType<typeof setTimeout> | null = null;
+    pinInput.oninput = () => {
+        const pin = pinInput.value;
+
+        // Clear any pending auto-unlock attempt
+        if (autoUnlockTimeout) {
+            clearTimeout(autoUnlockTimeout);
+            autoUnlockTimeout = null;
+        }
+
+        // Only attempt auto-unlock if PIN is at least 4 characters
+        if (pin.length >= 4) {
+            // Small delay to let user finish typing
+            autoUnlockTimeout = setTimeout(() => {
+                attemptUnlock(pin, true);
+            }, 150);
+        }
     };
 
     // Forgot PIN handler
