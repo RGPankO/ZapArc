@@ -211,10 +211,13 @@ function setupWizardListeners() {
         startBtn.onclick = () => showWizardStep('setup-choice-step');
     }
 
-    // Skip Setup - show existing wallet (unlock prompt)
+    // Skip Setup - show QR-only interface for external wallet mode
     const skipSetupBtn = document.getElementById('skip-setup-btn');
     if (skipSetupBtn) {
-        skipSetupBtn.onclick = () => showUnlockPrompt();
+        skipSetupBtn.onclick = async () => {
+            await chrome.storage.local.set({ walletSkipped: true });
+            showQROnlyInterface();
+        };
     }
 
     // Setup Choice Step
@@ -971,6 +974,69 @@ function showUnlockPrompt() {
         };
     }
 }
+
+// ========================================
+// QR-Only Interface (External Wallet Mode)
+// ========================================
+
+function showQROnlyInterface() {
+    const app = document.getElementById('app');
+    if (app) {
+        app.innerHTML = `
+            <header>
+                <h1>⚡ Lightning Tipping</h1>
+                <p style="font-size: 12px; color: #666; margin: 0;">QR Code Mode</p>
+            </header>
+            
+            <main>
+                <div style="text-align: center; padding: 20px;">
+                    <div style="background: #f0f7ff; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                        <h3 style="margin: 0 0 8px 0; color: #2196F3;">External Wallet Mode</h3>
+                        <p style="margin: 0; font-size: 13px; color: #666;">
+                            Tip detection active. QR codes will be generated for your external Lightning wallet.
+                        </p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; justify-content: center;">
+                        <button id="setup-wallet-later" style="
+                            padding: 8px 16px;
+                            border: 1px solid #f7931a;
+                            border-radius: 4px;
+                            background: white;
+                            color: #f7931a;
+                            cursor: pointer;
+                            font-size: 12px;
+                        ">Setup Wallet Later</button>
+                        
+                        <button id="settings-btn-qr" style="
+                            padding: 8px 16px;
+                            border: 1px solid #666;
+                            border-radius: 4px;
+                            background: white;
+                            color: #666;
+                            cursor: pointer;
+                            font-size: 12px;
+                        ">Settings</button>
+                    </div>
+                </div>
+            </main>
+        `;
+
+        // Add event listeners
+        document.getElementById('setup-wallet-later')?.addEventListener('click', () => {
+            // Clear the skip flag and show setup again
+            chrome.storage.local.remove(['walletSkipped']);
+            // Reload to show wizard
+            window.location.reload();
+        });
+
+        document.getElementById('settings-btn-qr')?.addEventListener('click', handleSettings);
+    }
+}
+
+// ========================================
+// Forgot PIN / Reset Wallet
+// ========================================
 
 function showForgotPinModal() {
     console.log('[Wallet] Forgot PIN modal opened');
