@@ -24,6 +24,8 @@ import {
     setSessionPin,
     isAddingWallet,
     setIsAddingWallet,
+    isImportingWallet,
+    setIsImportingWallet,
     currentWallets,
     setCurrentWallets,
     BIP39_WORDS,
@@ -189,9 +191,9 @@ function showWizardStep(stepId: string) {
         'create-step',
         'mnemonic-step',
         'confirm-step',
-        'import-step',
+        'import-wallet-step',
         'pin-step',
-        'completion-step'
+        'setup-complete-step'
     ];
 
     steps.forEach(id => {
@@ -251,8 +253,9 @@ function setupWizardListeners() {
 
     if (importWalletBtn) {
         importWalletBtn.onclick = () => {
-            showWizardStep('import-step');
-            setupImportWordInputs();
+            setIsImportingWallet(true); // Importing, not creating
+            initializeImportWallet();
+            showWizardStep('import-wallet-step');
         };
     }
 
@@ -311,7 +314,7 @@ function setupWizardListeners() {
 
     // PIN Step
     const pinBackBtn = document.getElementById('pin-back-btn');
-    const pinConfirmBtn = document.getElementById('pin-confirm-btn');
+    const pinContinueBtn = document.getElementById('pin-continue-btn');
 
     if (pinBackBtn) {
         pinBackBtn.onclick = () => {
@@ -324,13 +327,13 @@ function setupWizardListeners() {
         };
     }
 
-    if (pinConfirmBtn) {
-        pinConfirmBtn.onclick = () => handlePinConfirm();
+    if (pinContinueBtn) {
+        pinContinueBtn.onclick = () => handlePinConfirm();
     }
 
     // PIN Input listeners
-    const pinInput = document.getElementById('wallet-pin') as HTMLInputElement;
-    const confirmPinInput = document.getElementById('confirm-pin') as HTMLInputElement;
+    const pinInput = document.getElementById('pin-input') as HTMLInputElement;
+    const confirmPinInput = document.getElementById('pin-confirm') as HTMLInputElement;
 
     if (pinInput) {
         pinInput.oninput = validatePinInputs;
@@ -340,9 +343,9 @@ function setupWizardListeners() {
     }
 
     // Completion Step
-    const openWalletBtn = document.getElementById('open-wallet-btn');
-    if (openWalletBtn) {
-        openWalletBtn.onclick = async () => {
+    const completeSetupBtn = document.getElementById('complete-setup-btn');
+    if (completeSetupBtn) {
+        completeSetupBtn.onclick = async () => {
             await finalizeWalletSetup();
         };
     }
@@ -440,10 +443,10 @@ function validateWordConfirmation() {
 }
 
 function validatePinInputs() {
-    const pinInput = document.getElementById('wallet-pin') as HTMLInputElement;
-    const confirmPinInput = document.getElementById('confirm-pin') as HTMLInputElement;
-    const pinConfirmBtn = document.getElementById('pin-confirm-btn') as HTMLButtonElement;
-    const pinError = document.getElementById('pin-error');
+    const pinInput = document.getElementById('pin-input') as HTMLInputElement;
+    const confirmPinInput = document.getElementById('pin-confirm') as HTMLInputElement;
+    const pinConfirmBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
+    const pinError = document.getElementById('pin-strength');
 
     if (!pinInput || !confirmPinInput || !pinConfirmBtn) return;
 
@@ -453,28 +456,37 @@ function validatePinInputs() {
     // Clear previous errors
     if (pinError) pinError.classList.add('hidden');
 
-    // Validate PIN length
-    if (pin.length < 4) {
+    // Validate PIN length (6+ digits as per HTML description)
+    if (pin.length < 6) {
         pinConfirmBtn.disabled = true;
+        if (pinError && pin.length > 0) {
+            pinError.textContent = 'PIN must be at least 6 characters';
+            pinError.classList.remove('hidden');
+        }
         return;
     }
 
     // Check if PINs match
     if (pin !== confirmPin) {
         pinConfirmBtn.disabled = true;
-        if (confirmPin.length >= 4 && pinError) {
+        if (confirmPin.length >= 6 && pinError) {
             pinError.textContent = 'PINs do not match';
             pinError.classList.remove('hidden');
         }
         return;
     }
 
+    // All valid
+    if (pinError) {
+        pinError.textContent = '✓ PIN is valid';
+        pinError.classList.remove('hidden');
+    }
     pinConfirmBtn.disabled = false;
 }
 
 async function handlePinConfirm() {
-    const pinInput = document.getElementById('wallet-pin') as HTMLInputElement;
-    const pinConfirmBtn = document.getElementById('pin-confirm-btn') as HTMLButtonElement;
+    const pinInput = document.getElementById('pin-input') as HTMLInputElement;
+    const pinContinueBtn = document.getElementById('pin-continue-btn') as HTMLButtonElement;
 
     if (!pinInput) return;
 
@@ -484,8 +496,10 @@ async function handlePinConfirm() {
     console.log('[Wizard] PIN set, moving to completion');
 
     try {
-        pinConfirmBtn.disabled = true;
-        pinConfirmBtn.textContent = 'Creating wallet...';
+        if (pinContinueBtn) {
+            pinContinueBtn.disabled = true;
+            pinContinueBtn.textContent = 'Creating wallet...';
+        }
 
         // Determine if we're adding a wallet or creating initial one
         const nickname = isAddingWallet ? `Wallet ${currentWallets.length + 1}` : 'Main Wallet';
@@ -501,22 +515,24 @@ async function handlePinConfirm() {
 
         console.log('[Wizard] Wallet saved successfully');
 
-        showWizardStep('completion-step');
+        showWizardStep('setup-complete-step');
     } catch (error) {
         console.error('[Wizard] Error saving wallet:', error);
         showError('Failed to create wallet');
-        pinConfirmBtn.disabled = false;
-        pinConfirmBtn.textContent = 'Create Wallet';
+        if (pinContinueBtn) {
+            pinContinueBtn.disabled = false;
+            pinContinueBtn.textContent = 'Create Wallet';
+        }
     }
 }
 
 async function finalizeWalletSetup() {
     console.log('[Wizard] Finalizing wallet setup');
 
-    const openWalletBtn = document.getElementById('open-wallet-btn') as HTMLButtonElement;
-    if (openWalletBtn) {
-        openWalletBtn.disabled = true;
-        openWalletBtn.textContent = 'Opening...';
+    const completeSetupBtn = document.getElementById('complete-setup-btn') as HTMLButtonElement;
+    if (completeSetupBtn) {
+        completeSetupBtn.disabled = true;
+        completeSetupBtn.textContent = 'Opening...';
     }
 
     try {
@@ -561,16 +577,51 @@ async function finalizeWalletSetup() {
     } catch (error) {
         console.error('[Wizard] Error finalizing setup:', error);
         showError('Failed to open wallet');
-        if (openWalletBtn) {
-            openWalletBtn.disabled = false;
-            openWalletBtn.textContent = 'Open Wallet';
+        if (completeSetupBtn) {
+            completeSetupBtn.disabled = false;
+            completeSetupBtn.textContent = 'Start Using Wallet';
         }
     }
 }
 
+
 // ========================================
 // Import Functions
 // ========================================
+
+// Initialize Import Wallet Step
+function initializeImportWallet() {
+    const container = document.getElementById('import-words-container');
+    if (!container) return;
+
+    // Clear existing inputs
+    container.innerHTML = '';
+
+    // Create 12 input fields
+    for (let i = 1; i <= 12; i++) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'word-input-wrapper';
+        wrapper.innerHTML = `
+            <span class="word-number">${i}</span>
+            <input
+                type="text"
+                id="import-word-${i}"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                data-word-index="${i-1}"
+                placeholder="word ${i}"
+            />
+        `;
+        container.appendChild(wrapper);
+
+        const input = wrapper.querySelector('input') as HTMLInputElement;
+        setupWordAutocomplete(input, document.getElementById('word-suggestions') as HTMLElement);
+        setupWordEnterHandler(input, document.getElementById('word-suggestions') as HTMLElement);
+        setupWordPasteHandler(input);
+    }
+}
 
 function setupImportWordInputs() {
     const container = document.getElementById('import-words-container');
