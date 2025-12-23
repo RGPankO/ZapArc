@@ -8,6 +8,7 @@ import {
     isWalletSelectorOpen,
     setIsWalletSelectorOpen,
     sessionPin,
+    setSessionPin,
     breezSDK,
     setBreezSDK,
     isWalletUnlocked,
@@ -22,7 +23,7 @@ import {
 } from './state';
 import { connectBreezSDK } from './sdk';
 import { showError, showSuccess, showInfo } from './notifications';
-import { showPINModal, showModal, hideModal } from './modals';
+import { showPINModal, promptForPIN, showModal, hideModal } from './modals';
 
 // Callback type for wallet operations that need main popup functions
 export type WalletManagementCallbacks = {
@@ -215,21 +216,18 @@ export async function handleWalletSwitch(walletId: string): Promise<void> {
         // Show switching indicator
         showWalletSwitchingIndicator(true);
 
-        // Use session PIN for decryption (stored during unlock)
-        const pin = sessionPin || '';
+        // Try with current session PIN first
+        let pin = sessionPin || '';
+
         if (!pin) {
-            console.error('[Multi-Wallet] No session PIN available');
-            showError('Session expired. Please unlock wallet again.');
-            const unlockScreen = document.getElementById('unlock-screen');
-            const mainInterface = document.getElementById('main-interface');
-            if (unlockScreen && mainInterface) {
-                unlockScreen.classList.remove('hidden');
-                mainInterface.classList.add('hidden');
-                setIsWalletUnlocked(false);
+            // No session PIN - prompt for PIN
+            showWalletSwitchingIndicator(false);
+            pin = await promptForWalletPin(walletId);
+            if (!pin) {
+                return; // User cancelled
             }
-            return;
+            showWalletSwitchingIndicator(true);
         }
-        console.log('🔐 [Multi-Wallet] Using session PIN for wallet switch');
 
         // Clear cached balance before switching wallets
         await chrome.storage.local.remove(['cachedBalance']);
@@ -242,11 +240,42 @@ export async function handleWalletSwitch(walletId: string): Promise<void> {
             setBreezSDK(null);
         }
 
-        // Switch wallet
-        const switchResponse = await ExtensionMessaging.switchWallet(walletId, pin);
-        if (!switchResponse.success || !switchResponse.data) {
-            throw new Error(switchResponse.error || 'Wallet switch failed');
+        // Try to switch wallet with current PIN
+        let switchResponse = await ExtensionMessaging.switchWallet(walletId, pin);
+
+        // If PIN doesn't match (decryption fails), prompt for the correct PIN
+        if (!switchResponse.success && 
+            (switchResponse.error?.includes('decrypt') || 
+             switchResponse.error?.includes('Invalid PIN') ||
+             switchResponse.error?.includes('Failed to load wallet'))) {
+            console.log('[Multi-Wallet] PIN mismatch - prompting for wallet PIN');
+            showWalletSwitchingIndicator(false);
+
+            const walletName = currentWallets.find(w => w.id === walletId)?.nickname || 'this wallet';
+            showInfo(`Current PIN is invalid for ${walletName}. Please enter the correct PIN.`);
+
+            pin = await promptForWalletPin(walletId);
+            if (!pin) {
+                return; // User cancelled
+            }
+
+            showWalletSwitchingIndicator(true);
+            switchResponse = await ExtensionMessaging.switchWallet(walletId, pin);
         }
+
+        if (!switchResponse.success || !switchResponse.data) {
+            // Check if this is a PIN-related error and show a clearer message
+            const errorMsg = switchResponse.error || 'Wallet switch failed';
+            if (errorMsg.includes('decrypt') || errorMsg.includes('Failed to load wallet')) {
+                throw new Error('Incorrect PIN. Please try again.');
+            }
+            throw new Error(errorMsg);
+        }
+
+        // Update session PIN to the new wallet's PIN
+        setSessionPin(pin);
+        await chrome.storage.session.set({ walletSessionPin: pin });
+        console.log('🔐 [Multi-Wallet] Updated session PIN for new wallet');
 
         // Connect new SDK and store in state
         console.log('[Multi-Wallet] Connecting to new wallet SDK');
@@ -281,6 +310,15 @@ export async function handleWalletSwitch(walletId: string): Promise<void> {
         showError('Failed to switch wallet: ' + (error instanceof Error ? error.message : 'Unknown error'));
         showWalletSwitchingIndicator(false);
     }
+}
+
+/**
+ * Prompt user for wallet PIN
+ */
+async function promptForWalletPin(walletId: string): Promise<string> {
+    const walletName = currentWallets.find(w => w.id === walletId)?.nickname || 'wallet';
+    const pin = await promptForPIN(`Enter PIN for ${walletName}`);
+    return pin || '';
 }
 
 /**

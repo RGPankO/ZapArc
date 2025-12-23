@@ -2,6 +2,7 @@
 // Handles modal overlay, show/hide, and common modal patterns
 
 import { BIP39_WORDS } from './state';
+import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
 
 // ========================================
 // Modal State
@@ -166,6 +167,26 @@ export async function showPINModal(message: string): Promise<string | null> {
         inputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 newConfirmBtn.click();
+            }
+        });
+
+        // Auto-confirm with debounce when PIN reaches valid length (6+ digits)
+        const autoConfirm = createDebounce((pin: string) => {
+            closeCurrentModal(pin);
+        }, PIN_AUTO_CONFIRM_DELAY_MS);
+
+        inputEl.addEventListener('input', () => {
+            const pin = inputEl.value.trim();
+
+            // Cancel any pending auto-confirm
+            autoConfirm.cancel();
+
+            // Hide error on new input
+            errorEl?.classList.add('hidden');
+
+            // Only auto-confirm if PIN is at least 6 digits (our standard PIN length)
+            if (pin.length >= 6 && /^\d+$/.test(pin)) {
+                autoConfirm.call(pin);
             }
         });
 

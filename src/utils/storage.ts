@@ -632,23 +632,8 @@ export class ChromeStorageManager {
       // Load existing wallets or initialize empty array
       const result = await chrome.storage.local.get(['multiWalletData', 'walletVersion']);
 
-      // SECURITY: Verify PIN matches existing wallets (defense in depth)
-      // Skip verification for first wallet (no existing wallets to verify against)
-      if (result.multiWalletData) {
-        try {
-          const existingWallets = await this.loadWallets(pin);
-          if (!existingWallets) {
-            console.error('❌ [Storage] ADD_WALLET - Invalid PIN');
-            throw new Error('Invalid PIN. All wallets must use the same PIN.');
-          }
-          console.log('✅ [Storage] ADD_WALLET - PIN verified successfully');
-        } catch (error) {
-          console.error('❌ [Storage] ADD_WALLET - PIN verification failed:', error);
-          throw new Error('Invalid PIN. Cannot add wallet with different PIN.');
-        }
-      } else {
-        console.log('✅ [Storage] ADD_WALLET - First wallet, skipping PIN verification');
-      }
+      // Each wallet can have its own PIN - no need to verify against existing wallets
+      console.log('✅ [Storage] ADD_WALLET - Adding wallet with its own PIN');
 
       // Generate new wallet entry
       const walletId = generateUUID();

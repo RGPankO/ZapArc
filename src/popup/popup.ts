@@ -40,6 +40,9 @@ import { showNotification, showError, showSuccess, showInfo } from './notificati
 // Modal imports
 import { setupModalListeners, showPINModal, promptForPIN } from './modals';
 
+// Utility imports
+import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
+
 // Wallet Management imports
 import {
     initializeMultiWalletUI,
@@ -774,9 +777,7 @@ async function handlePinConfirm() {
         // Determine if we're adding a wallet or creating initial one
         const nickname = isAddingWallet ? `Wallet ${currentWallets.length + 1}` : 'Main Wallet';
 
-        // Import the wallet with the generated/imported mnemonic
-        // Note: createWallet generates its own mnemonic, but we already have one
-        // from either creation flow (where we generated it) or import flow
+        // Each wallet uses its own PIN
         const response = await ExtensionMessaging.importWallet(generatedMnemonic, nickname, pin);
 
         if (!response.success) {
@@ -784,6 +785,10 @@ async function handlePinConfirm() {
         }
 
         console.log('[Wizard] Wallet saved successfully');
+
+        // Update session PIN to the new wallet's PIN
+        setSessionPin(pin);
+        await chrome.storage.session.set({ walletSessionPin: pin });
 
         showWizardStep('setup-complete-step');
     } catch (error) {
@@ -1266,24 +1271,21 @@ function showUnlockPrompt() {
         if (e.key === 'Enter') attemptUnlock(pinInput.value, false);
     };
 
-    // Auto-unlock: try to unlock when PIN reaches valid length (4+ digits)
+    // Auto-unlock: try to unlock when PIN reaches valid length (6+ digits)
     // Uses debounce to avoid attempting on every keystroke
-    let autoUnlockTimeout: ReturnType<typeof setTimeout> | null = null;
+    const autoUnlock = createDebounce((pin: string) => {
+        attemptUnlock(pin, true);
+    }, PIN_AUTO_CONFIRM_DELAY_MS);
+
     pinInput.oninput = () => {
         const pin = pinInput.value;
 
-        // Clear any pending auto-unlock attempt
-        if (autoUnlockTimeout) {
-            clearTimeout(autoUnlockTimeout);
-            autoUnlockTimeout = null;
-        }
+        // Cancel any pending auto-unlock attempt
+        autoUnlock.cancel();
 
-        // Only attempt auto-unlock if PIN is at least 4 characters
-        if (pin.length >= 4) {
-            // Small delay to let user finish typing
-            autoUnlockTimeout = setTimeout(() => {
-                attemptUnlock(pin, true);
-            }, 150);
+        // Only attempt auto-unlock if PIN is at least 6 digits
+        if (pin.length >= 6 && /^\d+$/.test(pin)) {
+            autoUnlock.call(pin);
         }
     };
 
