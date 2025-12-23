@@ -571,6 +571,29 @@ function updateSelectedWordsDisplay() {
     const selectedWordsDiv = document.getElementById('selected-words');
     if (!selectedWordsDiv) return;
 
+    // If no words selected, show the paste input
+    if (selectedWords.length === 0) {
+        selectedWordsDiv.innerHTML = `
+            <p style="color: #666; font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
+            <input type="text" id="confirm-paste-input" placeholder="Paste your 12-word phrase here..."
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"
+            />
+        `;
+
+        // Re-add paste handler
+        const pasteInput = document.getElementById('confirm-paste-input') as HTMLInputElement;
+        if (pasteInput) {
+            pasteInput.addEventListener('paste', handleConfirmPaste);
+            pasteInput.addEventListener('input', () => {
+                const value = pasteInput.value.trim();
+                if (value.split(/\s+/).length === 12) {
+                    validatePastedPhrase(value);
+                }
+            });
+        }
+        return;
+    }
+
     selectedWordsDiv.innerHTML = '<p style="color: #666; font-size: 14px; margin-bottom: 10px;">Selected words:</p>';
 
     const wordsContainer = document.createElement('div');
@@ -581,15 +604,65 @@ function updateSelectedWordsDisplay() {
 
     selectedWords.forEach((word, index) => {
         const wordSpan = document.createElement('span');
-        wordSpan.style.padding = '6px 12px';
+        wordSpan.style.padding = '6px 8px 6px 12px';
         wordSpan.style.background = '#f0f0f0';
         wordSpan.style.borderRadius = '4px';
         wordSpan.style.fontSize = '14px';
-        wordSpan.textContent = `${index + 1}. ${word}`;
+        wordSpan.style.display = 'inline-flex';
+        wordSpan.style.alignItems = 'center';
+        wordSpan.style.gap = '6px';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = `${index + 1}. ${word}`;
+
+        const removeBtn = document.createElement('span');
+        removeBtn.textContent = '×';
+        removeBtn.style.cursor = 'pointer';
+        removeBtn.style.color = '#999';
+        removeBtn.style.fontSize = '16px';
+        removeBtn.style.fontWeight = 'bold';
+        removeBtn.style.lineHeight = '1';
+        removeBtn.title = 'Remove';
+        removeBtn.onmouseover = () => removeBtn.style.color = '#dc3545';
+        removeBtn.onmouseout = () => removeBtn.style.color = '#999';
+        removeBtn.onclick = () => removeSelectedWord(index);
+
+        wordSpan.appendChild(textSpan);
+        wordSpan.appendChild(removeBtn);
         wordsContainer.appendChild(wordSpan);
     });
 
     selectedWordsDiv.appendChild(wordsContainer);
+}
+
+// Remove a selected word and re-enable its button
+function removeSelectedWord(indexToRemove: number) {
+    const wordToRemove = selectedWords[indexToRemove];
+
+    // Remove from selected words array
+    const newSelectedWords = selectedWords.filter((_, i) => i !== indexToRemove);
+    setSelectedWords(newSelectedWords);
+
+    // Re-enable the corresponding word button
+    const wordOptionsDiv = document.getElementById('word-options');
+    if (wordOptionsDiv) {
+        const buttons = wordOptionsDiv.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.dataset.word === wordToRemove) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        });
+    }
+
+    // Update display
+    updateSelectedWordsDisplay();
+
+    // Disable continue button since order changed
+    const confirmContinueBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
+    if (confirmContinueBtn) {
+        confirmContinueBtn.disabled = true;
+    }
 }
 
 // Check if confirmation is correct
