@@ -295,21 +295,21 @@ function setupWizardListeners() {
 
     // Mnemonic Step
     const mnemonicBackBtn = document.getElementById('mnemonic-back-btn');
-    const copyMnemonicBtn = document.getElementById('copy-mnemonic-btn');
+    const wizardCopyMnemonicBtn = document.getElementById('wizard-copy-mnemonic-btn');
     const mnemonicContinueBtn = document.getElementById('mnemonic-continue-btn');
 
     if (mnemonicBackBtn) {
         mnemonicBackBtn.onclick = () => showWizardStep('setup-choice-step');
     }
 
-    if (copyMnemonicBtn) {
-        copyMnemonicBtn.onclick = async () => {
+    if (wizardCopyMnemonicBtn) {
+        wizardCopyMnemonicBtn.onclick = async () => {
             if (generatedMnemonic) {
                 await navigator.clipboard.writeText(generatedMnemonic);
                 showSuccess('Recovery phrase copied to clipboard!');
-                copyMnemonicBtn.textContent = '✓ Copied!';
+                wizardCopyMnemonicBtn.textContent = '✓ Copied!';
                 setTimeout(() => {
-                    copyMnemonicBtn.textContent = '📋 Copy to Clipboard';
+                    wizardCopyMnemonicBtn.textContent = '📋 Copy to Clipboard';
                 }, 2000);
             }
         };
