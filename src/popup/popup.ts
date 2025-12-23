@@ -716,11 +716,21 @@ function validatePinInputs() {
     // Clear previous errors
     if (pinError) pinError.classList.add('hidden');
 
-    // Validate PIN length (6+ digits as per HTML description)
-    if (pin.length < 6) {
+    // Validate PIN is exactly 6 digits
+    if (pin.length !== 6) {
         pinConfirmBtn.disabled = true;
         if (pinError && pin.length > 0) {
-            pinError.textContent = 'PIN must be at least 6 characters';
+            pinError.textContent = 'PIN must be exactly 6 digits';
+            pinError.classList.remove('hidden');
+        }
+        return;
+    }
+
+    // Validate PIN contains only numbers
+    if (!/^\d{6}$/.test(pin)) {
+        pinConfirmBtn.disabled = true;
+        if (pinError) {
+            pinError.textContent = 'PIN must contain only numbers';
             pinError.classList.remove('hidden');
         }
         return;
@@ -729,7 +739,7 @@ function validatePinInputs() {
     // Check if PINs match
     if (pin !== confirmPin) {
         pinConfirmBtn.disabled = true;
-        if (confirmPin.length >= 6 && pinError) {
+        if (confirmPin.length > 0 && pinError) {
             pinError.textContent = 'PINs do not match';
             pinError.classList.remove('hidden');
         }

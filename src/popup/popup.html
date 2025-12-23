@@ -253,12 +253,12 @@
             <div class="wizard-step hidden" id="pin-step">
                 <div class="wizard-header">
                     <h2>🔐 Create Your PIN</h2>
-                    <p>Create a 6+ digit PIN to secure your wallet</p>
+                    <p>Create a 6-digit PIN to secure your wallet</p>
                 </div>
                 <div class="wizard-content">
                     <div class="pin-input-group">
-                        <input type="password" id="pin-input" placeholder="Enter PIN (6+ digits)" maxlength="20">
-                        <input type="password" id="pin-confirm" placeholder="Confirm PIN" maxlength="20">
+                        <input type="password" id="pin-input" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" id="pin-confirm" placeholder="Confirm PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*">
                     </div>
                     <div class="pin-strength" id="pin-strength"></div>
                 </div>
@@ -379,7 +379,7 @@
                 <h2>🔒 Wallet Locked</h2>
                 <p>Enter your PIN to unlock your wallet</p>
                 <div class="pin-input-container">
-                    <input type="password" id="unlock-pin" placeholder="Enter PIN" maxlength="20">
+                    <input type="password" id="unlock-pin" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*">
                     <button id="unlock-btn" class="btn-primary">Unlock</button>
                 </div>
                 <div id="unlock-error" class="error-message hidden"></div>
