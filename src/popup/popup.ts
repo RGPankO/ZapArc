@@ -1243,6 +1243,18 @@ async function handleWalletReset(modal: HTMLElement) {
             confirmBtn.textContent = 'Deleting...';
         }
 
+        // Get all wallets first to check if there are others
+        const walletsResponse = await ExtensionMessaging.getAllWallets();
+        
+        if (!walletsResponse.success || !walletsResponse.data) {
+            throw new Error('Failed to get wallets');
+        }
+
+        const allWallets = walletsResponse.data;
+        const hasMultipleWallets = allWallets.length > 1;
+
+        console.log('[Wallet] Delete wallet - has multiple:', hasMultipleWallets, 'total:', allWallets.length);
+
         // Disconnect SDK
         if (breezSDK) {
             try {
@@ -1251,30 +1263,76 @@ async function handleWalletReset(modal: HTMLElement) {
             setBreezSDK(null);
         }
 
-        // Clear storage
-        await chrome.storage.local.clear();
+        if (hasMultipleWallets) {
+            // Multi-wallet: Delete only the active wallet
+            const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+            if (multiWalletResult.multiWalletData) {
+                const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+                const activeWalletId = multiWalletData.activeWalletId;
+                
+                console.log('[Wallet] Deleting active wallet:', activeWalletId);
+                
+                // Get session PIN for deletion
+                const sessionData = await chrome.storage.session.get(['walletSessionPin']);
+                if (!sessionData.walletSessionPin) {
+                    throw new Error('PIN required to delete wallet. Please unlock first.');
+                }
+                
+                // Delete the active wallet
+                const deleteResponse = await ExtensionMessaging.deleteWallet(activeWalletId, sessionData.walletSessionPin);
+                
+                if (!deleteResponse.success) {
+                    throw new Error(deleteResponse.error || 'Failed to delete wallet');
+                }
 
-        // Reset state
-        setIsWalletUnlocked(false);
-        setCurrentBalance(0);
-        setGeneratedMnemonic('');
-        setMnemonicWords([]);
-        setSelectedWords([]);
-        setUserPin('');
+                modal.remove();
 
-        modal.remove();
+                // Clear session PIN to force re-unlock
+                await chrome.storage.session.remove(['walletSessionPin']);
+                
+                // Reset state
+                setIsWalletUnlocked(false);
+                setCurrentBalance(0);
+                setBreezSDK(null);
 
-        showNotification('Wallet deleted. Set up a new wallet.', 'info', 5000);
+                showNotification('Wallet deleted. Please unlock to continue.', 'info', 5000);
 
-        // Show wizard
-        const unlockInterface = document.getElementById('unlock-interface');
-        if (unlockInterface) unlockInterface.classList.add('hidden');
+                // Show unlock prompt for remaining wallets
+                const unlockInterface = document.getElementById('unlock-interface');
+                const mainInterface = document.getElementById('main-interface');
+                
+                if (mainInterface) mainInterface.classList.add('hidden');
+                if (unlockInterface) unlockInterface.classList.remove('hidden');
+            }
+        } else {
+            // Last wallet: Clear all storage and show setup
+            console.log('[Wallet] Deleting last wallet - clearing all storage');
+            
+            await chrome.storage.local.clear();
+            await chrome.storage.session.clear();
 
-        showWalletSetupPrompt();
+            // Reset state
+            setIsWalletUnlocked(false);
+            setCurrentBalance(0);
+            setGeneratedMnemonic('');
+            setMnemonicWords([]);
+            setSelectedWords([]);
+            setUserPin('');
+
+            modal.remove();
+
+            showNotification('Last wallet deleted. Set up a new wallet.', 'info', 5000);
+
+            // Show wizard
+            const unlockInterface = document.getElementById('unlock-interface');
+            if (unlockInterface) unlockInterface.classList.add('hidden');
+
+            showWalletSetupPrompt();
+        }
 
     } catch (error) {
         console.error('❌ [Wallet] Reset failed:', error);
-        showError('Failed to reset wallet');
+        showError('Failed to delete wallet: ' + (error instanceof Error ? error.message : 'Unknown error'));
 
         const confirmBtn = document.getElementById('confirm-reset-btn') as HTMLButtonElement;
         if (confirmBtn) {
