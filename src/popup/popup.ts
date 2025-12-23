@@ -432,10 +432,28 @@ function setupWordConfirmation() {
     // Shuffle words
     const shuffledWords = [...mnemonicWords].sort(() => Math.random() - 0.5);
 
-    // Display selected words area
+    // Display selected words area with paste input
     const selectedWordsDiv = document.getElementById('selected-words');
     if (selectedWordsDiv) {
-        selectedWordsDiv.innerHTML = '<p style="color: #666; font-size: 14px;">Select words in order:</p>';
+        selectedWordsDiv.innerHTML = `
+            <p style="color: #666; font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
+            <input type="text" id="confirm-paste-input" placeholder="Paste your 12-word phrase here..."
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"
+            />
+        `;
+
+        // Add paste handler
+        const pasteInput = document.getElementById('confirm-paste-input') as HTMLInputElement;
+        if (pasteInput) {
+            pasteInput.addEventListener('paste', handleConfirmPaste);
+            pasteInput.addEventListener('input', () => {
+                // Also handle direct typing/paste via input event
+                const value = pasteInput.value.trim();
+                if (value.split(/\s+/).length === 12) {
+                    validatePastedPhrase(value);
+                }
+            });
+        }
     }
 
     // Display word options
@@ -461,6 +479,71 @@ function setupWordConfirmation() {
     const confirmContinueBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
     if (confirmContinueBtn) {
         confirmContinueBtn.disabled = true;
+    }
+}
+
+// Handle paste event in confirmation step
+function handleConfirmPaste(e: ClipboardEvent) {
+    e.preventDefault();
+    const pastedText = e.clipboardData?.getData('text');
+    if (pastedText) {
+        validatePastedPhrase(pastedText);
+    }
+}
+
+// Validate pasted phrase against the generated mnemonic
+function validatePastedPhrase(pastedText: string) {
+    const words = pastedText.trim().toLowerCase().split(/\s+/);
+
+    if (words.length !== 12) {
+        showError(`Expected 12 words, got ${words.length}`);
+        return;
+    }
+
+    // Check if pasted words match the generated mnemonic
+    const isCorrect = words.every((word, index) => word === mnemonicWords[index].toLowerCase());
+
+    if (isCorrect) {
+        // Set all words as selected
+        setSelectedWords([...mnemonicWords]);
+
+        // Disable all word buttons
+        const wordOptionsDiv = document.getElementById('word-options');
+        if (wordOptionsDiv) {
+            const buttons = wordOptionsDiv.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            });
+        }
+
+        // Update display and enable continue
+        updateSelectedWordsDisplay();
+
+        const confirmContinueBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
+        if (confirmContinueBtn) {
+            confirmContinueBtn.disabled = false;
+        }
+
+        // Show success message
+        const selectedWordsDiv = document.getElementById('selected-words');
+        if (selectedWordsDiv) {
+            const successMsg = document.createElement('p');
+            successMsg.style.color = '#28a745';
+            successMsg.style.fontWeight = 'bold';
+            successMsg.style.marginTop = '10px';
+            successMsg.textContent = '✓ Correct! You can continue.';
+            selectedWordsDiv.appendChild(successMsg);
+        }
+
+        showSuccess('Recovery phrase verified!');
+    } else {
+        showError('Phrase does not match. Please try again.');
+        // Clear the input
+        const pasteInput = document.getElementById('confirm-paste-input') as HTMLInputElement;
+        if (pasteInput) {
+            pasteInput.value = '';
+        }
     }
 }
 
