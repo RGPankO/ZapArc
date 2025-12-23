@@ -774,6 +774,68 @@ export class ChromeStorageManager {
   }
 
   /**
+   * Try to unlock any wallet with the given PIN
+   * Iterates through all wallets and returns the first one that successfully decrypts
+   * Also sets that wallet as the active wallet
+   */
+  async tryUnlockAnyWallet(pin: string): Promise<{ wallet: WalletData, metadata: WalletMetadata } | null> {
+    console.log('🔵 [Storage] TRY_UNLOCK_ANY_WALLET');
+
+    try {
+      const walletsData = await this.loadWallets(''); // Load wallet metadata without decryption
+      if (!walletsData || walletsData.wallets.length === 0) {
+        console.log('⚠️ [Storage] No wallets found');
+        return null;
+      }
+
+      console.log(`🔍 [Storage] Trying PIN against ${walletsData.wallets.length} wallet(s)`);
+
+      // Try to decrypt each wallet with the PIN
+      for (const walletEntry of walletsData.wallets) {
+        try {
+          console.log(`🔐 [Storage] Trying wallet: ${walletEntry.metadata.nickname} (${walletEntry.metadata.id})`);
+          
+          // Attempt to decrypt the mnemonic
+          const mnemonic = await this.decryptMnemonic(walletEntry.encryptedMnemonic, pin);
+          
+          // If we get here, decryption succeeded!
+          console.log(`✅ [Storage] PIN matched wallet: ${walletEntry.metadata.nickname}`);
+          
+          // Set this wallet as active
+          await this.setActiveWallet(walletEntry.metadata.id);
+          
+          const walletData: WalletData = {
+            mnemonic,
+            balance: 0,
+            transactions: []
+          };
+
+          console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET SUCCESS', {
+            walletId: walletEntry.metadata.id,
+            nickname: walletEntry.metadata.nickname
+          });
+
+          return {
+            wallet: walletData,
+            metadata: walletEntry.metadata
+          };
+        } catch (decryptError) {
+          // Decryption failed for this wallet, try the next one
+          console.log(`❌ [Storage] PIN did not match wallet: ${walletEntry.metadata.nickname}`);
+          continue;
+        }
+      }
+
+      // No wallet matched the PIN
+      console.log('❌ [Storage] PIN did not match any wallet');
+      return null;
+    } catch (error) {
+      console.error('❌ [Storage] TRY_UNLOCK_ANY_WALLET FAILED', error);
+      return null;
+    }
+  }
+
+  /**
    * Decrypt and return a specific wallet's full data by ID
    */
   async getWalletById(id: string, pin: string): Promise<{ wallet: WalletData, metadata: WalletMetadata } | null> {
