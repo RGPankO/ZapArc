@@ -2,7 +2,7 @@
 // This module centralizes all state to avoid circular dependencies
 
 import type { BreezSdk } from '@breeztech/breez-sdk-spark/web';
-import type { WalletMetadata } from '../types';
+import type { WalletMetadata, MasterKeyMetadata, SubWalletEntry } from '../types';
 import * as bip39 from 'bip39';
 
 // ========================================
@@ -36,10 +36,17 @@ export let currentBalance = 0;
 export let isWalletUnlocked = false;
 export let preparedPayment: any = null;
 
-// Multi-wallet state
+// Multi-wallet state (v1 - flat list, kept for backward compatibility)
 export let currentWallets: WalletMetadata[] = [];
 export let activeWalletId: string | null = null;
 export let isWalletSelectorOpen = false;
+
+// Hierarchical multi-wallet state (v2 - master keys with sub-wallets)
+export let masterKeys: MasterKeyMetadata[] = [];
+export let activeMasterKeyId: string | null = null;
+export let activeSubWalletIndex: number = 0;
+export let expandedMasterKeys: Set<string> = new Set();
+export let isHierarchicalMode: boolean = false; // true when using v2 storage
 
 // Breez SDK state
 export let breezSDK: BreezSdk | null = null;
@@ -111,6 +118,37 @@ export function setActiveWalletId(id: string | null): void {
 
 export function setIsWalletSelectorOpen(open: boolean): void {
     isWalletSelectorOpen = open;
+}
+
+// Hierarchical wallet setters
+export function setMasterKeys(keys: MasterKeyMetadata[]): void {
+    masterKeys = keys;
+}
+
+export function setActiveMasterKeyId(id: string | null): void {
+    activeMasterKeyId = id;
+}
+
+export function setActiveSubWalletIndex(index: number): void {
+    activeSubWalletIndex = index;
+}
+
+export function setExpandedMasterKeys(keys: Set<string>): void {
+    expandedMasterKeys = keys;
+}
+
+export function toggleMasterKeyExpanded(keyId: string): void {
+    if (expandedMasterKeys.has(keyId)) {
+        expandedMasterKeys.delete(keyId);
+    } else {
+        expandedMasterKeys.add(keyId);
+    }
+    // Create new Set to trigger reactivity if needed
+    expandedMasterKeys = new Set(expandedMasterKeys);
+}
+
+export function setIsHierarchicalMode(mode: boolean): void {
+    isHierarchicalMode = mode;
 }
 
 export function setBreezSDK(sdk: BreezSdk | null): void {
@@ -197,4 +235,66 @@ export function setIsImportingWallet(value: boolean): void {
         sessionStorage.removeItem(SESSION_KEY_IS_IMPORTING_WALLET);
     }
     isImportingWallet = value;
+}
+
+// ========================================
+// Hierarchical Wallet Helpers
+// ========================================
+
+/**
+ * Gets the currently active master key metadata
+ * @returns MasterKeyMetadata or null if none active
+ */
+export function getActiveMasterKey(): MasterKeyMetadata | null {
+    if (!activeMasterKeyId || masterKeys.length === 0) {
+        return null;
+    }
+    return masterKeys.find(mk => mk.id === activeMasterKeyId) || null;
+}
+
+/**
+ * Gets the display name for the currently active wallet
+ * Format: "Master Key Name > Sub-Wallet Name" or just "Master Key Name" if only one sub-wallet
+ */
+export function getActiveWalletDisplayName(): string {
+    const masterKey = getActiveMasterKey();
+    if (!masterKey) {
+        // Fallback to v1 display
+        if (activeWalletId && currentWallets.length > 0) {
+            const wallet = currentWallets.find(w => w.id === activeWalletId);
+            return wallet?.nickname || 'Wallet';
+        }
+        return 'No Wallet';
+    }
+
+    // For now, just return the master key name
+    // Sub-wallet names will be fetched from storage when needed
+    return masterKey.nickname;
+}
+
+/**
+ * Gets info about the active wallet for SDK operations
+ */
+export function getActiveWalletInfo(): { masterKeyId: string; subWalletIndex: number } | null {
+    if (!activeMasterKeyId) {
+        return null;
+    }
+    return {
+        masterKeyId: activeMasterKeyId,
+        subWalletIndex: activeSubWalletIndex,
+    };
+}
+
+/**
+ * Checks if a master key is expanded in the UI
+ */
+export function isMasterKeyExpanded(keyId: string): boolean {
+    return expandedMasterKeys.has(keyId);
+}
+
+/**
+ * Gets the total number of sub-wallets across all master keys
+ */
+export function getTotalSubWalletCount(): number {
+    return masterKeys.reduce((sum, mk) => sum + mk.subWalletCount, 0);
 }
