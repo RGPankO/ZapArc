@@ -159,8 +159,8 @@ export class PaymentProcessor {
 
       const lnurlData = lnurlResponse.data;
 
-      // Validate amount
-      const validationResult = this.validatePaymentAmount(options.amount, lnurlData);
+      // Validate amount - need to use lnurlData.data for the actual payment data
+      const validationResult = this.validatePaymentAmount(options.amount, lnurlData.data);
       if (!validationResult.success) {
         return {
           success: false,

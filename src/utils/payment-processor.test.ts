@@ -3,26 +3,30 @@
 
 import { PaymentProcessor, PaymentOptions } from './payment-processor';
 
-// Mock ExtensionMessaging for testing
-const mockMessaging = {
-  isWalletConnected: jest.fn(),
-  getBalance: jest.fn(),
-  parseLnurl: jest.fn(),
-  processPayment: jest.fn(),
-  payLnurl: jest.fn()
-};
-
 // Mock the messaging module
 jest.mock('./messaging', () => ({
-  ExtensionMessaging: mockMessaging
+  ExtensionMessaging: {
+    isWalletConnected: jest.fn(),
+    getBalance: jest.fn(),
+    parseLnurl: jest.fn(),
+    processPayment: jest.fn(),
+    payLnurl: jest.fn()
+  }
 }));
+
+const { ExtensionMessaging } = require('./messaging');
 
 describe('PaymentProcessor', () => {
   let paymentProcessor: PaymentProcessor;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     paymentProcessor = new PaymentProcessor();
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   describe('processPayment', () => {
@@ -35,9 +39,9 @@ describe('PaymentProcessor', () => {
 
     it('should successfully process a valid payment', async () => {
       // Mock successful responses
-      mockMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
-      mockMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
-      mockMessaging.parseLnurl.mockResolvedValue({
+      ExtensionMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
+      ExtensionMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
+      ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: true,
         data: {
           type: 'pay',
@@ -49,18 +53,18 @@ describe('PaymentProcessor', () => {
           }
         }
       });
-      mockMessaging.payLnurl.mockResolvedValue({ success: true });
+      ExtensionMessaging.payLnurl.mockResolvedValue({ success: true, data: {} });
 
       const result = await paymentProcessor.processPayment(mockPaymentOptions);
 
       expect(result.success).toBe(true);
-      expect(mockMessaging.isWalletConnected).toHaveBeenCalled();
-      expect(mockMessaging.getBalance).toHaveBeenCalled();
-      expect(mockMessaging.parseLnurl).toHaveBeenCalledWith(mockPaymentOptions.lnurl);
+      expect(ExtensionMessaging.isWalletConnected).toHaveBeenCalled();
+      expect(ExtensionMessaging.getBalance).toHaveBeenCalled();
+      expect(ExtensionMessaging.parseLnurl).toHaveBeenCalledWith(mockPaymentOptions.lnurl);
     });
 
     it('should fail when wallet is not connected', async () => {
-      mockMessaging.isWalletConnected.mockResolvedValue({ success: true, data: false });
+      ExtensionMessaging.isWalletConnected.mockResolvedValue({ success: true, data: false });
 
       const result = await paymentProcessor.processPayment(mockPaymentOptions);
 
@@ -70,8 +74,8 @@ describe('PaymentProcessor', () => {
     });
 
     it('should fail when balance is insufficient', async () => {
-      mockMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
-      mockMessaging.getBalance.mockResolvedValue({ success: true, data: 500 }); // Less than required
+      ExtensionMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
+      ExtensionMessaging.getBalance.mockResolvedValue({ success: true, data: 500 }); // Less than required
 
       const result = await paymentProcessor.processPayment(mockPaymentOptions);
 
@@ -81,9 +85,9 @@ describe('PaymentProcessor', () => {
     });
 
     it('should validate payment amount against LNURL limits', async () => {
-      mockMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
-      mockMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
-      mockMessaging.parseLnurl.mockResolvedValue({
+      ExtensionMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
+      ExtensionMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
+      ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: true,
         data: {
           type: 'pay',
@@ -106,9 +110,9 @@ describe('PaymentProcessor', () => {
     });
 
     it('should handle LNURL parsing errors', async () => {
-      mockMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
-      mockMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
-      mockMessaging.parseLnurl.mockResolvedValue({
+      ExtensionMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
+      ExtensionMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
+      ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: false,
         error: 'Invalid LNURL'
       });
@@ -120,9 +124,9 @@ describe('PaymentProcessor', () => {
     });
 
     it('should retry failed payments up to max retries', async () => {
-      mockMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
-      mockMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
-      mockMessaging.parseLnurl.mockResolvedValue({
+      ExtensionMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
+      ExtensionMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
+      ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: true,
         data: {
           type: 'pay',
@@ -136,17 +140,22 @@ describe('PaymentProcessor', () => {
       });
       
       // Mock payment failure with retryable error
-      mockMessaging.payLnurl.mockResolvedValue({
+      ExtensionMessaging.payLnurl.mockResolvedValue({
         success: false,
         error: 'Network timeout'
       });
 
-      const result = await paymentProcessor.processPayment(mockPaymentOptions);
+      const paymentPromise = paymentProcessor.processPayment(mockPaymentOptions);
+      
+      // Advance timers through all retry delays
+      await jest.runAllTimersAsync();
+      
+      const result = await paymentPromise;
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Payment failed after');
       // Should have tried multiple times (original + retries)
-      expect(mockMessaging.payLnurl).toHaveBeenCalledTimes(4); // 1 + 3 retries
+      expect(ExtensionMessaging.payLnurl).toHaveBeenCalledTimes(4); // 1 + 3 retries
     });
   });
 
@@ -157,7 +166,7 @@ describe('PaymentProcessor', () => {
         amount: 1000
       };
 
-      mockMessaging.parseLnurl.mockResolvedValue({
+      ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: true,
         data: {
           type: 'pay',
@@ -182,7 +191,7 @@ describe('PaymentProcessor', () => {
         amount: 1000
       };
 
-      mockMessaging.parseLnurl.mockResolvedValue({
+      ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: false,
         error: 'Invalid LNURL format'
       });
@@ -202,9 +211,9 @@ describe('PaymentProcessor', () => {
       };
 
       // Mock successful flow
-      mockMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
-      mockMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
-      mockMessaging.parseLnurl.mockResolvedValue({
+      ExtensionMessaging.isWalletConnected.mockResolvedValue({ success: true, data: true });
+      ExtensionMessaging.getBalance.mockResolvedValue({ success: true, data: 5000 });
+      ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: true,
         data: {
           type: 'pay',
@@ -216,7 +225,7 @@ describe('PaymentProcessor', () => {
           }
         }
       });
-      mockMessaging.payLnurl.mockResolvedValue({ success: true });
+      ExtensionMessaging.payLnurl.mockResolvedValue({ success: true, data: {} });
 
       let statusUpdates: any[] = [];
       
@@ -258,6 +267,3 @@ describe('PaymentProcessor', () => {
     });
   });
 });
-
-// Export for potential integration testing
-export { mockMessaging };
