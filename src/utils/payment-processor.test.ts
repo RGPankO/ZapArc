@@ -169,13 +169,10 @@ describe('PaymentProcessor', () => {
       ExtensionMessaging.parseLnurl.mockResolvedValue({
         success: true,
         data: {
-          type: 'pay',
-          data: {
-            callback: 'https://example.com/callback',
-            minSendable: 1000,
-            maxSendable: 100000000,
-            metadata: '[]'
-          }
+          callback: 'https://example.com/callback',
+          minSendable: 1000,
+          maxSendable: 100000000,
+          metadata: '[]'
         }
       });
 
