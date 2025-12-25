@@ -40,6 +40,9 @@ import { showNotification, showError, showSuccess, showInfo } from './notificati
 // Modal imports
 import { setupModalListeners, showPINModal, promptForPIN } from './modals';
 
+// Utility imports
+import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
+
 // Wallet Management imports
 import {
     initializeMultiWalletUI,
@@ -295,21 +298,21 @@ function setupWizardListeners() {
 
     // Mnemonic Step
     const mnemonicBackBtn = document.getElementById('mnemonic-back-btn');
-    const copyMnemonicBtn = document.getElementById('copy-mnemonic-btn');
+    const wizardCopyMnemonicBtn = document.getElementById('wizard-copy-mnemonic-btn');
     const mnemonicContinueBtn = document.getElementById('mnemonic-continue-btn');
 
     if (mnemonicBackBtn) {
         mnemonicBackBtn.onclick = () => showWizardStep('setup-choice-step');
     }
 
-    if (copyMnemonicBtn) {
-        copyMnemonicBtn.onclick = async () => {
+    if (wizardCopyMnemonicBtn) {
+        wizardCopyMnemonicBtn.onclick = async () => {
             if (generatedMnemonic) {
                 await navigator.clipboard.writeText(generatedMnemonic);
                 showSuccess('Recovery phrase copied to clipboard!');
-                copyMnemonicBtn.textContent = '✓ Copied!';
+                wizardCopyMnemonicBtn.textContent = '✓ Copied!';
                 setTimeout(() => {
-                    copyMnemonicBtn.textContent = '📋 Copy to Clipboard';
+                    wizardCopyMnemonicBtn.textContent = '📋 Copy to Clipboard';
                 }, 2000);
             }
         };
@@ -432,10 +435,28 @@ function setupWordConfirmation() {
     // Shuffle words
     const shuffledWords = [...mnemonicWords].sort(() => Math.random() - 0.5);
 
-    // Display selected words area
+    // Display selected words area with paste input
     const selectedWordsDiv = document.getElementById('selected-words');
     if (selectedWordsDiv) {
-        selectedWordsDiv.innerHTML = '<p style="color: #666; font-size: 14px;">Select words in order:</p>';
+        selectedWordsDiv.innerHTML = `
+            <p style="color: #666; font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
+            <input type="text" id="confirm-paste-input" placeholder="Paste your 12-word phrase here..."
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"
+            />
+        `;
+
+        // Add paste handler
+        const pasteInput = document.getElementById('confirm-paste-input') as HTMLInputElement;
+        if (pasteInput) {
+            pasteInput.addEventListener('paste', handleConfirmPaste);
+            pasteInput.addEventListener('input', () => {
+                // Also handle direct typing/paste via input event
+                const value = pasteInput.value.trim();
+                if (value.split(/\s+/).length === 12) {
+                    validatePastedPhrase(value);
+                }
+            });
+        }
     }
 
     // Display word options
@@ -464,6 +485,71 @@ function setupWordConfirmation() {
     }
 }
 
+// Handle paste event in confirmation step
+function handleConfirmPaste(e: ClipboardEvent) {
+    e.preventDefault();
+    const pastedText = e.clipboardData?.getData('text');
+    if (pastedText) {
+        validatePastedPhrase(pastedText);
+    }
+}
+
+// Validate pasted phrase against the generated mnemonic
+function validatePastedPhrase(pastedText: string) {
+    const words = pastedText.trim().toLowerCase().split(/\s+/);
+
+    if (words.length !== 12) {
+        showError(`Expected 12 words, got ${words.length}`);
+        return;
+    }
+
+    // Check if pasted words match the generated mnemonic
+    const isCorrect = words.every((word, index) => word === mnemonicWords[index].toLowerCase());
+
+    if (isCorrect) {
+        // Set all words as selected
+        setSelectedWords([...mnemonicWords]);
+
+        // Disable all word buttons
+        const wordOptionsDiv = document.getElementById('word-options');
+        if (wordOptionsDiv) {
+            const buttons = wordOptionsDiv.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            });
+        }
+
+        // Update display and enable continue
+        updateSelectedWordsDisplay();
+
+        const confirmContinueBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
+        if (confirmContinueBtn) {
+            confirmContinueBtn.disabled = false;
+        }
+
+        // Show success message
+        const selectedWordsDiv = document.getElementById('selected-words');
+        if (selectedWordsDiv) {
+            const successMsg = document.createElement('p');
+            successMsg.style.color = '#28a745';
+            successMsg.style.fontWeight = 'bold';
+            successMsg.style.marginTop = '10px';
+            successMsg.textContent = '✓ Correct! You can continue.';
+            selectedWordsDiv.appendChild(successMsg);
+        }
+
+        showSuccess('Recovery phrase verified!');
+    } else {
+        showError('Phrase does not match. Please try again.');
+        // Clear the input
+        const pasteInput = document.getElementById('confirm-paste-input') as HTMLInputElement;
+        if (pasteInput) {
+            pasteInput.value = '';
+        }
+    }
+}
+
 // Handle Word Selection
 function handleWordSelection(word: string, button: HTMLButtonElement) {
     // Add word to selected list
@@ -488,6 +574,29 @@ function updateSelectedWordsDisplay() {
     const selectedWordsDiv = document.getElementById('selected-words');
     if (!selectedWordsDiv) return;
 
+    // If no words selected, show the paste input
+    if (selectedWords.length === 0) {
+        selectedWordsDiv.innerHTML = `
+            <p style="color: #666; font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
+            <input type="text" id="confirm-paste-input" placeholder="Paste your 12-word phrase here..."
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"
+            />
+        `;
+
+        // Re-add paste handler
+        const pasteInput = document.getElementById('confirm-paste-input') as HTMLInputElement;
+        if (pasteInput) {
+            pasteInput.addEventListener('paste', handleConfirmPaste);
+            pasteInput.addEventListener('input', () => {
+                const value = pasteInput.value.trim();
+                if (value.split(/\s+/).length === 12) {
+                    validatePastedPhrase(value);
+                }
+            });
+        }
+        return;
+    }
+
     selectedWordsDiv.innerHTML = '<p style="color: #666; font-size: 14px; margin-bottom: 10px;">Selected words:</p>';
 
     const wordsContainer = document.createElement('div');
@@ -498,15 +607,65 @@ function updateSelectedWordsDisplay() {
 
     selectedWords.forEach((word, index) => {
         const wordSpan = document.createElement('span');
-        wordSpan.style.padding = '6px 12px';
+        wordSpan.style.padding = '6px 8px 6px 12px';
         wordSpan.style.background = '#f0f0f0';
         wordSpan.style.borderRadius = '4px';
         wordSpan.style.fontSize = '14px';
-        wordSpan.textContent = `${index + 1}. ${word}`;
+        wordSpan.style.display = 'inline-flex';
+        wordSpan.style.alignItems = 'center';
+        wordSpan.style.gap = '6px';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = `${index + 1}. ${word}`;
+
+        const removeBtn = document.createElement('span');
+        removeBtn.textContent = '×';
+        removeBtn.style.cursor = 'pointer';
+        removeBtn.style.color = '#999';
+        removeBtn.style.fontSize = '16px';
+        removeBtn.style.fontWeight = 'bold';
+        removeBtn.style.lineHeight = '1';
+        removeBtn.title = 'Remove';
+        removeBtn.onmouseover = () => removeBtn.style.color = '#dc3545';
+        removeBtn.onmouseout = () => removeBtn.style.color = '#999';
+        removeBtn.onclick = () => removeSelectedWord(index);
+
+        wordSpan.appendChild(textSpan);
+        wordSpan.appendChild(removeBtn);
         wordsContainer.appendChild(wordSpan);
     });
 
     selectedWordsDiv.appendChild(wordsContainer);
+}
+
+// Remove a selected word and re-enable its button
+function removeSelectedWord(indexToRemove: number) {
+    const wordToRemove = selectedWords[indexToRemove];
+
+    // Remove from selected words array
+    const newSelectedWords = selectedWords.filter((_, i) => i !== indexToRemove);
+    setSelectedWords(newSelectedWords);
+
+    // Re-enable the corresponding word button
+    const wordOptionsDiv = document.getElementById('word-options');
+    if (wordOptionsDiv) {
+        const buttons = wordOptionsDiv.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.dataset.word === wordToRemove) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        });
+    }
+
+    // Update display
+    updateSelectedWordsDisplay();
+
+    // Disable continue button since order changed
+    const confirmContinueBtn = document.getElementById('confirm-continue-btn') as HTMLButtonElement;
+    if (confirmContinueBtn) {
+        confirmContinueBtn.disabled = true;
+    }
 }
 
 // Check if confirmation is correct
@@ -560,11 +719,21 @@ function validatePinInputs() {
     // Clear previous errors
     if (pinError) pinError.classList.add('hidden');
 
-    // Validate PIN length (6+ digits as per HTML description)
-    if (pin.length < 6) {
+    // Validate PIN is exactly 6 digits
+    if (pin.length !== 6) {
         pinConfirmBtn.disabled = true;
         if (pinError && pin.length > 0) {
-            pinError.textContent = 'PIN must be at least 6 characters';
+            pinError.textContent = 'PIN must be exactly 6 digits';
+            pinError.classList.remove('hidden');
+        }
+        return;
+    }
+
+    // Validate PIN contains only numbers
+    if (!/^\d{6}$/.test(pin)) {
+        pinConfirmBtn.disabled = true;
+        if (pinError) {
+            pinError.textContent = 'PIN must contain only numbers';
             pinError.classList.remove('hidden');
         }
         return;
@@ -573,7 +742,7 @@ function validatePinInputs() {
     // Check if PINs match
     if (pin !== confirmPin) {
         pinConfirmBtn.disabled = true;
-        if (confirmPin.length >= 6 && pinError) {
+        if (confirmPin.length > 0 && pinError) {
             pinError.textContent = 'PINs do not match';
             pinError.classList.remove('hidden');
         }
@@ -608,9 +777,7 @@ async function handlePinConfirm() {
         // Determine if we're adding a wallet or creating initial one
         const nickname = isAddingWallet ? `Wallet ${currentWallets.length + 1}` : 'Main Wallet';
 
-        // Import the wallet with the generated/imported mnemonic
-        // Note: createWallet generates its own mnemonic, but we already have one
-        // from either creation flow (where we generated it) or import flow
+        // Each wallet uses its own PIN
         const response = await ExtensionMessaging.importWallet(generatedMnemonic, nickname, pin);
 
         if (!response.success) {
@@ -618,6 +785,10 @@ async function handlePinConfirm() {
         }
 
         console.log('[Wizard] Wallet saved successfully');
+
+        // Update session PIN to the new wallet's PIN
+        setSessionPin(pin);
+        await chrome.storage.session.set({ walletSessionPin: pin });
 
         showWizardStep('setup-complete-step');
     } catch (error) {
@@ -1100,24 +1271,21 @@ function showUnlockPrompt() {
         if (e.key === 'Enter') attemptUnlock(pinInput.value, false);
     };
 
-    // Auto-unlock: try to unlock when PIN reaches valid length (4+ digits)
+    // Auto-unlock: try to unlock when PIN reaches valid length (6+ digits)
     // Uses debounce to avoid attempting on every keystroke
-    let autoUnlockTimeout: ReturnType<typeof setTimeout> | null = null;
+    const autoUnlock = createDebounce((pin: string) => {
+        attemptUnlock(pin, true);
+    }, PIN_AUTO_CONFIRM_DELAY_MS);
+
     pinInput.oninput = () => {
         const pin = pinInput.value;
 
-        // Clear any pending auto-unlock attempt
-        if (autoUnlockTimeout) {
-            clearTimeout(autoUnlockTimeout);
-            autoUnlockTimeout = null;
-        }
+        // Cancel any pending auto-unlock attempt
+        autoUnlock.cancel();
 
-        // Only attempt auto-unlock if PIN is at least 4 characters
-        if (pin.length >= 4) {
-            // Small delay to let user finish typing
-            autoUnlockTimeout = setTimeout(() => {
-                attemptUnlock(pin, true);
-            }, 150);
+        // Only attempt auto-unlock if PIN is at least 6 digits
+        if (pin.length >= 6 && /^\d+$/.test(pin)) {
+            autoUnlock.call(pin);
         }
     };
 
@@ -1243,6 +1411,18 @@ async function handleWalletReset(modal: HTMLElement) {
             confirmBtn.textContent = 'Deleting...';
         }
 
+        // Get all wallets first to check if there are others
+        const walletsResponse = await ExtensionMessaging.getAllWallets();
+        
+        if (!walletsResponse.success || !walletsResponse.data) {
+            throw new Error('Failed to get wallets');
+        }
+
+        const allWallets = walletsResponse.data;
+        const hasMultipleWallets = allWallets.length > 1;
+
+        console.log('[Wallet] Delete wallet - has multiple:', hasMultipleWallets, 'total:', allWallets.length);
+
         // Disconnect SDK
         if (breezSDK) {
             try {
@@ -1251,30 +1431,76 @@ async function handleWalletReset(modal: HTMLElement) {
             setBreezSDK(null);
         }
 
-        // Clear storage
-        await chrome.storage.local.clear();
+        if (hasMultipleWallets) {
+            // Multi-wallet: Delete only the active wallet
+            const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+            if (multiWalletResult.multiWalletData) {
+                const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+                const activeWalletId = multiWalletData.activeWalletId;
+                
+                console.log('[Wallet] Deleting active wallet:', activeWalletId);
+                
+                // Get session PIN for deletion
+                const sessionData = await chrome.storage.session.get(['walletSessionPin']);
+                if (!sessionData.walletSessionPin) {
+                    throw new Error('PIN required to delete wallet. Please unlock first.');
+                }
+                
+                // Delete the active wallet
+                const deleteResponse = await ExtensionMessaging.deleteWallet(activeWalletId, sessionData.walletSessionPin);
+                
+                if (!deleteResponse.success) {
+                    throw new Error(deleteResponse.error || 'Failed to delete wallet');
+                }
 
-        // Reset state
-        setIsWalletUnlocked(false);
-        setCurrentBalance(0);
-        setGeneratedMnemonic('');
-        setMnemonicWords([]);
-        setSelectedWords([]);
-        setUserPin('');
+                modal.remove();
 
-        modal.remove();
+                // Clear session PIN to force re-unlock
+                await chrome.storage.session.remove(['walletSessionPin']);
+                
+                // Reset state
+                setIsWalletUnlocked(false);
+                setCurrentBalance(0);
+                setBreezSDK(null);
 
-        showNotification('Wallet deleted. Set up a new wallet.', 'info', 5000);
+                showNotification('Wallet deleted. Please unlock to continue.', 'info', 5000);
 
-        // Show wizard
-        const unlockInterface = document.getElementById('unlock-interface');
-        if (unlockInterface) unlockInterface.classList.add('hidden');
+                // Show unlock prompt for remaining wallets
+                const unlockInterface = document.getElementById('unlock-interface');
+                const mainInterface = document.getElementById('main-interface');
+                
+                if (mainInterface) mainInterface.classList.add('hidden');
+                if (unlockInterface) unlockInterface.classList.remove('hidden');
+            }
+        } else {
+            // Last wallet: Clear all storage and show setup
+            console.log('[Wallet] Deleting last wallet - clearing all storage');
+            
+            await chrome.storage.local.clear();
+            await chrome.storage.session.clear();
 
-        showWalletSetupPrompt();
+            // Reset state
+            setIsWalletUnlocked(false);
+            setCurrentBalance(0);
+            setGeneratedMnemonic('');
+            setMnemonicWords([]);
+            setSelectedWords([]);
+            setUserPin('');
+
+            modal.remove();
+
+            showNotification('Last wallet deleted. Set up a new wallet.', 'info', 5000);
+
+            // Show wizard
+            const unlockInterface = document.getElementById('unlock-interface');
+            if (unlockInterface) unlockInterface.classList.add('hidden');
+
+            showWalletSetupPrompt();
+        }
 
     } catch (error) {
         console.error('❌ [Wallet] Reset failed:', error);
-        showError('Failed to reset wallet');
+        showError('Failed to delete wallet: ' + (error instanceof Error ? error.message : 'Unknown error'));
 
         const confirmBtn = document.getElementById('confirm-reset-btn') as HTMLButtonElement;
         if (confirmBtn) {

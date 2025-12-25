@@ -325,25 +325,26 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'LOAD_WALLET':
         console.log('🔵 [Background] LOAD_WALLET - PIN received, length:', message.pin?.length);
 
-        // FIX: Use getActiveWallet() to respect multi-wallet activeWalletId
-        const activeWalletData = await storageManager.getActiveWallet(message.pin);
+        // Try to unlock any wallet with the given PIN
+        // This iterates through all wallets and returns the first one that decrypts successfully
+        const unlockedWallet = await storageManager.tryUnlockAnyWallet(message.pin);
 
-        if (!activeWalletData) {
-          console.error('❌ [Background] LOAD_WALLET - No active wallet found');
-          sendResponse({ success: false, error: 'No active wallet found' });
+        if (!unlockedWallet) {
+          console.error('❌ [Background] LOAD_WALLET - No wallet matched the PIN');
+          sendResponse({ success: false, error: 'Incorrect PIN' });
           break;
         }
 
-        console.log('✅ [Background] LOAD_WALLET - Active wallet decrypted successfully');
-        console.log('🔍 [Background] LOAD_WALLET - Wallet ID:', activeWalletData.metadata.id);
+        console.log('✅ [Background] LOAD_WALLET - Wallet unlocked successfully');
+        console.log('🔍 [Background] LOAD_WALLET - Wallet ID:', unlockedWallet.metadata.id);
         console.log('🔍 [Background] LOAD_WALLET - Response data:', {
-          hasWallet: !!activeWalletData.wallet,
-          hasMnemonic: !!activeWalletData.wallet?.mnemonic,
-          walletId: activeWalletData.metadata.id,
-          nickname: activeWalletData.metadata.nickname
+          hasWallet: !!unlockedWallet.wallet,
+          hasMnemonic: !!unlockedWallet.wallet?.mnemonic,
+          walletId: unlockedWallet.metadata.id,
+          nickname: unlockedWallet.metadata.nickname
         });
 
-        sendResponse({ success: true, data: activeWalletData.wallet, metadata: activeWalletData.metadata });
+        sendResponse({ success: true, data: unlockedWallet.wallet, metadata: unlockedWallet.metadata });
         break;
 
       case 'SAVE_DOMAIN_SETTINGS':

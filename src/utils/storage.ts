@@ -632,23 +632,8 @@ export class ChromeStorageManager {
       // Load existing wallets or initialize empty array
       const result = await chrome.storage.local.get(['multiWalletData', 'walletVersion']);
 
-      // SECURITY: Verify PIN matches existing wallets (defense in depth)
-      // Skip verification for first wallet (no existing wallets to verify against)
-      if (result.multiWalletData) {
-        try {
-          const existingWallets = await this.loadWallets(pin);
-          if (!existingWallets) {
-            console.error('❌ [Storage] ADD_WALLET - Invalid PIN');
-            throw new Error('Invalid PIN. All wallets must use the same PIN.');
-          }
-          console.log('✅ [Storage] ADD_WALLET - PIN verified successfully');
-        } catch (error) {
-          console.error('❌ [Storage] ADD_WALLET - PIN verification failed:', error);
-          throw new Error('Invalid PIN. Cannot add wallet with different PIN.');
-        }
-      } else {
-        console.log('✅ [Storage] ADD_WALLET - First wallet, skipping PIN verification');
-      }
+      // Each wallet can have its own PIN - no need to verify against existing wallets
+      console.log('✅ [Storage] ADD_WALLET - Adding wallet with its own PIN');
 
       // Generate new wallet entry
       const walletId = generateUUID();
@@ -784,6 +769,68 @@ export class ChromeStorageManager {
       };
     } catch (error) {
       console.error('❌ [Storage] GET_ACTIVE_WALLET FAILED', error);
+      return null;
+    }
+  }
+
+  /**
+   * Try to unlock any wallet with the given PIN
+   * Iterates through all wallets and returns the first one that successfully decrypts
+   * Also sets that wallet as the active wallet
+   */
+  async tryUnlockAnyWallet(pin: string): Promise<{ wallet: WalletData, metadata: WalletMetadata } | null> {
+    console.log('🔵 [Storage] TRY_UNLOCK_ANY_WALLET');
+
+    try {
+      const walletsData = await this.loadWallets(''); // Load wallet metadata without decryption
+      if (!walletsData || walletsData.wallets.length === 0) {
+        console.log('⚠️ [Storage] No wallets found');
+        return null;
+      }
+
+      console.log(`🔍 [Storage] Trying PIN against ${walletsData.wallets.length} wallet(s)`);
+
+      // Try to decrypt each wallet with the PIN
+      for (const walletEntry of walletsData.wallets) {
+        try {
+          console.log(`🔐 [Storage] Trying wallet: ${walletEntry.metadata.nickname} (${walletEntry.metadata.id})`);
+          
+          // Attempt to decrypt the mnemonic
+          const mnemonic = await this.decryptMnemonic(walletEntry.encryptedMnemonic, pin);
+          
+          // If we get here, decryption succeeded!
+          console.log(`✅ [Storage] PIN matched wallet: ${walletEntry.metadata.nickname}`);
+          
+          // Set this wallet as active
+          await this.setActiveWallet(walletEntry.metadata.id);
+          
+          const walletData: WalletData = {
+            mnemonic,
+            balance: 0,
+            transactions: []
+          };
+
+          console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET SUCCESS', {
+            walletId: walletEntry.metadata.id,
+            nickname: walletEntry.metadata.nickname
+          });
+
+          return {
+            wallet: walletData,
+            metadata: walletEntry.metadata
+          };
+        } catch (decryptError) {
+          // Decryption failed for this wallet, try the next one
+          console.log(`❌ [Storage] PIN did not match wallet: ${walletEntry.metadata.nickname}`);
+          continue;
+        }
+      }
+
+      // No wallet matched the PIN
+      console.log('❌ [Storage] PIN did not match any wallet');
+      return null;
+    } catch (error) {
+      console.error('❌ [Storage] TRY_UNLOCK_ANY_WALLET FAILED', error);
       return null;
     }
   }
