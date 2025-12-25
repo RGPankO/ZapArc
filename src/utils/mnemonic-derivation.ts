@@ -174,14 +174,14 @@ export function deriveSubWalletMnemonic(
     );
   }
 
-  // Validate master mnemonic
-  if (!bip39.validateMnemonic(masterMnemonic)) {
-    throw new Error('Invalid master mnemonic');
-  }
-
-  // If index is 0, return the original mnemonic unchanged
+  // If index is 0, return the original mnemonic unchanged (no validation needed)
   if (subWalletIndex === 0) {
     return masterMnemonic;
+  }
+
+  // Validate master mnemonic (only needed for derivation)
+  if (!bip39.validateMnemonic(masterMnemonic)) {
+    throw new Error('Invalid master mnemonic');
   }
 
   // Split mnemonic into words

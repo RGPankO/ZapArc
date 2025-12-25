@@ -2080,3 +2080,123 @@ body.modal-open {
 .delete-wallet-btn {
   margin-bottom: 15px;
 }
+
+/* ========================================
+   Hierarchical Wallet Dropdown Styles
+   ======================================== */
+
+/* Master Key Dropdown Item */
+.master-key-dropdown-item {
+  margin-bottom: 4px;
+}
+
+.master-key-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f5f5f5;
+  border-radius: 6px 6px 0 0;
+  border: 1px solid #e0e0e0;
+  border-bottom: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.master-key-dropdown-header:hover {
+  background: #e8e8e8;
+}
+
+.master-key-dropdown-header.active {
+  background: #e8f5e9;
+}
+
+.dropdown-expand-icon {
+  font-size: 10px;
+  color: #666;
+  width: 12px;
+}
+
+.master-key-dropdown-info {
+  flex: 1;
+}
+
+.master-key-dropdown-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.master-key-dropdown-meta {
+  font-size: 11px;
+  color: #888;
+}
+
+/* Sub-Wallet Dropdown Items */
+.sub-wallet-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 24px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sub-wallet-dropdown-item:last-child {
+  border-radius: 0 0 6px 6px;
+}
+
+.sub-wallet-dropdown-item:hover {
+  background: #f0f7ff;
+}
+
+.sub-wallet-dropdown-item.active {
+  background: #e8f5e9;
+}
+
+.sub-wallet-indent {
+  font-family: monospace;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.sub-wallet-check {
+  color: #4caf50;
+  font-weight: bold;
+  width: 14px;
+}
+
+.sub-wallet-name {
+  flex: 1;
+  font-size: 13px;
+  color: #333;
+}
+
+.active-badge-small {
+  background: #4caf50;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+/* Loading/Error States */
+.loading-wallets,
+.no-wallets,
+.error-wallets {
+  padding: 20px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}
+
+.error-wallets {
+  color: #dc3545;
+}

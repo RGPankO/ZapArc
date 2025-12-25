@@ -18,6 +18,8 @@ import {
   HIERARCHICAL_WALLET_CONSTANTS
 } from '../types';
 
+import { deriveSubWalletMnemonic } from './mnemonic-derivation';
+
 /**
  * Generate a UUID v4 string
  * Uses crypto.randomUUID() with fallback to manual generation
@@ -1178,90 +1180,91 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Load hierarchical wallet data (v2)
-   */
-  async loadHierarchicalWallets(): Promise<HierarchicalWalletStorage | null> {
-    console.log('🔵 [Storage] LOAD_HIERARCHICAL_WALLETS');
-
-    try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
-
-      if (!result.multiWalletData) {
-        return null;
-      }
-
-      const data = JSON.parse(result.multiWalletData);
-
-      if (data.version !== 2) {
-        console.warn('⚠️ [Storage] Not hierarchical data (version !== 2)');
-        return null;
-      }
-
-      console.log('✅ [Storage] LOAD_HIERARCHICAL_WALLETS SUCCESS', {
-        masterKeyCount: data.masterKeys.length,
-        activeMasterKeyId: data.activeMasterKeyId,
-        activeSubWalletIndex: data.activeSubWalletIndex
-      });
-
-      return data as HierarchicalWalletStorage;
-    } catch (error) {
-      console.error('❌ [Storage] LOAD_HIERARCHICAL_WALLETS FAILED', error);
-      return null;
-    }
-  }
-
-  /**
-   * Save hierarchical wallet data (v2)
-   */
-  async saveHierarchicalWallets(data: HierarchicalWalletStorage): Promise<void> {
-    console.log('🔵 [Storage] SAVE_HIERARCHICAL_WALLETS', {
-      masterKeyCount: data.masterKeys.length,
-      activeMasterKeyId: data.activeMasterKeyId
-    });
-
-    try {
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(data),
-        walletVersion: 2
-      });
-
-      console.log('✅ [Storage] SAVE_HIERARCHICAL_WALLETS SUCCESS');
-    } catch (error) {
-      console.error('❌ [Storage] SAVE_HIERARCHICAL_WALLETS FAILED', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get all master key metadata (without decryption)
+   * Reads directly from wallet list - each wallet IS a master key
+   * No migration needed - just treats existing wallets as master keys
    */
   async getMasterKeyMetadata(): Promise<MasterKeyMetadata[]> {
-    const data = await this.loadHierarchicalWallets();
-    if (!data) {
+    console.log('🔵 [Storage] GET_MASTER_KEY_METADATA');
+    
+    try {
+      // Load v1 wallet list directly
+      const result = await chrome.storage.local.get(['multiWalletData']);
+      
+      if (!result.multiWalletData) {
+        console.log('⚠️ [Storage] No multiWalletData found');
+        return [];
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      
+      // Each wallet is treated as a master key
+      // Sub-wallets are optional additions to each wallet
+      const masterKeys: MasterKeyMetadata[] = data.wallets.map(wallet => ({
+        id: wallet.metadata.id,
+        nickname: wallet.metadata.nickname,
+        createdAt: wallet.metadata.createdAt,
+        lastUsedAt: wallet.metadata.lastUsedAt,
+        subWalletCount: (wallet.subWallets?.length || 0) + 1, // +1 for the wallet itself (index 0)
+        isExpanded: false // Default collapsed
+      }));
+
+      console.log('✅ [Storage] GET_MASTER_KEY_METADATA SUCCESS', {
+        count: masterKeys.length
+      });
+
+      return masterKeys;
+    } catch (error) {
+      console.error('❌ [Storage] GET_MASTER_KEY_METADATA FAILED', error);
       return [];
     }
-
-    return data.masterKeys.map(mk => ({
-      id: mk.id,
-      nickname: mk.nickname,
-      createdAt: mk.createdAt,
-      lastUsedAt: mk.lastUsedAt,
-      subWalletCount: mk.subWallets.length,
-      isExpanded: mk.isExpanded
-    }));
   }
 
   /**
-   * Get sub-wallets for a specific master key
+   * Get sub-wallets for a specific wallet (master key)
+   * Returns the wallet itself (index 0) plus any derived sub-wallets
    */
   async getSubWallets(masterKeyId: string): Promise<SubWalletEntry[]> {
-    const data = await this.loadHierarchicalWallets();
-    if (!data) {
+    console.log('🔵 [Storage] GET_SUB_WALLETS', { masterKeyId });
+    
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+      
+      if (!result.multiWalletData) {
+        return [];
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+      
+      if (!wallet) {
+        return [];
+      }
+
+      // Create a list starting with the wallet itself (index 0 = original mnemonic)
+      const subWallets: SubWalletEntry[] = [
+        {
+          index: 0,
+          nickname: 'Default', // The original wallet
+          createdAt: wallet.metadata.createdAt,
+          lastUsedAt: wallet.metadata.lastUsedAt
+        }
+      ];
+
+      // Add any additional sub-wallets
+      if (wallet.subWallets) {
+        subWallets.push(...wallet.subWallets);
+      }
+
+      console.log('✅ [Storage] GET_SUB_WALLETS SUCCESS', {
+        count: subWallets.length
+      });
+
+      return subWallets;
+    } catch (error) {
+      console.error('❌ [Storage] GET_SUB_WALLETS FAILED', error);
       return [];
     }
-
-    const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-    return masterKey?.subWallets || [];
   }
 
   /**
@@ -1271,94 +1274,57 @@ export class ChromeStorageManager {
     mnemonic: string,
     nickname: string,
     pin: string,
-    createDefaultSubWallet: boolean = true
+    _createDefaultSubWallet: boolean = true
   ): Promise<string> {
-    console.log('🔵 [Storage] ADD_MASTER_KEY', { nickname, createDefaultSubWallet });
+    console.log('🔵 [Storage] ADD_MASTER_KEY', { nickname });
 
-    try {
-      let data = await this.loadHierarchicalWallets();
-
-      // Initialize if no data exists
-      if (!data) {
-        data = {
-          version: 2,
-          masterKeys: [],
-          activeMasterKeyId: '',
-          activeSubWalletIndex: 0,
-          masterKeyOrder: []
-        };
-      }
-
-      // Check master key limit
-      if (data.masterKeys.length >= HIERARCHICAL_WALLET_CONSTANTS.MAX_MASTER_KEYS) {
-        throw new Error(`Maximum of ${HIERARCHICAL_WALLET_CONSTANTS.MAX_MASTER_KEYS} master keys allowed`);
-      }
-
-      // Create new master key
-      const masterKeyId = generateUUID();
-      const encryptedMnemonic = await this.encryptMnemonic(mnemonic, pin);
-      const now = Date.now();
-
-      const newMasterKey: MasterKeyEntry = {
-        id: masterKeyId,
-        nickname,
-        encryptedMnemonic: encryptedMnemonic as EncryptedData,
-        createdAt: now,
-        lastUsedAt: now,
-        subWallets: createDefaultSubWallet ? [{
-          index: 0,
-          nickname: 'Default',
-          createdAt: now,
-          lastUsedAt: now
-        }] : [],
-        isExpanded: true
-      };
-
-      data.masterKeys.push(newMasterKey);
-      data.masterKeyOrder.push(masterKeyId);
-
-      // Set as active if first master key
-      if (data.masterKeys.length === 1) {
-        data.activeMasterKeyId = masterKeyId;
-        data.activeSubWalletIndex = 0;
-      }
-
-      await this.saveHierarchicalWallets(data);
-
-      console.log('✅ [Storage] ADD_MASTER_KEY SUCCESS', { masterKeyId, nickname });
-      return masterKeyId;
-    } catch (error) {
-      console.error('❌ [Storage] ADD_MASTER_KEY FAILED', error);
-      throw error;
-    }
+    // addMasterKey now delegates to addWallet for consistency
+    // Sub-wallets are added separately via addSubWallet
+    const walletData: WalletData = {
+      mnemonic,
+      balance: 0,
+      transactions: []
+    };
+    return this.addWallet(walletData, nickname, pin);
   }
 
   /**
-   * Add a sub-wallet to an existing master key
+   * Add a sub-wallet to an existing wallet (master key)
+   * Extends the wallet entry with a sub-wallet that uses a derived mnemonic
    */
   async addSubWallet(masterKeyId: string, nickname: string): Promise<number> {
     console.log('🔵 [Storage] ADD_SUB_WALLET', { masterKeyId, nickname });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+      
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (!masterKey) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+      
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
       }
 
-      // Check sub-wallet limit
-      if (masterKey.subWallets.length >= HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS) {
-        throw new Error(`Maximum of ${HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS} sub-wallets per master key`);
+      // Initialize subWallets array if it doesn't exist
+      if (!wallet.subWallets) {
+        wallet.subWallets = [];
       }
 
-      // Find next available index
-      const usedIndices = new Set(masterKey.subWallets.map(sw => sw.index));
+      // Check sub-wallet limit (index 0 is the original, so max 19 additional)
+      if (wallet.subWallets.length >= HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS - 1) {
+        throw new Error(`Maximum of ${HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS - 1} additional sub-wallets allowed`);
+      }
+
+      // Find next available index (skip 0 as it's the original wallet)
+      const usedIndices = new Set(wallet.subWallets.map(sw => sw.index));
+      usedIndices.add(0); // Reserve index 0 for the original wallet
+      
       let nextIndex = -1;
-      for (let i = 0; i < HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS; i++) {
+      for (let i = 1; i < HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS; i++) {
         if (!usedIndices.has(i)) {
           nextIndex = i;
           break;
@@ -1377,10 +1343,13 @@ export class ChromeStorageManager {
         lastUsedAt: now
       };
 
-      masterKey.subWallets.push(newSubWallet);
-      masterKey.lastUsedAt = now;
+      wallet.subWallets.push(newSubWallet);
+      wallet.metadata.lastUsedAt = now;
 
-      await this.saveHierarchicalWallets(data);
+      // Save back to storage
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
 
       console.log('✅ [Storage] ADD_SUB_WALLET SUCCESS', { masterKeyId, index: nextIndex, nickname });
       return nextIndex;
@@ -1397,34 +1366,39 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] REMOVE_MASTER_KEY', { masterKeyId });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      // Prevent removing last master key
-      if (data.masterKeys.length === 1) {
-        throw new Error('Cannot remove the last master key');
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+
+      // Prevent removing last wallet
+      if (data.wallets.length === 1) {
+        throw new Error('Cannot remove the last wallet');
       }
 
-      const index = data.masterKeys.findIndex(mk => mk.id === masterKeyId);
+      const index = data.wallets.findIndex(w => w.metadata.id === masterKeyId);
       if (index === -1) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+        throw new Error(`Wallet ${masterKeyId} not found`);
       }
 
-      data.masterKeys.splice(index, 1);
-      data.masterKeyOrder = data.masterKeyOrder.filter(id => id !== masterKeyId);
+      data.wallets.splice(index, 1);
+      data.walletOrder = data.walletOrder.filter(id => id !== masterKeyId);
 
-      // If removing active master key, switch to first remaining
-      if (data.activeMasterKeyId === masterKeyId) {
-        data.activeMasterKeyId = data.masterKeys[0].id;
-        data.activeSubWalletIndex = data.masterKeys[0].subWallets[0]?.index || 0;
-        console.log('⚠️ [Storage] Removed active master key, switched to', {
-          newActiveMasterKeyId: data.activeMasterKeyId
+      // If removing active wallet, switch to first remaining
+      if (data.activeWalletId === masterKeyId) {
+        data.activeWalletId = data.wallets[0].metadata.id;
+        data.activeSubWalletIndex = 0;
+        console.log('⚠️ [Storage] Removed active wallet, switched to', {
+          newActiveWalletId: data.activeWalletId
         });
       }
 
-      await this.saveHierarchicalWallets(data);
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
 
       console.log('✅ [Storage] REMOVE_MASTER_KEY SUCCESS', { masterKeyId });
     } catch (error) {
@@ -1434,43 +1408,50 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Remove a sub-wallet from a master key
+   * Remove a sub-wallet from a wallet
    */
   async removeSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
     console.log('🔵 [Storage] REMOVE_SUB_WALLET', { masterKeyId, subWalletIndex });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      // Cannot remove index 0 (the original wallet)
+      if (subWalletIndex === 0) {
+        throw new Error('Cannot remove the original wallet (index 0)');
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (!masterKey) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      // Prevent removing last sub-wallet
-      if (masterKey.subWallets.length === 1) {
-        throw new Error('Cannot remove the last sub-wallet from a master key');
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
       }
 
-      const swIndex = masterKey.subWallets.findIndex(sw => sw.index === subWalletIndex);
+      if (!wallet.subWallets || wallet.subWallets.length === 0) {
+        throw new Error('Wallet has no sub-wallets to remove');
+      }
+
+      const swIndex = wallet.subWallets.findIndex(sw => sw.index === subWalletIndex);
       if (swIndex === -1) {
         throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
       }
 
-      masterKey.subWallets.splice(swIndex, 1);
+      wallet.subWallets.splice(swIndex, 1);
 
-      // If removing active sub-wallet, switch to first remaining
-      if (data.activeMasterKeyId === masterKeyId && data.activeSubWalletIndex === subWalletIndex) {
-        data.activeSubWalletIndex = masterKey.subWallets[0].index;
-        console.log('⚠️ [Storage] Removed active sub-wallet, switched to index', {
-          newActiveSubWalletIndex: data.activeSubWalletIndex
-        });
+      // If removing active sub-wallet, switch to original wallet (index 0)
+      if (data.activeWalletId === masterKeyId && data.activeSubWalletIndex === subWalletIndex) {
+        data.activeSubWalletIndex = 0;
+        console.log('⚠️ [Storage] Removed active sub-wallet, switched to index 0');
       }
 
-      await this.saveHierarchicalWallets(data);
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
 
       console.log('✅ [Storage] REMOVE_SUB_WALLET SUCCESS', { masterKeyId, subWalletIndex });
     } catch (error) {
@@ -1486,32 +1467,44 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] SET_ACTIVE_HIERARCHICAL_WALLET', { masterKeyId, subWalletIndex });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (!masterKey) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
       }
 
-      const subWallet = masterKey.subWallets.find(sw => sw.index === subWalletIndex);
-      if (!subWallet) {
-        throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+      // Validate sub-wallet index exists
+      if (subWalletIndex === 0) {
+        // Index 0 is always the original wallet (master key)
+      } else {
+        // Check if sub-wallet exists
+        const subWallet = wallet.subWallets?.find(sw => sw.index === subWalletIndex);
+        if (!subWallet) {
+          throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+        }
+        // Update lastUsedAt for the sub-wallet
+        subWallet.lastUsedAt = Date.now();
       }
 
-      data.activeMasterKeyId = masterKeyId;
+      // Update active wallet info
+      data.activeWalletId = masterKeyId;
       data.activeSubWalletIndex = subWalletIndex;
 
-      // Update lastUsedAt
-      const now = Date.now();
-      masterKey.lastUsedAt = now;
-      subWallet.lastUsedAt = now;
+      // Update lastUsedAt for the wallet
+      wallet.metadata.lastUsedAt = Date.now();
 
-      await this.saveHierarchicalWallets(data);
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
 
-      console.log('✅ [Storage] SET_ACTIVE_HIERARCHICAL_WALLET SUCCESS');
+      console.log('✅ [Storage] SET_ACTIVE_HIERARCHICAL_WALLET SUCCESS', { masterKeyId, subWalletIndex });
     } catch (error) {
       console.error('❌ [Storage] SET_ACTIVE_HIERARCHICAL_WALLET FAILED', error);
       throw error;
@@ -1519,23 +1512,26 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Get the decrypted mnemonic for a master key
+   * Get the decrypted mnemonic for a master key (wallet)
    */
   async getMasterKeyMnemonic(masterKeyId: string, pin: string): Promise<string> {
     console.log('🔵 [Storage] GET_MASTER_KEY_MNEMONIC', { masterKeyId });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (!masterKey) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
       }
 
-      const mnemonic = await this.decryptMnemonic(masterKey.encryptedMnemonic, pin);
+      const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
 
       console.log('✅ [Storage] GET_MASTER_KEY_MNEMONIC SUCCESS');
       return mnemonic;
@@ -1546,30 +1542,38 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Try to unlock any master key with the given PIN
-   * Returns the first master key that successfully decrypts
+   * Try to unlock any wallet with the given PIN
+   * Returns the first wallet that successfully decrypts
    */
   async tryUnlockAnyMasterKey(pin: string): Promise<{ masterKeyId: string, mnemonic: string } | null> {
     console.log('🔵 [Storage] TRY_UNLOCK_ANY_MASTER_KEY');
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data || data.masterKeys.length === 0) {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
         return null;
       }
 
-      for (const masterKey of data.masterKeys) {
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+
+      if (!data.wallets || data.wallets.length === 0) {
+        return null;
+      }
+
+      for (const wallet of data.wallets) {
         try {
-          const mnemonic = await this.decryptMnemonic(masterKey.encryptedMnemonic, pin);
-          console.log(`✅ [Storage] PIN matched master key: ${masterKey.nickname}`);
+          const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
+          console.log(`✅ [Storage] PIN matched wallet: ${wallet.metadata.nickname}`);
 
-          // Set this as active
-          await this.setActiveHierarchicalWallet(
-            masterKey.id,
-            masterKey.subWallets[0]?.index || 0
-          );
+          // Set this as active with current sub-wallet index (or 0 if none set)
+          const subWalletIndex = (data.activeWalletId === wallet.metadata.id && data.activeSubWalletIndex)
+            ? data.activeSubWalletIndex
+            : 0;
 
-          return { masterKeyId: masterKey.id, mnemonic };
+          await this.setActiveHierarchicalWallet(wallet.metadata.id, subWalletIndex);
+
+          return { masterKeyId: wallet.metadata.id, mnemonic };
         } catch {
           continue;
         }
@@ -1583,24 +1587,30 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Rename a master key
+   * Rename a wallet (master key)
    */
   async renameMasterKey(masterKeyId: string, newNickname: string): Promise<void> {
     console.log('🔵 [Storage] RENAME_MASTER_KEY', { masterKeyId, newNickname });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (!masterKey) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
       }
 
-      masterKey.nickname = newNickname;
-      await this.saveHierarchicalWallets(data);
+      wallet.metadata.nickname = newNickname;
+
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
 
       console.log('✅ [Storage] RENAME_MASTER_KEY SUCCESS');
     } catch (error) {
@@ -1616,23 +1626,33 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] RENAME_SUB_WALLET', { masterKeyId, subWalletIndex, newNickname });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (!masterKey) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
       }
 
-      const subWallet = masterKey.subWallets.find(sw => sw.index === subWalletIndex);
+      if (!wallet.subWallets) {
+        throw new Error('Wallet has no sub-wallets');
+      }
+
+      const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
       if (!subWallet) {
         throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
       }
 
       subWallet.nickname = newNickname;
-      await this.saveHierarchicalWallets(data);
+
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
 
       console.log('✅ [Storage] RENAME_SUB_WALLET SUCCESS');
     } catch (error) {
@@ -1642,17 +1662,23 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Toggle master key expansion state in UI
+   * Toggle wallet expansion state in UI
    */
   async toggleMasterKeyExpanded(masterKeyId: string): Promise<void> {
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) return;
+      const result = await chrome.storage.local.get(['multiWalletData']);
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (masterKey) {
-        masterKey.isExpanded = !masterKey.isExpanded;
-        await this.saveHierarchicalWallets(data);
+      if (!result.multiWalletData) return;
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (wallet) {
+        wallet.isExpanded = !wallet.isExpanded;
+
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(data)
+        });
       }
     } catch (error) {
       console.error('❌ [Storage] TOGGLE_MASTER_KEY_EXPANDED FAILED', error);
@@ -1660,10 +1686,10 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Add discovered sub-wallets to a master key
+   * Add discovered sub-wallets to a wallet
    * Used after sub-wallet discovery to add multiple sub-wallets at once
    *
-   * @param masterKeyId - UUID of the master key
+   * @param masterKeyId - UUID of the wallet
    * @param subWallets - Array of { index, nickname } for discovered wallets
    */
   async addDiscoveredSubWallets(
@@ -1676,23 +1702,31 @@ export class ChromeStorageManager {
     });
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data) {
-        throw new Error('No hierarchical wallet data found');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
-      if (!masterKey) {
-        throw new Error(`Master key ${masterKeyId} not found`);
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
+      }
+
+      // Initialize subWallets array if it doesn't exist
+      if (!wallet.subWallets) {
+        wallet.subWallets = [];
       }
 
       const now = Date.now();
 
       // Add each discovered sub-wallet if it doesn't already exist
       for (const sw of subWallets) {
-        const exists = masterKey.subWallets.some(existing => existing.index === sw.index);
+        const exists = wallet.subWallets.some(existing => existing.index === sw.index);
         if (!exists) {
-          masterKey.subWallets.push({
+          wallet.subWallets.push({
             index: sw.index,
             nickname: sw.nickname,
             createdAt: now,
@@ -1705,12 +1739,14 @@ export class ChromeStorageManager {
       }
 
       // Sort sub-wallets by index
-      masterKey.subWallets.sort((a, b) => a.index - b.index);
+      wallet.subWallets.sort((a, b) => a.index - b.index);
 
-      await this.saveHierarchicalWallets(data);
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
 
       console.log('✅ [Storage] ADD_DISCOVERED_SUB_WALLETS SUCCESS', {
-        totalSubWallets: masterKey.subWallets.length
+        totalSubWallets: wallet.subWallets.length
       });
     } catch (error) {
       console.error('❌ [Storage] ADD_DISCOVERED_SUB_WALLETS FAILED', error);
@@ -1724,14 +1760,21 @@ export class ChromeStorageManager {
    */
   async getActiveHierarchicalWalletInfo(): Promise<{ masterKeyId: string, subWalletIndex: number } | null> {
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data || !data.activeMasterKeyId) {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        return null;
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+
+      if (!data.activeWalletId) {
         return null;
       }
 
       return {
-        masterKeyId: data.activeMasterKeyId,
-        subWalletIndex: data.activeSubWalletIndex
+        masterKeyId: data.activeWalletId,
+        subWalletIndex: data.activeSubWalletIndex ?? 0
       };
     } catch (error) {
       console.error('❌ [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_INFO FAILED', error);
@@ -1756,45 +1799,55 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_MNEMONIC');
 
     try {
-      const data = await this.loadHierarchicalWallets();
-      if (!data || !data.activeMasterKeyId) {
-        console.warn('⚠️ [Storage] No active hierarchical wallet');
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        console.warn('⚠️ [Storage] No wallet data');
         return null;
       }
 
-      const masterKey = data.masterKeys.find(mk => mk.id === data.activeMasterKeyId);
-      if (!masterKey) {
-        console.error('❌ [Storage] Active master key not found');
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+
+      if (!data.activeWalletId) {
+        console.warn('⚠️ [Storage] No active wallet');
         return null;
       }
 
-      const subWallet = masterKey.subWallets.find(sw => sw.index === data.activeSubWalletIndex);
-      if (!subWallet) {
-        console.error('❌ [Storage] Active sub-wallet not found');
+      const wallet = data.wallets.find(w => w.metadata.id === data.activeWalletId);
+      if (!wallet) {
+        console.error('❌ [Storage] Active wallet not found');
         return null;
+      }
+
+      const subWalletIndex = data.activeSubWalletIndex ?? 0;
+
+      // Get sub-wallet nickname
+      let subWalletNickname = 'Default';
+      if (subWalletIndex > 0 && wallet.subWallets) {
+        const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
+        if (subWallet) {
+          subWalletNickname = subWallet.nickname;
+        }
       }
 
       // Decrypt the master mnemonic
-      const masterMnemonic = await this.decryptMnemonic(masterKey.encryptedMnemonic, pin);
-
-      // Import mnemonic derivation utility dynamically to avoid circular deps
-      const { deriveSubWalletMnemonic } = await import('./mnemonic-derivation');
+      const masterMnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
 
       // Derive sub-wallet mnemonic (index 0 = original, index 1-19 = modified)
-      const derivedMnemonic = deriveSubWalletMnemonic(masterMnemonic, data.activeSubWalletIndex);
+      const derivedMnemonic = deriveSubWalletMnemonic(masterMnemonic, subWalletIndex);
 
       console.log('✅ [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_MNEMONIC SUCCESS', {
-        masterKeyId: data.activeMasterKeyId,
-        subWalletIndex: data.activeSubWalletIndex,
-        isOriginalMnemonic: data.activeSubWalletIndex === 0
+        masterKeyId: data.activeWalletId,
+        subWalletIndex,
+        isOriginalMnemonic: subWalletIndex === 0
       });
 
       return {
         mnemonic: derivedMnemonic,
-        masterKeyId: data.activeMasterKeyId,
-        subWalletIndex: data.activeSubWalletIndex,
-        masterKeyNickname: masterKey.nickname,
-        subWalletNickname: subWallet.nickname
+        masterKeyId: data.activeWalletId,
+        subWalletIndex,
+        masterKeyNickname: wallet.metadata.nickname,
+        subWalletNickname
       };
     } catch (error) {
       console.error('❌ [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_MNEMONIC FAILED', error);
@@ -1803,9 +1856,8 @@ export class ChromeStorageManager {
   }
 
   /**
-   * Try to unlock any wallet (v1 or v2) with the given PIN
-   * First tries v2 hierarchical format, then falls back to v1 flat format
-   * Returns the mnemonic for the active wallet (derived for sub-wallets in v2)
+   * Try to unlock any wallet with the given PIN
+   * Returns the mnemonic for the active wallet (derived if sub-wallet is active)
    */
   async tryUnlockAnyWalletUnified(pin: string): Promise<{
     wallet: WalletData;
@@ -1821,93 +1873,73 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED');
 
     try {
-      const version = await this.getWalletVersion();
-      console.log('🔍 [Storage] Wallet version:', version);
-
-      // Try v2 hierarchical first
-      if (version === 2) {
-        console.log('🔍 [Storage] Trying v2 hierarchical unlock...');
-
-        // Try to unlock any master key with the PIN
-        const unlocked = await this.tryUnlockAnyMasterKey(pin);
-        if (unlocked) {
-          // Get the full hierarchical wallet mnemonic (derived)
-          const activeWallet = await this.getActiveHierarchicalWalletMnemonic(pin);
-          if (activeWallet) {
-            const walletData: WalletData = {
-              mnemonic: activeWallet.mnemonic,
-              balance: 0,
-              transactions: []
-            };
-
-            // Create metadata for compatibility
-            const metadata: WalletMetadata = {
-              id: `${activeWallet.masterKeyId}:${activeWallet.subWalletIndex}`,
-              nickname: activeWallet.subWalletIndex === 0
-                ? activeWallet.masterKeyNickname
-                : `${activeWallet.masterKeyNickname} > ${activeWallet.subWalletNickname}`,
-              createdAt: Date.now(),
-              lastUsedAt: Date.now()
-            };
-
-            console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS (v2)', {
-              masterKeyId: activeWallet.masterKeyId,
-              subWalletIndex: activeWallet.subWalletIndex
-            });
-
-            return {
-              wallet: walletData,
-              metadata,
-              isHierarchical: true,
-              hierarchicalInfo: {
-                masterKeyId: activeWallet.masterKeyId,
-                subWalletIndex: activeWallet.subWalletIndex,
-                masterKeyNickname: activeWallet.masterKeyNickname,
-                subWalletNickname: activeWallet.subWalletNickname
-              }
-            };
-          }
-        }
-
-        console.log('❌ [Storage] v2 hierarchical unlock failed');
+      // Try to unlock any wallet with the PIN
+      const unlocked = await this.tryUnlockAnyMasterKey(pin);
+      if (!unlocked) {
+        console.log('❌ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED - No wallet matched PIN');
         return null;
       }
 
-      // Fall back to v1 flat multi-wallet
-      if (version === 1) {
-        console.log('🔍 [Storage] Trying v1 flat multi-wallet unlock...');
-        const result = await this.tryUnlockAnyWallet(pin);
-        if (result) {
-          console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS (v1)');
-          return {
-            wallet: result.wallet,
-            metadata: result.metadata,
-            isHierarchical: false
-          };
+      // We already have the decrypted master mnemonic from tryUnlockAnyMasterKey
+      // Now get the active wallet info (without decrypting again)
+      const result = await chrome.storage.local.get(['multiWalletData']);
+      if (!result.multiWalletData) {
+        return null;
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === unlocked.masterKeyId);
+      if (!wallet) {
+        return null;
+      }
+
+      const subWalletIndex = data.activeSubWalletIndex ?? 0;
+
+      // Get sub-wallet nickname
+      let subWalletNickname = 'Default';
+      if (subWalletIndex > 0 && wallet.subWallets) {
+        const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
+        if (subWallet) {
+          subWalletNickname = subWallet.nickname;
         }
       }
 
-      // v0 legacy single wallet
-      if (version === 0) {
-        console.log('🔍 [Storage] Trying v0 legacy single wallet unlock...');
-        const walletData = await this.loadEncryptedWallet(pin);
-        if (walletData) {
-          console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS (v0 legacy)');
-          return {
-            wallet: walletData,
-            metadata: {
-              id: 'legacy',
-              nickname: 'Wallet 1',
-              createdAt: 0,
-              lastUsedAt: Date.now()
-            },
-            isHierarchical: false
-          };
-        }
-      }
+      // Derive sub-wallet mnemonic using the already-decrypted master mnemonic
+      // (index 0 = original, index 1-19 = modified)
+      const derivedMnemonic = deriveSubWalletMnemonic(unlocked.mnemonic, subWalletIndex);
 
-      console.log('❌ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED - No wallet matched PIN');
-      return null;
+      const walletData: WalletData = {
+        mnemonic: derivedMnemonic,
+        balance: 0,
+        transactions: []
+      };
+
+      // Create metadata for compatibility
+      const metadata: WalletMetadata = {
+        id: `${unlocked.masterKeyId}:${subWalletIndex}`,
+        nickname: subWalletIndex === 0
+          ? wallet.metadata.nickname
+          : `${wallet.metadata.nickname} > ${subWalletNickname}`,
+        createdAt: wallet.metadata.createdAt,
+        lastUsedAt: wallet.metadata.lastUsedAt
+      };
+
+      console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS', {
+        masterKeyId: unlocked.masterKeyId,
+        subWalletIndex
+      });
+
+      return {
+        wallet: walletData,
+        metadata,
+        isHierarchical: true,
+        hierarchicalInfo: {
+          masterKeyId: unlocked.masterKeyId,
+          subWalletIndex,
+          masterKeyNickname: wallet.metadata.nickname,
+          subWalletNickname
+        }
+      };
     } catch (error) {
       console.error('❌ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED FAILED', error);
       return null;

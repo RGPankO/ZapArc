@@ -1042,6 +1042,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // Listen for wallet unlock to start alarm
+// NOTE: This needs to return false for unhandled messages so main handler can process them
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'START_AUTO_LOCK_ALARM') {
     startAutoLockAlarm();
@@ -1054,4 +1055,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+  
+  // Return false to indicate we're not handling this message
+  // This allows the main message handler to process it
+  return false;
 });

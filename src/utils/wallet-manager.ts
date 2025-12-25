@@ -5,6 +5,7 @@ import * as bip39 from 'bip39';
 import { BreezSDKWrapper, BreezConfig, LnurlPayResult } from './breez-sdk';
 import { ChromeStorageManager } from './storage';
 import { WalletData, Transaction, UserSettings } from '../types';
+import { deriveSubWalletMnemonic } from './mnemonic-derivation';
 
 export interface WalletStatus {
   isConnected: boolean;
@@ -890,7 +891,6 @@ export class WalletManager {
     const masterMnemonic = await this.storage.getMasterKeyMnemonic(masterKeyId, pin);
 
     // Derive the sub-wallet mnemonic
-    const { deriveSubWalletMnemonic } = await import('./mnemonic-derivation');
     return deriveSubWalletMnemonic(masterMnemonic, subWalletIndex);
   }
 
@@ -915,27 +915,27 @@ export class WalletManager {
     console.log('WalletManager: Switching to hierarchical wallet', { masterKeyId, subWalletIndex });
 
     try {
-      // Step 1: Set as active in storage
-      await this.storage.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
-
-      // Step 2: Disconnect current SDK if connected
+      // Step 1: Disconnect current SDK if connected
       if (this.breezSDK.isWalletConnected()) {
         console.log('WalletManager: Disconnecting current SDK');
         await this.breezSDK.disconnect();
       }
 
-      // Step 3: Get derived mnemonic
+      // Step 2: Get derived mnemonic (this validates the PIN)
       const derivedMnemonic = await this.getHierarchicalWalletMnemonic(
         masterKeyId,
         subWalletIndex,
         pin
       );
 
-      // Step 4: Get wallet info for display
+      // Step 3: Get wallet info for display
       const subWallets = await this.storage.getSubWallets(masterKeyId);
       const masterKeys = await this.storage.getMasterKeyMetadata();
       const masterKey = masterKeys.find(mk => mk.id === masterKeyId);
       const subWallet = subWallets.find(sw => sw.index === subWalletIndex);
+
+      // Step 4: ONLY NOW set as active in storage (after successful PIN validation)
+      await this.storage.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
 
       console.log('WalletManager: Hierarchical wallet switch prepared', {
         masterKeyId,

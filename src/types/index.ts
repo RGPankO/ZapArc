@@ -30,6 +30,7 @@ export interface WalletMetadata {
 
 /**
  * Encrypted wallet entry with metadata
+ * Extended to support optional sub-wallets (no migration needed)
  */
 export interface EncryptedWalletEntry {
   metadata: WalletMetadata;     // Unencrypted metadata
@@ -38,14 +39,17 @@ export interface EncryptedWalletEntry {
     iv: number[];               // Initialization vector
     timestamp: number;          // Encryption timestamp for integrity check
   };
+  subWallets?: SubWalletEntry[];  // Optional: derived sub-wallets (if empty/undefined, wallet works as before)
+  isExpanded?: boolean;           // UI state: whether sub-wallets are expanded in dropdown
 }
 
 /**
- * Multi-wallet storage structure (v1 - flat wallet list)
+ * Multi-wallet storage structure (extended to support sub-wallets)
  */
 export interface MultiWalletStorage {
-  wallets: EncryptedWalletEntry[];  // All wallet entries
-  activeWalletId: string;           // Currently selected wallet UUID
+  wallets: EncryptedWalletEntry[];  // All wallet entries (each can have sub-wallets)
+  activeWalletId: string;           // Currently selected wallet UUID (acts as master key)
+  activeSubWalletIndex?: number;    // Which sub-wallet (0 = original, 1+ = derived). Defaults to 0.
   walletOrder: string[];            // User-defined wallet ordering (UUIDs)
   version: number;                  // Schema version (1 for multi-wallet)
 }

@@ -243,18 +243,14 @@ function showWizardStep(stepId: string) {
     });
 
     // Show/hide "Add Sub-Wallet" button
-    // Show when: 1) on setup-choice-step, 2) adding a wallet (not initial setup), 3) at least one master key exists
+    // Show when: 1) on setup-choice-step, 2) adding a wallet (not initial setup), 3) at least one wallet exists
     if (stepId === 'setup-choice-step') {
         const addSubWalletBtn = document.getElementById('add-sub-wallet-btn');
         if (addSubWalletBtn) {
-            // Always show sub-wallet option when adding a wallet and master keys exist
             const currentMasterKeys = getMasterKeys();
             const shouldShow = isAddingWallet && currentMasterKeys.length > 0;
             addSubWalletBtn.classList.toggle('hidden', !shouldShow);
-            console.log(`[Wizard] Add Sub-Wallet button visibility: ${shouldShow}`, {
-                isAddingWallet,
-                masterKeysCount: currentMasterKeys.length
-            });
+            console.log(`[Wizard] Add Sub-Wallet button: ${shouldShow ? 'visible' : 'hidden'} (${currentMasterKeys.length} wallets)`);
         }
     }
 }
@@ -427,55 +423,39 @@ function setupWizardListeners() {
 
 /**
  * Handle adding a sub-wallet from the wizard (when user clicks "Add Sub-Wallet" card)
- * Shows a selection of existing master keys and creates a new sub-wallet under the selected one
+ * Directly creates a new sub-wallet under the currently active wallet with auto-generated name
  */
 async function handleAddSubWalletFromWizard(): Promise<void> {
     console.log('[Wizard] Adding sub-wallet from wizard');
 
     try {
-        // Check if we have master keys loaded
-        const currentMasterKeys = getMasterKeys();
-        if (currentMasterKeys.length === 0) {
-            showError('No master keys found. Please create a wallet first.');
+        // Get the currently active wallet ID from storage
+        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+        if (!multiWalletResult.multiWalletData) {
+            showError('No wallet found. Please create a wallet first.');
             return;
         }
 
-        // If only one master key, use it directly
-        let selectedMasterKeyId: string;
-        let selectedMasterKeyName: string;
-
-        if (currentMasterKeys.length === 1) {
-            selectedMasterKeyId = currentMasterKeys[0].id;
-            selectedMasterKeyName = currentMasterKeys[0].nickname;
-        } else {
-            // Multiple master keys - ask user to select one
-            const selection = prompt(
-                `Select a master key to add sub-wallet to:\n\n${currentMasterKeys.map((mk, i) => `${i + 1}. ${mk.nickname}`).join('\n')}\n\nEnter number (1-${currentMasterKeys.length}):`
-            );
-
-            if (!selection) return; // User cancelled
-
-            const index = parseInt(selection, 10) - 1;
-            if (isNaN(index) || index < 0 || index >= currentMasterKeys.length) {
-                showError('Invalid selection');
-                return;
-            }
-
-            selectedMasterKeyId = currentMasterKeys[index].id;
-            selectedMasterKeyName = currentMasterKeys[index].nickname;
+        const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+        const activeWalletId = multiWalletData.activeWalletId;
+        
+        if (!activeWalletId) {
+            showError('No active wallet. Please unlock a wallet first.');
+            return;
         }
 
-        // Prompt for sub-wallet nickname
-        const nickname = prompt(`Enter a name for the new sub-wallet under "${selectedMasterKeyName}":`, 'Sub-Wallet');
-        if (!nickname || !nickname.trim()) {
-            return; // User cancelled
-        }
+        // Find the active wallet to get sub-wallet count for auto-naming
+        const activeWallet = multiWalletData.wallets?.find((w: any) => w.metadata.id === activeWalletId);
+        const existingSubWalletCount = activeWallet?.subWallets?.length || 0;
+        
+        // Auto-generate name: "Sub-Wallet 1", "Sub-Wallet 2", etc.
+        const nickname = `Sub-Wallet ${existingSubWalletCount + 1}`;
 
-        // Add the sub-wallet
-        const response = await ExtensionMessaging.addSubWallet(selectedMasterKeyId, nickname.trim());
+        // Add the sub-wallet to the currently active wallet
+        const response = await ExtensionMessaging.addSubWallet(activeWalletId, nickname);
 
         if (response.success) {
-            showSuccess(`Sub-wallet "${nickname}" created under "${selectedMasterKeyName}"!`);
+            showSuccess(`${nickname} created!`);
 
             // Hide wizard, show main interface
             const wizard = document.getElementById('onboarding-wizard');
@@ -486,7 +466,7 @@ async function handleAddSubWalletFromWizard(): Promise<void> {
 
             setIsAddingWallet(false);
 
-            // Refresh wallet UI
+            // Refresh wallet UI and show wallet management
             await initializeMultiWalletUI();
         } else {
             showError(response.error || 'Failed to create sub-wallet');

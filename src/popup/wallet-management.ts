@@ -143,32 +143,227 @@ export function updateWalletSelectorUI(): void {
 }
 
 /**
- * Populate wallet dropdown with all wallets
+ * Populate wallet dropdown with hierarchical wallet structure
+ * Shows master keys (wallets) with their sub-wallets nested underneath
  */
-export function populateWalletDropdown(): void {
+export async function populateWalletDropdown(): Promise<void> {
     const walletList = document.getElementById('wallet-list');
     if (!walletList) return;
 
-    walletList.innerHTML = '';
+    walletList.innerHTML = '<div class="loading-wallets">Loading...</div>';
 
-    currentWallets.forEach(wallet => {
-        const isActive = wallet.lastUsedAt === Math.max(...currentWallets.map(w => w.lastUsedAt));
+    try {
+        // Get current active wallet info from storage
+        const storageResult = await chrome.storage.local.get(['multiWalletData']);
+        if (!storageResult.multiWalletData) {
+            walletList.innerHTML = '<div class="no-wallets">No wallets found</div>';
+            return;
+        }
 
-        const walletItem = document.createElement('div');
-        walletItem.className = `wallet-item${isActive ? ' active' : ''}`;
-        walletItem.dataset.walletId = wallet.id;
+        const data = JSON.parse(storageResult.multiWalletData);
+        const activeWalletId = data.activeWalletId;
+        const activeSubWalletIndex = data.activeSubWalletIndex || 0;
 
-        walletItem.innerHTML = `
-      <span class="wallet-item-check">${isActive ? '✓' : ''}</span>
-      <div class="wallet-item-info">
-        <div class="wallet-item-name">${wallet.nickname}</div>
-        <div class="wallet-item-balance">Last used: ${new Date(wallet.lastUsedAt).toLocaleDateString()}</div>
-      </div>
-    `;
+        let html = '';
 
-        walletItem.onclick = () => handleWalletSwitch(wallet.id);
-        walletList.appendChild(walletItem);
+        // Each wallet is a master key
+        for (const wallet of currentWallets) {
+            const isActiveWallet = wallet.id === activeWalletId;
+            const subWallets = (data.wallets?.find((w: any) => w.metadata.id === wallet.id)?.subWallets) || [];
+            const hasSubWallets = subWallets.length > 0;
+            const createdDate = new Date(wallet.createdAt).toLocaleDateString();
+
+            if (hasSubWallets) {
+                // Wallet with sub-wallets - show hierarchical structure
+                // Master wallet is clickable at top level (index 0), sub-wallets shown below (index 1+)
+                const isMasterActive = isActiveWallet && activeSubWalletIndex === 0;
+
+                html += `
+                    <div class="master-key-dropdown-item expanded" data-master-id="${wallet.id}">
+                        <div class="master-key-dropdown-header ${isMasterActive ? 'active' : ''}"
+                             data-master-id="${wallet.id}" data-sub-index="0">
+                            <span class="dropdown-expand-icon">▼</span>
+                            <span class="master-key-icon">🔑</span>
+                            <div class="master-key-dropdown-info">
+                                <div class="master-key-dropdown-name">
+                                    ${wallet.nickname}
+                                </div>
+                                <div class="master-key-dropdown-meta">Last used: ${createdDate}</div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-wallets only (index 1+), master wallet is at the header level -->
+                        ${subWallets.map((sw: any, i: number) => {
+                            const isActiveSubWallet = isActiveWallet && sw.index === activeSubWalletIndex;
+                            const isLast = i === subWallets.length - 1;
+                            return `
+                                <div class="sub-wallet-dropdown-item ${isActiveSubWallet ? 'active' : ''}"
+                                     data-master-id="${wallet.id}" data-sub-index="${sw.index}">
+                                    <span class="sub-wallet-indent">${isLast ? '└──' : '├──'}</span>
+                                    <span class="sub-wallet-name">${sw.nickname}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } else {
+                // Wallet without sub-wallets - show as simple clickable item (like before)
+                html += `
+                    <div class="wallet-item ${isActiveWallet ? 'active' : ''}" 
+                         data-wallet-id="${wallet.id}" data-master-id="${wallet.id}" data-sub-index="0">
+                        <div class="wallet-item-info">
+                            <div class="wallet-item-name">${wallet.nickname}</div>
+                            <div class="wallet-item-balance">Last used: ${createdDate}</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        walletList.innerHTML = html;
+        attachDropdownListeners();
+    } catch (error) {
+        console.error('[Wallet Management] Error populating dropdown:', error);
+        walletList.innerHTML = '<div class="error-wallets">Error loading wallets</div>';
+    }
+}
+
+/**
+ * Attach listeners to hierarchical dropdown items
+ */
+function attachDropdownListeners(): void {
+    // Master wallet header click to switch to master (index 0)
+    document.querySelectorAll('.master-key-dropdown-header[data-sub-index="0"]').forEach(header => {
+        header.addEventListener('click', async (e) => {
+            const target = e.currentTarget as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+
+            if (masterId) {
+                await handleHierarchicalWalletSwitch(masterId, 0);
+            }
+        });
     });
+
+    // Sub-wallet click to switch
+    document.querySelectorAll('.sub-wallet-dropdown-item').forEach(item => {
+        item.addEventListener('click', async (e) => {
+            const target = e.currentTarget as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const subIndex = parseInt(target.getAttribute('data-sub-index') || '0', 10);
+
+            if (masterId) {
+                await handleHierarchicalWalletSwitch(masterId, subIndex);
+            }
+        });
+    });
+
+    // Simple wallet item click (wallets without sub-wallets)
+    document.querySelectorAll('.wallet-item[data-master-id]').forEach(item => {
+        item.addEventListener('click', async (e) => {
+            const target = e.currentTarget as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+
+            if (masterId) {
+                await handleHierarchicalWalletSwitch(masterId, 0);
+            }
+        });
+    });
+}
+
+/**
+ * Handle switching to a specific sub-wallet
+ * Prompts for PIN if switching to a different master wallet
+ */
+async function handleHierarchicalWalletSwitch(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    console.log('[Wallet Management] Switching to wallet:', { masterKeyId, subWalletIndex });
+    
+    try {
+        // Close dropdown
+        const walletDropdown = document.getElementById('wallet-dropdown');
+        const currentWalletBtn = document.getElementById('current-wallet-btn');
+        if (walletDropdown) walletDropdown.classList.add('hidden');
+        if (currentWalletBtn) currentWalletBtn.classList.remove('open');
+        setIsWalletSelectorOpen(false);
+
+        // Get current active wallet from storage to determine if we're switching master wallets
+        const storageResult = await chrome.storage.local.get(['multiWalletData']);
+        let currentActiveMasterKeyId = '';
+        
+        if (storageResult.multiWalletData) {
+            const data = JSON.parse(storageResult.multiWalletData);
+            currentActiveMasterKeyId = data.activeWalletId || '';
+        }
+
+        // Check if switching to a different master wallet (different PIN required)
+        const isDifferentMasterWallet = currentActiveMasterKeyId !== masterKeyId;
+        let pin: string | null;
+
+        if (isDifferentMasterWallet) {
+            // Switching to a different master wallet - need to prompt for its PIN
+            console.log('[Wallet Management] Different master wallet - prompting for PIN');
+            
+            pin = await promptForPIN('Enter PIN for the wallet you\'re switching to:');
+            if (!pin) {
+                console.log('[Wallet Management] PIN prompt cancelled');
+                return; // User cancelled
+            }
+        } else {
+            // Switching sub-wallet within same master wallet - use session PIN
+            console.log('[Wallet Management] Same master wallet - using session PIN');
+            pin = sessionPin;
+            if (!pin) {
+                showError('Session expired. Please unlock again.');
+                return;
+            }
+        }
+
+        // Switch to the hierarchical wallet
+        const response = await ExtensionMessaging.switchHierarchicalWallet(masterKeyId, subWalletIndex, pin);
+        
+        if (response.success && response.data) {
+            // Update local state
+            setActiveMasterKeyId(masterKeyId);
+            setActiveSubWalletIndex(subWalletIndex);
+
+            // Update session PIN if we switched to a different master wallet
+            if (isDifferentMasterWallet) {
+                setSessionPin(pin);
+                console.log('[Wallet Management] Updated session PIN for new master wallet');
+            }
+
+            // Dispatch custom event for popup.ts to handle SDK reconnection
+            const event = new CustomEvent('hierarchical-wallet-switched', {
+                detail: {
+                    mnemonic: response.data.mnemonic,
+                    masterKeyId: masterKeyId,
+                    subWalletIndex: subWalletIndex,
+                    masterKeyNickname: response.data.masterKeyNickname,
+                    subWalletNickname: response.data.subWalletNickname
+                }
+            });
+            window.dispatchEvent(event);
+
+            // Show correct name: master wallet name for index 0, sub-wallet name for others
+            const displayName = subWalletIndex === 0 
+                ? response.data.masterKeyNickname 
+                : response.data.subWalletNickname;
+            showSuccess(`Switched to ${displayName}`);
+
+            // Refresh UI
+            await initializeMultiWalletUI();
+        } else {
+            // Provide user-friendly error message for common cases
+            const errorMsg = response.error || 'Failed to switch wallet';
+            if (errorMsg.includes('decrypt') || errorMsg.includes('mnemonic')) {
+                showError('Incorrect PIN. Please try again.');
+            } else {
+                showError(errorMsg);
+            }
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Switch error:', error);
+        showError('Failed to switch wallet');
+    }
 }
 
 /**
