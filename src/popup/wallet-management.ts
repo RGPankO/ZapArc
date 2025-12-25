@@ -192,28 +192,34 @@ export async function populateWalletDropdown(): Promise<void> {
                             </div>
                         </div>
 
-                        <!-- Sub-wallets only (index 1+), master wallet is at the header level -->
-                        ${subWallets.map((sw: any, i: number) => {
-                            const isActiveSubWallet = isActiveWallet && sw.index === activeSubWalletIndex;
-                            const isLast = i === subWallets.length - 1;
-                            return `
-                                <div class="sub-wallet-dropdown-item ${isActiveSubWallet ? 'active' : ''}"
-                                     data-master-id="${wallet.id}" data-sub-index="${sw.index}">
-                                    <span class="sub-wallet-indent">${isLast ? '└──' : '├──'}</span>
-                                    <span class="sub-wallet-name">${sw.nickname}</span>
-                                </div>
-                            `;
-                        }).join('')}
+                        <!-- Sub-wallets wrapper for proper indentation -->
+                        <div class="sub-wallet-list">
+                            ${subWallets.map((sw: any, i: number) => {
+                                const isActiveSubWallet = isActiveWallet && sw.index === activeSubWalletIndex;
+                                const isLast = i === subWallets.length - 1;
+                                return `
+                                    <div class="sub-wallet-dropdown-item ${isActiveSubWallet ? 'active' : ''}"
+                                         data-master-id="${wallet.id}" data-sub-index="${sw.index}">
+                                        <span class="sub-wallet-indent">${isLast ? '└──' : '├──'}</span>
+                                        <span class="sub-wallet-name">${sw.nickname}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
                     </div>
                 `;
             } else {
-                // Wallet without sub-wallets - show as simple clickable item (like before)
+                // Wallet without sub-wallets - use same header structure for consistency
                 html += `
-                    <div class="wallet-item ${isActiveWallet ? 'active' : ''}" 
-                         data-wallet-id="${wallet.id}" data-master-id="${wallet.id}" data-sub-index="0">
-                        <div class="wallet-item-info">
-                            <div class="wallet-item-name">${wallet.nickname}</div>
-                            <div class="wallet-item-balance">Last used: ${createdDate}</div>
+                    <div class="master-key-dropdown-item" data-master-id="${wallet.id}">
+                        <div class="master-key-dropdown-header ${isActiveWallet ? 'active' : ''}"
+                             data-master-id="${wallet.id}" data-sub-index="0">
+                            <span class="dropdown-expand-icon"></span>
+                            <span class="master-key-icon">🔑</span>
+                            <div class="master-key-dropdown-info">
+                                <div class="master-key-dropdown-name">${wallet.nickname}</div>
+                                <div class="master-key-dropdown-meta">Last used: ${createdDate}</div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -253,18 +259,6 @@ function attachDropdownListeners(): void {
 
             if (masterId) {
                 await handleHierarchicalWalletSwitch(masterId, subIndex);
-            }
-        });
-    });
-
-    // Simple wallet item click (wallets without sub-wallets)
-    document.querySelectorAll('.wallet-item[data-master-id]').forEach(item => {
-        item.addEventListener('click', async (e) => {
-            const target = e.currentTarget as HTMLElement;
-            const masterId = target.getAttribute('data-master-id');
-
-            if (masterId) {
-                await handleHierarchicalWalletSwitch(masterId, 0);
             }
         });
     });

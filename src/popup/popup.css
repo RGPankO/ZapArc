@@ -1831,8 +1831,6 @@ body.modal-open {
 /* Sub-Wallet List (nested) */
 .sub-wallet-list {
   margin-left: 24px;
-  margin-top: 12px;
-  border-left: 2px solid #e0e0e0;
   padding-left: 12px;
 }
 
@@ -2103,6 +2101,12 @@ body.modal-open {
   transition: background 0.15s;
 }
 
+/* Standalone wallets (without sub-wallets) get full rounded corners and complete border */
+.master-key-dropdown-item:not(.expanded) .master-key-dropdown-header {
+  border-radius: 6px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
 .master-key-dropdown-header:hover {
   background: #e8e8e8;
 }
@@ -2140,24 +2144,20 @@ body.modal-open {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px 10px 24px;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-top: none;
+  padding: 8px 12px;
+  background: transparent;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.sub-wallet-dropdown-item:last-child {
-  border-radius: 0 0 6px 6px;
-}
-
 .sub-wallet-dropdown-item:hover {
   background: #f0f7ff;
+  border-radius: 4px;
 }
 
 .sub-wallet-dropdown-item.active {
   background: #e8f5e9;
+  border-radius: 4px;
 }
 
 .sub-wallet-indent {
