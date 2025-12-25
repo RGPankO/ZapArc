@@ -49,9 +49,16 @@ export type WalletManagementCallbacks = {
 };
 
 // Show add wallet flow (sets isAddingWallet and shows wizard)
-function showAddWalletFlow(): void {
+async function showAddWalletFlow(): Promise<void> {
     console.log('[Wallet Management] Starting add wallet flow');
     setIsAddingWallet(true);
+
+    // Load master keys first so the sub-wallet button can show correctly
+    const masterKeysResponse = await ExtensionMessaging.getMasterKeyMetadata();
+    if (masterKeysResponse.success && masterKeysResponse.data) {
+        setMasterKeys(masterKeysResponse.data);
+        console.log(`[Wallet Management] Loaded ${masterKeysResponse.data.length} master key(s) for add wallet flow`);
+    }
 
     // Hide management interface
     hideWalletManagementInterface();
@@ -415,86 +422,20 @@ export function hideWalletManagementInterface(): void {
 
 /**
  * Load and display wallet list in management interface
- * Supports both v1 (flat) and v2 (hierarchical) modes
+ * Always uses hierarchical view (master keys with sub-wallets)
  */
 export async function loadWalletManagementList(): Promise<void> {
     try {
-        console.log('[Wallet Management] Loading wallet list');
+        console.log('[Wallet Management] Loading wallet list (hierarchical)');
 
-        // Check if we're in hierarchical mode (v2)
-        const versionResponse = await ExtensionMessaging.getWalletVersion();
-        const isV2 = versionResponse.success && versionResponse.data === 2;
-
-        if (isV2) {
-            setIsHierarchicalMode(true);
-            await loadHierarchicalWalletList();
-        } else {
-            setIsHierarchicalMode(false);
-            await loadFlatWalletList();
-        }
+        // Always use hierarchical mode - all wallets are master keys with sub-wallets
+        setIsHierarchicalMode(true);
+        await loadHierarchicalWalletList();
 
     } catch (error) {
         console.error('[Wallet Management] Failed to load wallet list:', error);
         showError('Failed to load wallets');
     }
-}
-
-/**
- * Load flat wallet list (v1 mode - backward compatibility)
- */
-async function loadFlatWalletList(): Promise<void> {
-    const walletsResponse = await ExtensionMessaging.getAllWallets();
-    if (!walletsResponse.success || !walletsResponse.data) {
-        showError('Failed to load wallets');
-        return;
-    }
-
-    const wallets = walletsResponse.data;
-    console.log(`[Wallet Management] Loaded ${wallets.length} wallet(s) (v1 flat mode)`);
-
-    const activeWalletData = await chrome.storage.local.get(['activeWalletId']);
-    const activeWalletId = activeWalletData.activeWalletId;
-
-    const listContainer = document.getElementById('wallet-management-list');
-    if (!listContainer) {
-        console.error('[Wallet Management] List container not found');
-        return;
-    }
-
-    if (wallets.length === 0) {
-        listContainer.innerHTML = '<div class="no-transactions" style="padding: 40px 20px;">No wallets found</div>';
-        return;
-    }
-
-    listContainer.innerHTML = wallets.map(wallet => {
-        const isActive = wallet.id === activeWalletId;
-        const canDelete = wallets.length > 1;
-        const createdDate = new Date(wallet.createdAt).toLocaleDateString();
-
-        return `
-            <div class="wallet-mgmt-item ${isActive ? 'active' : ''}" data-wallet-id="${wallet.id}">
-                <div class="wallet-mgmt-header">
-                    <div class="wallet-mgmt-name">
-                        ${wallet.nickname}
-                        ${isActive ? '<span class="active-badge">Active</span>' : ''}
-                    </div>
-                </div>
-                <div class="wallet-mgmt-balance">
-                    Created: ${createdDate}
-                </div>
-                <div class="wallet-mgmt-actions">
-                    <button class="wallet-mgmt-btn rename-btn" data-wallet-id="${wallet.id}" data-wallet-name="${wallet.nickname}">
-                        Rename
-                    </button>
-                    <button class="wallet-mgmt-btn delete-btn" data-wallet-id="${wallet.id}" ${!canDelete ? 'disabled' : ''}>
-                        Delete
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    attachWalletManagementListeners();
 }
 
 /**
@@ -579,9 +520,14 @@ async function loadHierarchicalWalletList(): Promise<void> {
                 </div>
 
                 <div class="sub-wallet-list ${isExpanded ? '' : 'hidden'}">
-                    <button class="add-sub-wallet-btn" data-master-id="${mk.id}">
-                        + Add Sub-Wallet
-                    </button>
+                    <div class="sub-wallet-actions-row">
+                        <button class="add-sub-wallet-btn" data-master-id="${mk.id}">
+                            + Add Sub-Wallet
+                        </button>
+                        <button class="scan-sub-wallets-btn" data-master-id="${mk.id}">
+                            🔍 Scan
+                        </button>
+                    </div>
                     ${subWallets.map(sw => {
                         const isActiveSubWallet = isActiveMasterKey && sw.index === currentActiveSubWalletIndex;
                         const canDeleteSubWallet = subWallets.length > 1;
@@ -669,6 +615,18 @@ function attachHierarchicalWalletListeners(): void {
             const masterId = target.getAttribute('data-master-id');
             if (masterId) {
                 await handleAddSubWallet(masterId);
+            }
+        });
+    });
+
+    // Scan for sub-wallets
+    document.querySelectorAll('.scan-sub-wallets-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            if (masterId) {
+                await handleScanSubWallets(masterId);
             }
         });
     });
@@ -823,6 +781,81 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
     } catch (error) {
         console.error('[Wallet Management] Add sub-wallet failed:', error);
         showError('Failed to create sub-wallet');
+    }
+}
+
+/**
+ * Handle scanning for existing sub-wallets with activity
+ * This connects to each derived sub-wallet and checks for balance
+ */
+async function handleScanSubWallets(masterId: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Scanning for sub-wallets on master key ${masterId}`);
+
+        // Get PIN for decryption
+        const pin = sessionPin || await showPINModal('Enter your PIN to scan for sub-wallets');
+        if (!pin) return;
+
+        // Show scanning indicator
+        showInfo('Scanning for sub-wallets... This may take a moment.');
+
+        // Get the master key mnemonic
+        const mnemonicResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(masterId, 0, pin);
+        if (!mnemonicResponse.success || !mnemonicResponse.data) {
+            showError('Failed to decrypt master key');
+            return;
+        }
+
+        // Import discovery module dynamically (it uses Breez SDK which requires DOM context)
+        const { discoverSubWallets, getDiscoveredWalletNames } = await import('../utils/sub-wallet-discovery');
+        const { BREEZ_API_KEY } = await import('./state');
+
+        // Run discovery
+        const results = await discoverSubWallets(mnemonicResponse.data, {
+            maxIndexToScan: 5, // Scan up to 5 sub-wallets
+            stopAfterEmptyCount: 3, // Stop after 3 consecutive empty
+            apiKey: BREEZ_API_KEY,
+            onProgress: (progress) => {
+                console.log(`[Discovery] Scanning index ${progress.currentIndex}/${progress.totalToScan}`);
+            }
+        });
+
+        // Get discovered wallets (those with activity)
+        const discoveredWallets = getDiscoveredWalletNames(results);
+
+        if (discoveredWallets.length === 0) {
+            showInfo('No additional sub-wallets with activity found.');
+            return;
+        }
+
+        // Filter out index 0 (already exists as main wallet)
+        const newWallets = discoveredWallets.filter(w => w.index > 0);
+
+        if (newWallets.length === 0) {
+            showInfo('No additional sub-wallets with activity found.');
+            return;
+        }
+
+        // Confirm with user
+        const walletList = newWallets.map(w => `  - Index ${w.index}: ${w.nickname}`).join('\n');
+        const confirmed = confirm(
+            `Found ${newWallets.length} sub-wallet(s) with activity:\n\n${walletList}\n\nAdd these sub-wallets?`
+        );
+
+        if (!confirmed) return;
+
+        // Add discovered sub-wallets
+        const addResponse = await ExtensionMessaging.addDiscoveredSubWallets(masterId, newWallets);
+
+        if (addResponse.success) {
+            showSuccess(`Added ${newWallets.length} discovered sub-wallet(s)!`);
+            await loadWalletManagementList();
+        } else {
+            showError(addResponse.error || 'Failed to add discovered sub-wallets');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Scan sub-wallets failed:', error);
+        showError('Failed to scan for sub-wallets');
     }
 }
 

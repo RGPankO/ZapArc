@@ -125,6 +125,10 @@ export function setMasterKeys(keys: MasterKeyMetadata[]): void {
     masterKeys = keys;
 }
 
+export function getMasterKeys(): MasterKeyMetadata[] {
+    return masterKeys;
+}
+
 export function setActiveMasterKeyId(id: string | null): void {
     activeMasterKeyId = id;
 }

@@ -30,6 +30,7 @@ import {
     setCurrentWallets,
     BIP39_WORDS,
     setIsSDKInitialized,
+    getMasterKeys,
 } from './state';
 
 // SDK imports
@@ -240,6 +241,22 @@ function showWizardStep(stepId: string) {
             element.classList.toggle('hidden', id !== stepId);
         }
     });
+
+    // Show/hide "Add Sub-Wallet" button
+    // Show when: 1) on setup-choice-step, 2) adding a wallet (not initial setup), 3) at least one master key exists
+    if (stepId === 'setup-choice-step') {
+        const addSubWalletBtn = document.getElementById('add-sub-wallet-btn');
+        if (addSubWalletBtn) {
+            // Always show sub-wallet option when adding a wallet and master keys exist
+            const currentMasterKeys = getMasterKeys();
+            const shouldShow = isAddingWallet && currentMasterKeys.length > 0;
+            addSubWalletBtn.classList.toggle('hidden', !shouldShow);
+            console.log(`[Wizard] Add Sub-Wallet button visibility: ${shouldShow}`, {
+                isAddingWallet,
+                masterKeysCount: currentMasterKeys.length
+            });
+        }
+    }
 }
 
 function setupWizardListeners() {
@@ -294,6 +311,14 @@ function setupWizardListeners() {
             setIsImportingWallet(true); // Importing, not creating
             initializeImportWallet();
             showWizardStep('import-wallet-step');
+        };
+    }
+
+    // Add Sub-Wallet button (only visible in hierarchical mode when adding wallet)
+    const addSubWalletBtn = document.getElementById('add-sub-wallet-btn');
+    if (addSubWalletBtn) {
+        addSubWalletBtn.onclick = () => {
+            handleAddSubWalletFromWizard();
         };
     }
 
@@ -397,6 +422,78 @@ function setupWizardListeners() {
     }
     if (renameBackBtn) {
         renameBackBtn.onclick = () => hideRenameInterface();
+    }
+}
+
+/**
+ * Handle adding a sub-wallet from the wizard (when user clicks "Add Sub-Wallet" card)
+ * Shows a selection of existing master keys and creates a new sub-wallet under the selected one
+ */
+async function handleAddSubWalletFromWizard(): Promise<void> {
+    console.log('[Wizard] Adding sub-wallet from wizard');
+
+    try {
+        // Check if we have master keys loaded
+        const currentMasterKeys = getMasterKeys();
+        if (currentMasterKeys.length === 0) {
+            showError('No master keys found. Please create a wallet first.');
+            return;
+        }
+
+        // If only one master key, use it directly
+        let selectedMasterKeyId: string;
+        let selectedMasterKeyName: string;
+
+        if (currentMasterKeys.length === 1) {
+            selectedMasterKeyId = currentMasterKeys[0].id;
+            selectedMasterKeyName = currentMasterKeys[0].nickname;
+        } else {
+            // Multiple master keys - ask user to select one
+            const selection = prompt(
+                `Select a master key to add sub-wallet to:\n\n${currentMasterKeys.map((mk, i) => `${i + 1}. ${mk.nickname}`).join('\n')}\n\nEnter number (1-${currentMasterKeys.length}):`
+            );
+
+            if (!selection) return; // User cancelled
+
+            const index = parseInt(selection, 10) - 1;
+            if (isNaN(index) || index < 0 || index >= currentMasterKeys.length) {
+                showError('Invalid selection');
+                return;
+            }
+
+            selectedMasterKeyId = currentMasterKeys[index].id;
+            selectedMasterKeyName = currentMasterKeys[index].nickname;
+        }
+
+        // Prompt for sub-wallet nickname
+        const nickname = prompt(`Enter a name for the new sub-wallet under "${selectedMasterKeyName}":`, 'Sub-Wallet');
+        if (!nickname || !nickname.trim()) {
+            return; // User cancelled
+        }
+
+        // Add the sub-wallet
+        const response = await ExtensionMessaging.addSubWallet(selectedMasterKeyId, nickname.trim());
+
+        if (response.success) {
+            showSuccess(`Sub-wallet "${nickname}" created under "${selectedMasterKeyName}"!`);
+
+            // Hide wizard, show main interface
+            const wizard = document.getElementById('onboarding-wizard');
+            const mainInterface = document.getElementById('main-interface');
+
+            if (wizard) wizard.classList.add('hidden');
+            if (mainInterface) mainInterface.classList.remove('hidden');
+
+            setIsAddingWallet(false);
+
+            // Refresh wallet UI
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to create sub-wallet');
+        }
+    } catch (error) {
+        console.error('[Wizard] Error adding sub-wallet:', error);
+        showError('Failed to create sub-wallet');
     }
 }
 

@@ -942,4 +942,23 @@ export class ExtensionMessaging {
       type: 'GET_ACTIVE_HIERARCHICAL_WALLET_INFO'
     });
   }
+
+  /**
+   * Add discovered sub-wallets to a master key
+   * Used after sub-wallet discovery to add multiple sub-wallets at once
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWallets - Array of { index, nickname } for discovered wallets
+   * @returns Success status
+   */
+  static async addDiscoveredSubWallets(
+    masterKeyId: string,
+    subWallets: { index: number; nickname: string }[]
+  ): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'ADD_DISCOVERED_SUB_WALLETS',
+      masterKeyId,
+      subWallets
+    });
+  }
 }

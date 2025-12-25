@@ -1660,6 +1660,65 @@ export class ChromeStorageManager {
   }
 
   /**
+   * Add discovered sub-wallets to a master key
+   * Used after sub-wallet discovery to add multiple sub-wallets at once
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWallets - Array of { index, nickname } for discovered wallets
+   */
+  async addDiscoveredSubWallets(
+    masterKeyId: string,
+    subWallets: { index: number; nickname: string }[]
+  ): Promise<void> {
+    console.log('🔵 [Storage] ADD_DISCOVERED_SUB_WALLETS', {
+      masterKeyId,
+      count: subWallets.length
+    });
+
+    try {
+      const data = await this.loadHierarchicalWallets();
+      if (!data) {
+        throw new Error('No hierarchical wallet data found');
+      }
+
+      const masterKey = data.masterKeys.find(mk => mk.id === masterKeyId);
+      if (!masterKey) {
+        throw new Error(`Master key ${masterKeyId} not found`);
+      }
+
+      const now = Date.now();
+
+      // Add each discovered sub-wallet if it doesn't already exist
+      for (const sw of subWallets) {
+        const exists = masterKey.subWallets.some(existing => existing.index === sw.index);
+        if (!exists) {
+          masterKey.subWallets.push({
+            index: sw.index,
+            nickname: sw.nickname,
+            createdAt: now,
+            lastUsedAt: now
+          });
+          console.log(`[Storage] Added discovered sub-wallet: index=${sw.index}, name="${sw.nickname}"`);
+        } else {
+          console.log(`[Storage] Sub-wallet index ${sw.index} already exists, skipping`);
+        }
+      }
+
+      // Sort sub-wallets by index
+      masterKey.subWallets.sort((a, b) => a.index - b.index);
+
+      await this.saveHierarchicalWallets(data);
+
+      console.log('✅ [Storage] ADD_DISCOVERED_SUB_WALLETS SUCCESS', {
+        totalSubWallets: masterKey.subWallets.length
+      });
+    } catch (error) {
+      console.error('❌ [Storage] ADD_DISCOVERED_SUB_WALLETS FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get the active hierarchical wallet info
    * Returns masterKeyId and subWalletIndex of the currently active wallet
    */

@@ -966,4 +966,14 @@ export class WalletManager {
   } | null> {
     return this.storage.getActiveHierarchicalWalletInfo();
   }
+
+  /**
+   * Add discovered sub-wallets to a master key
+   */
+  async addDiscoveredSubWallets(
+    masterKeyId: string,
+    subWallets: { index: number; nickname: string }[]
+  ): Promise<void> {
+    return this.storage.addDiscoveredSubWallets(masterKeyId, subWallets);
+  }
 }

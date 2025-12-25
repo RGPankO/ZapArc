@@ -485,7 +485,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'IMPORT_WALLET':
         try {
-          console.log('[Background] IMPORT_WALLET - Importing wallet');
+          console.log('[Background] IMPORT_WALLET - Importing wallet as master key');
           let { mnemonic, nickname, pin } = message;
 
           // Validate parameters
@@ -498,15 +498,29 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
           // Auto-generate nickname if not provided
           if (!nickname || typeof nickname !== 'string' || !nickname.trim()) {
-            const wallets = await walletManager.getAllWallets();
-            const walletCount = wallets.length;
-            nickname = `Wallet ${walletCount + 1}`;
+            const masterKeys = await storageManager.getMasterKeyMetadata();
+            const masterKeyCount = masterKeys.length;
+            nickname = masterKeyCount === 0 ? 'Main Wallet' : `Wallet ${masterKeyCount + 1}`;
             console.log(`[Background] IMPORT_WALLET - Auto-generated nickname: "${nickname}"`);
           }
 
-          const importedWallet = await walletManager.importWallet(mnemonic, nickname, pin);
-          console.log('[Background] IMPORT_WALLET - Wallet imported successfully');
-          sendResponse({ success: true, data: importedWallet });
+          // Always create as master key with default sub-wallet (index 0)
+          // This ensures all wallets are in hierarchical format from the start
+          const masterKeyId = await storageManager.addMasterKey(mnemonic.trim().toLowerCase(), nickname, pin, true);
+          console.log('[Background] IMPORT_WALLET - Created as master key:', masterKeyId);
+
+          // Set as active wallet
+          await storageManager.setActiveHierarchicalWallet(masterKeyId, 0);
+
+          // Return wallet data for compatibility
+          const walletData = {
+            mnemonic: mnemonic.trim().toLowerCase(),
+            balance: 0,
+            transactions: []
+          };
+
+          console.log('[Background] IMPORT_WALLET - Wallet imported successfully (hierarchical)');
+          sendResponse({ success: true, data: walletData });
         } catch (error) {
           console.error('[Background] IMPORT_WALLET - Failed:', error);
           sendResponse({
@@ -906,6 +920,28 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         } catch (error) {
           console.error('[Background] GET_ACTIVE_HIERARCHICAL_WALLET_INFO - Failed:', error);
           sendResponse({ success: false, error: 'Failed to get active wallet info' });
+        }
+        break;
+
+      case 'ADD_DISCOVERED_SUB_WALLETS':
+        try {
+          const { masterKeyId, subWallets } = message;
+          if (!masterKeyId || !subWallets || !Array.isArray(subWallets)) {
+            throw new Error('Master key ID and sub-wallets array are required');
+          }
+          console.log('[Background] ADD_DISCOVERED_SUB_WALLETS', {
+            masterKeyId,
+            count: subWallets.length
+          });
+
+          await walletManager.addDiscoveredSubWallets(masterKeyId, subWallets);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] ADD_DISCOVERED_SUB_WALLETS - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to add discovered sub-wallets'
+          });
         }
         break;
 

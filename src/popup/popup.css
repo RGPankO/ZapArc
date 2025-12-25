@@ -1840,14 +1840,20 @@ body.modal-open {
   display: none;
 }
 
+/* Sub-Wallet Actions Row */
+.sub-wallet-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 /* Add Sub-Wallet Button */
 .add-sub-wallet-btn {
-  width: 100%;
+  flex: 1;
   padding: 10px;
   border: 1px dashed #ccc;
   background: transparent;
   border-radius: 4px;
-  margin-bottom: 8px;
   cursor: pointer;
   font-size: 13px;
   color: #666;
@@ -1858,6 +1864,25 @@ body.modal-open {
   border-color: #4caf50;
   color: #4caf50;
   background: #f9fff9;
+}
+
+/* Scan Sub-Wallets Button */
+.scan-sub-wallets-btn {
+  padding: 10px 12px;
+  border: 1px dashed #ccc;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #666;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.scan-sub-wallets-btn:hover {
+  border-color: #2196f3;
+  color: #2196f3;
+  background: #f5faff;
 }
 
 /* Sub-Wallet Item */
