@@ -47,7 +47,7 @@ export class PaymentProcessor {
   private static readonly MAX_RETRIES = 3;
   private static readonly RETRY_DELAYS = [1000, 3000, 5000]; // Progressive delays in ms
   private static readonly PAYMENT_TIMEOUT = 30000; // 30 seconds
-  
+
   private activePayments = new Map<string, PaymentStatus>();
   private paymentCallbacks = new Map<string, (status: PaymentStatus) => void>();
 
@@ -56,7 +56,7 @@ export class PaymentProcessor {
    */
   async processPayment(options: PaymentOptions): Promise<PaymentResult> {
     const paymentId = this.generatePaymentId();
-    
+
     try {
       // Initialize payment status
       const paymentStatus: PaymentStatus = {
@@ -69,7 +69,7 @@ export class PaymentProcessor {
         maxRetries: PaymentProcessor.MAX_RETRIES,
         timestamp: Date.now()
       };
-      
+
       this.activePayments.set(paymentId, paymentStatus);
       this.notifyStatusChange(paymentStatus);
 
@@ -109,7 +109,7 @@ export class PaymentProcessor {
       this.notifyStatusChange(paymentStatus);
 
       const paymentResult = await this.executePaymentWithRetry(paymentId, lnurlData.data, options);
-      
+
       // Update final status
       paymentStatus.status = paymentResult.success ? 'completed' : 'failed';
       if (!paymentResult.success) {
@@ -171,7 +171,7 @@ export class PaymentProcessor {
       // For QR code, we can either:
       // 1. Return the LNURL directly for wallet scanning
       // 2. Generate a bolt11 invoice if the LNURL service supports it
-      
+
       // For now, return the LNURL - most Lightning wallets can scan LNURL QR codes
       return {
         success: true,
@@ -259,7 +259,7 @@ export class PaymentProcessor {
     }
 
     const result = await this.executePayment(lnurlResponse.data, options);
-    
+
     payment.status = result.success ? 'completed' : 'failed';
     if (!result.success) {
       payment.error = result.error;
@@ -427,7 +427,7 @@ export class PaymentProcessor {
 
         // Execute payment
         const result = await this.executePayment(lnurlData, options);
-        
+
         if (result.success) {
           return result;
         }
@@ -446,7 +446,7 @@ export class PaymentProcessor {
 
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Payment execution failed';
-        
+
         // Don't retry on certain errors
         if (this.isNonRetryableError(error)) {
           break;
@@ -482,12 +482,12 @@ export class PaymentProcessor {
 
       // Race between payment and timeout
       const result = await Promise.race([paymentPromise, timeoutPromise]);
-      
+
       return result;
 
     } catch (error) {
       console.error('Payment execution error:', error);
-      
+
       const errorMessage = error instanceof Error ? error.message : 'Payment failed';
       const isRetryable = this.isRetryableError(error);
 
@@ -546,7 +546,7 @@ export class PaymentProcessor {
    */
   private isRetryableError(error: any): boolean {
     if (!error) return false;
-    
+
     const errorMessage = error.message || error.toString() || '';
     const lowerMessage = errorMessage.toLowerCase();
 
@@ -570,7 +570,7 @@ export class PaymentProcessor {
    */
   private isNonRetryableError(error: any): boolean {
     if (!error) return false;
-    
+
     const errorMessage = error.message || error.toString() || '';
     const lowerMessage = errorMessage.toLowerCase();
 

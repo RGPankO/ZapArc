@@ -2,18 +2,18 @@
 // Simple tests to verify payment processing workflow functionality
 
 import { PaymentProcessor, PaymentOptions } from './payment-processor';
+import { vi } from 'vitest';
 
-// Mock ExtensionMessaging for testing
-const mockMessaging = {
-  isWalletConnected: jest.fn(),
-  getBalance: jest.fn(),
-  parseLnurl: jest.fn(),
-  processPayment: jest.fn(),
-  payLnurl: jest.fn()
-};
+// Mock the messaging module using hoisted variable
+const mockMessaging = vi.hoisted(() => ({
+  isWalletConnected: vi.fn(),
+  getBalance: vi.fn(),
+  parseLnurl: vi.fn(),
+  processPayment: vi.fn(),
+  payLnurl: vi.fn()
+}));
 
-// Mock the messaging module
-jest.mock('./messaging', () => ({
+vi.mock('./messaging', () => ({
   ExtensionMessaging: mockMessaging
 }));
 
@@ -21,8 +21,13 @@ describe('PaymentProcessor', () => {
   let paymentProcessor: PaymentProcessor;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     paymentProcessor = new PaymentProcessor();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('processPayment', () => {
@@ -49,7 +54,7 @@ describe('PaymentProcessor', () => {
           }
         }
       });
-      mockMessaging.payLnurl.mockResolvedValue({ success: true });
+      mockMessaging.payLnurl.mockResolvedValue({ success: true, data: {} });
 
       const result = await paymentProcessor.processPayment(mockPaymentOptions);
 
@@ -134,14 +139,19 @@ describe('PaymentProcessor', () => {
           }
         }
       });
-      
+
       // Mock payment failure with retryable error
       mockMessaging.payLnurl.mockResolvedValue({
         success: false,
         error: 'Network timeout'
       });
 
-      const result = await paymentProcessor.processPayment(mockPaymentOptions);
+      const paymentPromise = paymentProcessor.processPayment(mockPaymentOptions);
+
+      // Advance timers through all retry delays
+      await vi.runAllTimersAsync();
+
+      const result = await paymentPromise;
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Payment failed after');
@@ -160,13 +170,10 @@ describe('PaymentProcessor', () => {
       mockMessaging.parseLnurl.mockResolvedValue({
         success: true,
         data: {
-          type: 'pay',
-          data: {
-            callback: 'https://example.com/callback',
-            minSendable: 1000,
-            maxSendable: 100000000,
-            metadata: '[]'
-          }
+          callback: 'https://example.com/callback',
+          minSendable: 1000,
+          maxSendable: 100000000,
+          metadata: '[]'
         }
       });
 
@@ -216,17 +223,17 @@ describe('PaymentProcessor', () => {
           }
         }
       });
-      mockMessaging.payLnurl.mockResolvedValue({ success: true });
+      mockMessaging.payLnurl.mockResolvedValue({ success: true, data: {} });
 
       let statusUpdates: any[] = [];
-      
+
       // Start payment and track status
       const paymentPromise = paymentProcessor.processPayment(mockOptions);
-      
+
       // Get active payments to check status
       const activePayments = paymentProcessor.getActivePayments();
       expect(activePayments.length).toBe(1);
-      
+
       const payment = activePayments[0];
       expect(payment.status).toBe('pending');
       expect(payment.amount).toBe(1000);
@@ -244,20 +251,17 @@ describe('PaymentProcessor', () => {
 
       // Start payment but don't await
       paymentProcessor.processPayment(mockOptions);
-      
+
       const activePayments = paymentProcessor.getActivePayments();
       expect(activePayments.length).toBe(1);
-      
+
       const paymentId = activePayments[0].id;
       const cancelled = paymentProcessor.cancelPayment(paymentId);
-      
+
       expect(cancelled).toBe(true);
-      
+
       const payment = paymentProcessor.getPaymentStatus(paymentId);
       expect(payment?.status).toBe('cancelled');
     });
   });
 });
-
-// Export for potential integration testing
-export { mockMessaging };
