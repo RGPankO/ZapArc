@@ -1658,4 +1658,200 @@ export class ChromeStorageManager {
       console.error('❌ [Storage] TOGGLE_MASTER_KEY_EXPANDED FAILED', error);
     }
   }
+
+  /**
+   * Get the active hierarchical wallet info
+   * Returns masterKeyId and subWalletIndex of the currently active wallet
+   */
+  async getActiveHierarchicalWalletInfo(): Promise<{ masterKeyId: string, subWalletIndex: number } | null> {
+    try {
+      const data = await this.loadHierarchicalWallets();
+      if (!data || !data.activeMasterKeyId) {
+        return null;
+      }
+
+      return {
+        masterKeyId: data.activeMasterKeyId,
+        subWalletIndex: data.activeSubWalletIndex
+      };
+    } catch (error) {
+      console.error('❌ [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_INFO FAILED', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get the derived mnemonic for the active hierarchical wallet
+   * This derives the sub-wallet mnemonic from the master key based on activeSubWalletIndex
+   *
+   * @param pin - User's PIN to decrypt the master key
+   * @returns Derived mnemonic for the active sub-wallet, or null if not found
+   */
+  async getActiveHierarchicalWalletMnemonic(pin: string): Promise<{
+    mnemonic: string;
+    masterKeyId: string;
+    subWalletIndex: number;
+    masterKeyNickname: string;
+    subWalletNickname: string;
+  } | null> {
+    console.log('🔵 [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_MNEMONIC');
+
+    try {
+      const data = await this.loadHierarchicalWallets();
+      if (!data || !data.activeMasterKeyId) {
+        console.warn('⚠️ [Storage] No active hierarchical wallet');
+        return null;
+      }
+
+      const masterKey = data.masterKeys.find(mk => mk.id === data.activeMasterKeyId);
+      if (!masterKey) {
+        console.error('❌ [Storage] Active master key not found');
+        return null;
+      }
+
+      const subWallet = masterKey.subWallets.find(sw => sw.index === data.activeSubWalletIndex);
+      if (!subWallet) {
+        console.error('❌ [Storage] Active sub-wallet not found');
+        return null;
+      }
+
+      // Decrypt the master mnemonic
+      const masterMnemonic = await this.decryptMnemonic(masterKey.encryptedMnemonic, pin);
+
+      // Import mnemonic derivation utility dynamically to avoid circular deps
+      const { deriveSubWalletMnemonic } = await import('./mnemonic-derivation');
+
+      // Derive sub-wallet mnemonic (index 0 = original, index 1-19 = modified)
+      const derivedMnemonic = deriveSubWalletMnemonic(masterMnemonic, data.activeSubWalletIndex);
+
+      console.log('✅ [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_MNEMONIC SUCCESS', {
+        masterKeyId: data.activeMasterKeyId,
+        subWalletIndex: data.activeSubWalletIndex,
+        isOriginalMnemonic: data.activeSubWalletIndex === 0
+      });
+
+      return {
+        mnemonic: derivedMnemonic,
+        masterKeyId: data.activeMasterKeyId,
+        subWalletIndex: data.activeSubWalletIndex,
+        masterKeyNickname: masterKey.nickname,
+        subWalletNickname: subWallet.nickname
+      };
+    } catch (error) {
+      console.error('❌ [Storage] GET_ACTIVE_HIERARCHICAL_WALLET_MNEMONIC FAILED', error);
+      return null;
+    }
+  }
+
+  /**
+   * Try to unlock any wallet (v1 or v2) with the given PIN
+   * First tries v2 hierarchical format, then falls back to v1 flat format
+   * Returns the mnemonic for the active wallet (derived for sub-wallets in v2)
+   */
+  async tryUnlockAnyWalletUnified(pin: string): Promise<{
+    wallet: WalletData;
+    metadata: WalletMetadata;
+    isHierarchical: boolean;
+    hierarchicalInfo?: {
+      masterKeyId: string;
+      subWalletIndex: number;
+      masterKeyNickname: string;
+      subWalletNickname: string;
+    };
+  } | null> {
+    console.log('🔵 [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED');
+
+    try {
+      const version = await this.getWalletVersion();
+      console.log('🔍 [Storage] Wallet version:', version);
+
+      // Try v2 hierarchical first
+      if (version === 2) {
+        console.log('🔍 [Storage] Trying v2 hierarchical unlock...');
+
+        // Try to unlock any master key with the PIN
+        const unlocked = await this.tryUnlockAnyMasterKey(pin);
+        if (unlocked) {
+          // Get the full hierarchical wallet mnemonic (derived)
+          const activeWallet = await this.getActiveHierarchicalWalletMnemonic(pin);
+          if (activeWallet) {
+            const walletData: WalletData = {
+              mnemonic: activeWallet.mnemonic,
+              balance: 0,
+              transactions: []
+            };
+
+            // Create metadata for compatibility
+            const metadata: WalletMetadata = {
+              id: `${activeWallet.masterKeyId}:${activeWallet.subWalletIndex}`,
+              nickname: activeWallet.subWalletIndex === 0
+                ? activeWallet.masterKeyNickname
+                : `${activeWallet.masterKeyNickname} > ${activeWallet.subWalletNickname}`,
+              createdAt: Date.now(),
+              lastUsedAt: Date.now()
+            };
+
+            console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS (v2)', {
+              masterKeyId: activeWallet.masterKeyId,
+              subWalletIndex: activeWallet.subWalletIndex
+            });
+
+            return {
+              wallet: walletData,
+              metadata,
+              isHierarchical: true,
+              hierarchicalInfo: {
+                masterKeyId: activeWallet.masterKeyId,
+                subWalletIndex: activeWallet.subWalletIndex,
+                masterKeyNickname: activeWallet.masterKeyNickname,
+                subWalletNickname: activeWallet.subWalletNickname
+              }
+            };
+          }
+        }
+
+        console.log('❌ [Storage] v2 hierarchical unlock failed');
+        return null;
+      }
+
+      // Fall back to v1 flat multi-wallet
+      if (version === 1) {
+        console.log('🔍 [Storage] Trying v1 flat multi-wallet unlock...');
+        const result = await this.tryUnlockAnyWallet(pin);
+        if (result) {
+          console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS (v1)');
+          return {
+            wallet: result.wallet,
+            metadata: result.metadata,
+            isHierarchical: false
+          };
+        }
+      }
+
+      // v0 legacy single wallet
+      if (version === 0) {
+        console.log('🔍 [Storage] Trying v0 legacy single wallet unlock...');
+        const walletData = await this.loadEncryptedWallet(pin);
+        if (walletData) {
+          console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS (v0 legacy)');
+          return {
+            wallet: walletData,
+            metadata: {
+              id: 'legacy',
+              nickname: 'Wallet 1',
+              createdAt: 0,
+              lastUsedAt: Date.now()
+            },
+            isHierarchical: false
+          };
+        }
+      }
+
+      console.log('❌ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED - No wallet matched PIN');
+      return null;
+    } catch (error) {
+      console.error('❌ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED FAILED', error);
+      return null;
+    }
+  }
 }

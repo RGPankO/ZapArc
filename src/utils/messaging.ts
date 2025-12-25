@@ -879,4 +879,67 @@ export class ExtensionMessaging {
       type: 'MIGRATE_TO_HIERARCHICAL'
     });
   }
+
+  /**
+   * Switch to a specific hierarchical wallet (master key + sub-wallet)
+   * Returns the derived mnemonic for SDK connection
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns Object with derived mnemonic and wallet info
+   */
+  static async switchHierarchicalWallet(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<MessageResponse<{
+    mnemonic: string;
+    masterKeyNickname: string;
+    subWalletNickname: string;
+    masterKeyId: string;
+    subWalletIndex: number;
+  }>> {
+    return this.sendToBackground({
+      type: 'SWITCH_HIERARCHICAL_WALLET',
+      masterKeyId,
+      subWalletIndex,
+      pin
+    });
+  }
+
+  /**
+   * Get the derived mnemonic for a specific hierarchical wallet
+   * Useful when needing to reconnect SDK for a specific wallet
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns The derived mnemonic for the sub-wallet
+   */
+  static async getHierarchicalWalletMnemonic(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<MessageResponse<string>> {
+    return this.sendToBackground({
+      type: 'GET_HIERARCHICAL_WALLET_MNEMONIC',
+      masterKeyId,
+      subWalletIndex,
+      pin
+    });
+  }
+
+  /**
+   * Get the active hierarchical wallet info
+   * @returns Object with masterKeyId and subWalletIndex, or null if not hierarchical
+   */
+  static async getActiveHierarchicalWalletInfo(): Promise<MessageResponse<{
+    masterKeyId: string;
+    subWalletIndex: number;
+  } | null>> {
+    return this.sendToBackground({
+      type: 'GET_ACTIVE_HIERARCHICAL_WALLET_INFO'
+    });
+  }
 }

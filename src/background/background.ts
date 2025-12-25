@@ -325,9 +325,9 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'LOAD_WALLET':
         console.log('🔵 [Background] LOAD_WALLET - PIN received, length:', message.pin?.length);
 
-        // Try to unlock any wallet with the given PIN
-        // This iterates through all wallets and returns the first one that decrypts successfully
-        const unlockedWallet = await storageManager.tryUnlockAnyWallet(message.pin);
+        // Try to unlock any wallet (v1 flat or v2 hierarchical) with the given PIN
+        // For v2, this returns the derived sub-wallet mnemonic based on activeSubWalletIndex
+        const unlockedWallet = await storageManager.tryUnlockAnyWalletUnified(message.pin);
 
         if (!unlockedWallet) {
           console.error('❌ [Background] LOAD_WALLET - No wallet matched the PIN');
@@ -336,15 +336,22 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
 
         console.log('✅ [Background] LOAD_WALLET - Wallet unlocked successfully');
-        console.log('🔍 [Background] LOAD_WALLET - Wallet ID:', unlockedWallet.metadata.id);
         console.log('🔍 [Background] LOAD_WALLET - Response data:', {
           hasWallet: !!unlockedWallet.wallet,
           hasMnemonic: !!unlockedWallet.wallet?.mnemonic,
           walletId: unlockedWallet.metadata.id,
-          nickname: unlockedWallet.metadata.nickname
+          nickname: unlockedWallet.metadata.nickname,
+          isHierarchical: unlockedWallet.isHierarchical,
+          hierarchicalInfo: unlockedWallet.hierarchicalInfo
         });
 
-        sendResponse({ success: true, data: unlockedWallet.wallet, metadata: unlockedWallet.metadata });
+        sendResponse({
+          success: true,
+          data: unlockedWallet.wallet,
+          metadata: unlockedWallet.metadata,
+          isHierarchical: unlockedWallet.isHierarchical,
+          hierarchicalInfo: unlockedWallet.hierarchicalInfo
+        });
         break;
 
       case 'SAVE_DOMAIN_SETTINGS':
@@ -832,6 +839,73 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
             success: false,
             error: error instanceof Error ? error.message : 'Failed to migrate'
           });
+        }
+        break;
+
+      case 'SWITCH_HIERARCHICAL_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex, pin } = message;
+          if (!masterKeyId || subWalletIndex === undefined || !pin) {
+            throw new Error('Master key ID, sub-wallet index, and PIN are required');
+          }
+          console.log('[Background] SWITCH_HIERARCHICAL_WALLET', { masterKeyId, subWalletIndex });
+
+          const switchResult = await walletManager.switchHierarchicalWallet(
+            masterKeyId,
+            subWalletIndex,
+            pin
+          );
+
+          sendResponse({
+            success: true,
+            data: {
+              mnemonic: switchResult.mnemonic,
+              masterKeyNickname: switchResult.masterKeyNickname,
+              subWalletNickname: switchResult.subWalletNickname,
+              masterKeyId,
+              subWalletIndex
+            }
+          });
+        } catch (error) {
+          console.error('[Background] SWITCH_HIERARCHICAL_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to switch wallet'
+          });
+        }
+        break;
+
+      case 'GET_HIERARCHICAL_WALLET_MNEMONIC':
+        try {
+          const { masterKeyId, subWalletIndex, pin } = message;
+          if (!masterKeyId || subWalletIndex === undefined || !pin) {
+            throw new Error('Master key ID, sub-wallet index, and PIN are required');
+          }
+          console.log('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC', { masterKeyId, subWalletIndex });
+
+          const mnemonic = await walletManager.getHierarchicalWalletMnemonic(
+            masterKeyId,
+            subWalletIndex,
+            pin
+          );
+
+          sendResponse({ success: true, data: mnemonic });
+        } catch (error) {
+          console.error('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get wallet mnemonic'
+          });
+        }
+        break;
+
+      case 'GET_ACTIVE_HIERARCHICAL_WALLET_INFO':
+        try {
+          const info = await walletManager.getActiveHierarchicalWalletInfo();
+          sendResponse({ success: true, data: info });
+        } catch (error) {
+          console.error('[Background] GET_ACTIVE_HIERARCHICAL_WALLET_INFO - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get active wallet info' });
         }
         break;
 

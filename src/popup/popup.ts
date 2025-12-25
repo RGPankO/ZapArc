@@ -29,6 +29,7 @@ import {
     currentWallets,
     setCurrentWallets,
     BIP39_WORDS,
+    setIsSDKInitialized,
 } from './state';
 
 // SDK imports
@@ -1863,3 +1864,53 @@ async function initializePopup() {
 
 // Start initialization when DOM is ready
 document.addEventListener('DOMContentLoaded', initializePopup);
+
+// ========================================
+// Hierarchical Wallet Switch Handler
+// ========================================
+
+/**
+ * Handle wallet switch events from wallet-management.ts
+ * This reconnects the SDK with the new derived mnemonic
+ */
+window.addEventListener('hierarchical-wallet-switched', async (event: Event) => {
+    const customEvent = event as CustomEvent<{
+        mnemonic: string;
+        masterKeyId: string;
+        subWalletIndex: number;
+        masterKeyNickname: string;
+        subWalletNickname: string;
+    }>;
+
+    console.log('🔄 [Popup] Hierarchical wallet switch event received', {
+        masterKeyId: customEvent.detail.masterKeyId,
+        subWalletIndex: customEvent.detail.subWalletIndex
+    });
+
+    try {
+        // Disconnect existing SDK
+        if (breezSDK) {
+            console.log('🔄 [Popup] Disconnecting previous SDK...');
+            await disconnectBreezSDK();
+            setBreezSDK(null);
+            setIsSDKInitialized(false);
+        }
+
+        // Connect with new derived mnemonic
+        console.log('🔄 [Popup] Connecting SDK with derived mnemonic...');
+        const sdk = await connectBreezSDK(customEvent.detail.mnemonic);
+        setBreezSDK(sdk);
+        setIsSDKInitialized(true);
+
+        // Update balance
+        await updateBalanceDisplay();
+
+        console.log('✅ [Popup] SDK reconnected for new wallet', {
+            masterKeyNickname: customEvent.detail.masterKeyNickname,
+            subWalletNickname: customEvent.detail.subWalletNickname
+        });
+    } catch (error) {
+        console.error('❌ [Popup] Failed to reconnect SDK after wallet switch:', error);
+        showError('Failed to connect to new wallet');
+    }
+});

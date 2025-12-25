@@ -699,6 +699,24 @@ function attachHierarchicalWalletListeners(): void {
             }
         });
     });
+
+    // Select sub-wallet (switch to it)
+    document.querySelectorAll('.sub-wallet-item').forEach(item => {
+        item.addEventListener('click', async (e) => {
+            // Don't trigger if clicking on action buttons
+            const target = e.target as HTMLElement;
+            if (target.closest('.sub-wallet-actions')) {
+                return;
+            }
+
+            const itemEl = e.currentTarget as HTMLElement;
+            const masterId = itemEl.getAttribute('data-master-id');
+            const subIndex = itemEl.getAttribute('data-sub-index');
+            if (masterId && subIndex) {
+                await handleSelectSubWallet(masterId, parseInt(subIndex, 10));
+            }
+        });
+    });
 }
 
 // ========================================
@@ -853,6 +871,62 @@ async function handleDeleteSubWallet(masterId: string, subIndex: number): Promis
     } catch (error) {
         console.error('[Wallet Management] Delete sub-wallet failed:', error);
         showError('Failed to delete sub-wallet');
+    }
+}
+
+/**
+ * Handle selecting/switching to a sub-wallet
+ * This triggers SDK reconnection with the derived mnemonic
+ */
+async function handleSelectSubWallet(masterId: string, subIndex: number): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Switching to sub-wallet ${masterId}:${subIndex}`);
+
+        // Check if already active
+        if (activeMasterKeyId === masterId && activeSubWalletIndex === subIndex) {
+            console.log('[Wallet Management] Already active, skipping switch');
+            return;
+        }
+
+        // Request PIN for switching (needed to derive mnemonic)
+        const pin = sessionPin || await showPINModal('Enter your PIN to switch wallet');
+        if (!pin) return;
+
+        // Show loading state
+        showInfo('Switching wallet...');
+
+        // Switch wallet via background (this derives the sub-wallet mnemonic)
+        const response = await ExtensionMessaging.switchHierarchicalWallet(masterId, subIndex, pin);
+
+        if (response.success && response.data) {
+            // Update local state
+            setActiveMasterKeyId(masterId);
+            setActiveSubWalletIndex(subIndex);
+
+            // The popup will need to reconnect SDK with the new mnemonic
+            // Dispatch custom event for popup.ts to handle SDK reconnection
+            const event = new CustomEvent('hierarchical-wallet-switched', {
+                detail: {
+                    mnemonic: response.data.mnemonic,
+                    masterKeyId: masterId,
+                    subWalletIndex: subIndex,
+                    masterKeyNickname: response.data.masterKeyNickname,
+                    subWalletNickname: response.data.subWalletNickname
+                }
+            });
+            window.dispatchEvent(event);
+
+            showSuccess(`Switched to ${response.data.subWalletNickname}`);
+
+            // Refresh the wallet list UI
+            await loadWalletManagementList();
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to switch wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Switch sub-wallet failed:', error);
+        showError('Failed to switch wallet');
     }
 }
 

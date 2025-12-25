@@ -871,4 +871,99 @@ export class WalletManager {
   async migrateToHierarchical(): Promise<void> {
     return this.storage.migrateToHierarchical();
   }
+
+  /**
+   * Get the derived mnemonic for a specific hierarchical wallet
+   * This is used when switching wallets to get the correct mnemonic for SDK connection
+   *
+   * @param masterKeyId - The master key ID
+   * @param subWalletIndex - The sub-wallet index (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns Derived mnemonic for the sub-wallet
+   */
+  async getHierarchicalWalletMnemonic(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<string> {
+    // Get the master key mnemonic
+    const masterMnemonic = await this.storage.getMasterKeyMnemonic(masterKeyId, pin);
+
+    // Derive the sub-wallet mnemonic
+    const { deriveSubWalletMnemonic } = await import('./mnemonic-derivation');
+    return deriveSubWalletMnemonic(masterMnemonic, subWalletIndex);
+  }
+
+  /**
+   * Switch to a specific hierarchical wallet (master key + sub-wallet)
+   * Returns the derived mnemonic for SDK connection
+   *
+   * @param masterKeyId - The master key ID
+   * @param subWalletIndex - The sub-wallet index (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns Object with derived mnemonic and wallet info
+   */
+  async switchHierarchicalWallet(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<{
+    mnemonic: string;
+    masterKeyNickname: string;
+    subWalletNickname: string;
+  }> {
+    console.log('WalletManager: Switching to hierarchical wallet', { masterKeyId, subWalletIndex });
+
+    try {
+      // Step 1: Set as active in storage
+      await this.storage.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
+
+      // Step 2: Disconnect current SDK if connected
+      if (this.breezSDK.isWalletConnected()) {
+        console.log('WalletManager: Disconnecting current SDK');
+        await this.breezSDK.disconnect();
+      }
+
+      // Step 3: Get derived mnemonic
+      const derivedMnemonic = await this.getHierarchicalWalletMnemonic(
+        masterKeyId,
+        subWalletIndex,
+        pin
+      );
+
+      // Step 4: Get wallet info for display
+      const subWallets = await this.storage.getSubWallets(masterKeyId);
+      const masterKeys = await this.storage.getMasterKeyMetadata();
+      const masterKey = masterKeys.find(mk => mk.id === masterKeyId);
+      const subWallet = subWallets.find(sw => sw.index === subWalletIndex);
+
+      console.log('WalletManager: Hierarchical wallet switch prepared', {
+        masterKeyId,
+        subWalletIndex,
+        masterKeyNickname: masterKey?.nickname,
+        subWalletNickname: subWallet?.nickname
+      });
+
+      return {
+        mnemonic: derivedMnemonic,
+        masterKeyNickname: masterKey?.nickname || 'Unknown',
+        subWalletNickname: subWallet?.nickname || 'Unknown'
+      };
+    } catch (error) {
+      console.error('WalletManager: Hierarchical wallet switch failed:', error);
+      throw new Error(
+        `Wallet switch failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Get the active hierarchical wallet info
+   */
+  async getActiveHierarchicalWalletInfo(): Promise<{
+    masterKeyId: string;
+    subWalletIndex: number;
+  } | null> {
+    return this.storage.getActiveHierarchicalWalletInfo();
+  }
 }
