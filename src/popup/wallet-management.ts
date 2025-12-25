@@ -19,8 +19,20 @@ import {
     setRenameWalletCurrentName,
     isRenameSaving,
     setIsRenameSaving,
-    setIsAddingWallet
+    setIsAddingWallet,
+    // Hierarchical wallet state
+    masterKeys,
+    setMasterKeys,
+    activeMasterKeyId,
+    setActiveMasterKeyId,
+    activeSubWalletIndex,
+    setActiveSubWalletIndex,
+    isHierarchicalMode,
+    setIsHierarchicalMode,
+    expandedMasterKeys,
+    toggleMasterKeyExpanded as toggleMasterKeyExpandedState
 } from './state';
+import type { MasterKeyMetadata, SubWalletEntry } from '../types';
 import { connectBreezSDK } from './sdk';
 import { showError, showSuccess, showInfo } from './notifications';
 import { showPINModal, promptForPIN, showModal, hideModal } from './modals';
@@ -403,67 +415,444 @@ export function hideWalletManagementInterface(): void {
 
 /**
  * Load and display wallet list in management interface
+ * Supports both v1 (flat) and v2 (hierarchical) modes
  */
 export async function loadWalletManagementList(): Promise<void> {
     try {
         console.log('[Wallet Management] Loading wallet list');
 
-        const walletsResponse = await ExtensionMessaging.getAllWallets();
-        if (!walletsResponse.success || !walletsResponse.data) {
-            showError('Failed to load wallets');
-            return;
+        // Check if we're in hierarchical mode (v2)
+        const versionResponse = await ExtensionMessaging.getWalletVersion();
+        const isV2 = versionResponse.success && versionResponse.data === 2;
+
+        if (isV2) {
+            setIsHierarchicalMode(true);
+            await loadHierarchicalWalletList();
+        } else {
+            setIsHierarchicalMode(false);
+            await loadFlatWalletList();
         }
-
-        const wallets = walletsResponse.data;
-        console.log(`[Wallet Management] Loaded ${wallets.length} wallet(s)`);
-
-        const activeWalletData = await chrome.storage.local.get(['activeWalletId']);
-        const activeWalletId = activeWalletData.activeWalletId;
-
-        const listContainer = document.getElementById('wallet-management-list');
-        if (!listContainer) {
-            console.error('[Wallet Management] List container not found');
-            return;
-        }
-
-        if (wallets.length === 0) {
-            listContainer.innerHTML = '<div class="no-transactions" style="padding: 40px 20px;">No wallets found</div>';
-            return;
-        }
-
-        listContainer.innerHTML = wallets.map(wallet => {
-            const isActive = wallet.id === activeWalletId;
-            const canDelete = wallets.length > 1;
-            const createdDate = new Date(wallet.createdAt).toLocaleDateString();
-
-            return `
-                <div class="wallet-mgmt-item ${isActive ? 'active' : ''}" data-wallet-id="${wallet.id}">
-                    <div class="wallet-mgmt-header">
-                        <div class="wallet-mgmt-name">
-                            ${wallet.nickname}
-                            ${isActive ? '<span class="active-badge">Active</span>' : ''}
-                        </div>
-                    </div>
-                    <div class="wallet-mgmt-balance">
-                        Created: ${createdDate}
-                    </div>
-                    <div class="wallet-mgmt-actions">
-                        <button class="wallet-mgmt-btn rename-btn" data-wallet-id="${wallet.id}" data-wallet-name="${wallet.nickname}">
-                            Rename
-                        </button>
-                        <button class="wallet-mgmt-btn delete-btn" data-wallet-id="${wallet.id}" ${!canDelete ? 'disabled' : ''}>
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        attachWalletManagementListeners();
 
     } catch (error) {
         console.error('[Wallet Management] Failed to load wallet list:', error);
         showError('Failed to load wallets');
+    }
+}
+
+/**
+ * Load flat wallet list (v1 mode - backward compatibility)
+ */
+async function loadFlatWalletList(): Promise<void> {
+    const walletsResponse = await ExtensionMessaging.getAllWallets();
+    if (!walletsResponse.success || !walletsResponse.data) {
+        showError('Failed to load wallets');
+        return;
+    }
+
+    const wallets = walletsResponse.data;
+    console.log(`[Wallet Management] Loaded ${wallets.length} wallet(s) (v1 flat mode)`);
+
+    const activeWalletData = await chrome.storage.local.get(['activeWalletId']);
+    const activeWalletId = activeWalletData.activeWalletId;
+
+    const listContainer = document.getElementById('wallet-management-list');
+    if (!listContainer) {
+        console.error('[Wallet Management] List container not found');
+        return;
+    }
+
+    if (wallets.length === 0) {
+        listContainer.innerHTML = '<div class="no-transactions" style="padding: 40px 20px;">No wallets found</div>';
+        return;
+    }
+
+    listContainer.innerHTML = wallets.map(wallet => {
+        const isActive = wallet.id === activeWalletId;
+        const canDelete = wallets.length > 1;
+        const createdDate = new Date(wallet.createdAt).toLocaleDateString();
+
+        return `
+            <div class="wallet-mgmt-item ${isActive ? 'active' : ''}" data-wallet-id="${wallet.id}">
+                <div class="wallet-mgmt-header">
+                    <div class="wallet-mgmt-name">
+                        ${wallet.nickname}
+                        ${isActive ? '<span class="active-badge">Active</span>' : ''}
+                    </div>
+                </div>
+                <div class="wallet-mgmt-balance">
+                    Created: ${createdDate}
+                </div>
+                <div class="wallet-mgmt-actions">
+                    <button class="wallet-mgmt-btn rename-btn" data-wallet-id="${wallet.id}" data-wallet-name="${wallet.nickname}">
+                        Rename
+                    </button>
+                    <button class="wallet-mgmt-btn delete-btn" data-wallet-id="${wallet.id}" ${!canDelete ? 'disabled' : ''}>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    attachWalletManagementListeners();
+}
+
+/**
+ * Load hierarchical wallet list (v2 mode - master keys with sub-wallets)
+ */
+async function loadHierarchicalWalletList(): Promise<void> {
+    const masterKeysResponse = await ExtensionMessaging.getMasterKeyMetadata();
+    if (!masterKeysResponse.success || !masterKeysResponse.data) {
+        showError('Failed to load master keys');
+        return;
+    }
+
+    const masterKeyList: MasterKeyMetadata[] = masterKeysResponse.data;
+    setMasterKeys(masterKeyList);
+    console.log(`[Wallet Management] Loaded ${masterKeyList.length} master key(s) (v2 hierarchical mode)`);
+
+    // Get active wallet info
+    const activeData = await chrome.storage.local.get(['multiWalletData']);
+    let currentActiveMasterKeyId = '';
+    let currentActiveSubWalletIndex = 0;
+
+    if (activeData.multiWalletData) {
+        try {
+            const data = JSON.parse(activeData.multiWalletData);
+            currentActiveMasterKeyId = data.activeMasterKeyId || '';
+            currentActiveSubWalletIndex = data.activeSubWalletIndex || 0;
+        } catch (e) {
+            console.error('[Wallet Management] Failed to parse active wallet data');
+        }
+    }
+
+    setActiveMasterKeyId(currentActiveMasterKeyId);
+    setActiveSubWalletIndex(currentActiveSubWalletIndex);
+
+    const listContainer = document.getElementById('wallet-management-list');
+    if (!listContainer) {
+        console.error('[Wallet Management] List container not found');
+        return;
+    }
+
+    if (masterKeyList.length === 0) {
+        listContainer.innerHTML = '<div class="no-transactions" style="padding: 40px 20px;">No wallets found</div>';
+        return;
+    }
+
+    // Build hierarchical HTML
+    let html = '';
+
+    for (const mk of masterKeyList) {
+        const isActiveMasterKey = mk.id === currentActiveMasterKeyId;
+        const isExpanded = expandedMasterKeys.has(mk.id) || mk.isExpanded;
+        const canDeleteMasterKey = masterKeyList.length > 1;
+        const createdDate = new Date(mk.createdAt).toLocaleDateString();
+
+        // Fetch sub-wallets for this master key
+        const subWalletsResponse = await ExtensionMessaging.getSubWallets(mk.id);
+        const subWallets: SubWalletEntry[] = subWalletsResponse.success && subWalletsResponse.data
+            ? subWalletsResponse.data
+            : [];
+
+        html += `
+            <div class="master-key-item ${isExpanded ? 'expanded' : 'collapsed'} ${isActiveMasterKey ? 'active' : ''}"
+                 data-master-id="${mk.id}">
+                <div class="master-key-header" data-master-id="${mk.id}">
+                    <span class="master-key-icon">🔑</span>
+                    <span class="master-key-name">${mk.nickname}</span>
+                    <span class="sub-wallet-count">(${mk.subWalletCount})</span>
+                    <span class="expand-icon">${isExpanded ? '▼' : '▶'}</span>
+                </div>
+                <div class="master-key-meta">Created: ${createdDate}</div>
+                <div class="master-key-actions">
+                    <button class="wallet-mgmt-btn rename-master-btn"
+                            data-master-id="${mk.id}"
+                            data-master-name="${mk.nickname}">
+                        Rename
+                    </button>
+                    <button class="wallet-mgmt-btn delete-master-btn"
+                            data-master-id="${mk.id}"
+                            ${!canDeleteMasterKey ? 'disabled' : ''}>
+                        Delete
+                    </button>
+                </div>
+
+                <div class="sub-wallet-list ${isExpanded ? '' : 'hidden'}">
+                    <button class="add-sub-wallet-btn" data-master-id="${mk.id}">
+                        + Add Sub-Wallet
+                    </button>
+                    ${subWallets.map(sw => {
+                        const isActiveSubWallet = isActiveMasterKey && sw.index === currentActiveSubWalletIndex;
+                        const canDeleteSubWallet = subWallets.length > 1;
+
+                        return `
+                            <div class="sub-wallet-item ${isActiveSubWallet ? 'active' : ''}"
+                                 data-master-id="${mk.id}"
+                                 data-sub-index="${sw.index}">
+                                <div class="sub-wallet-header">
+                                    <span class="sub-wallet-icon">💼</span>
+                                    <span class="sub-wallet-name">${sw.nickname}</span>
+                                    ${isActiveSubWallet ? '<span class="active-badge">Active</span>' : ''}
+                                </div>
+                                <div class="sub-wallet-actions">
+                                    <button class="wallet-mgmt-btn rename-sub-btn"
+                                            data-master-id="${mk.id}"
+                                            data-sub-index="${sw.index}"
+                                            data-sub-name="${sw.nickname}">
+                                        Rename
+                                    </button>
+                                    <button class="wallet-mgmt-btn delete-sub-btn"
+                                            data-master-id="${mk.id}"
+                                            data-sub-index="${sw.index}"
+                                            ${!canDeleteSubWallet ? 'disabled' : ''}>
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    listContainer.innerHTML = html;
+    attachHierarchicalWalletListeners();
+}
+
+/**
+ * Attach event listeners for hierarchical wallet management
+ */
+function attachHierarchicalWalletListeners(): void {
+    // Master key expand/collapse
+    document.querySelectorAll('.master-key-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+            const target = e.currentTarget as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            if (masterId) {
+                handleToggleMasterKeyExpand(masterId);
+            }
+        });
+    });
+
+    // Rename master key
+    document.querySelectorAll('.rename-master-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const currentName = target.getAttribute('data-master-name');
+            if (masterId && currentName) {
+                await handleRenameMasterKey(masterId, currentName);
+            }
+        });
+    });
+
+    // Delete master key
+    document.querySelectorAll('.delete-master-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            if (masterId) {
+                await handleDeleteMasterKey(masterId);
+            }
+        });
+    });
+
+    // Add sub-wallet
+    document.querySelectorAll('.add-sub-wallet-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            if (masterId) {
+                await handleAddSubWallet(masterId);
+            }
+        });
+    });
+
+    // Rename sub-wallet
+    document.querySelectorAll('.rename-sub-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const subIndex = target.getAttribute('data-sub-index');
+            const currentName = target.getAttribute('data-sub-name');
+            if (masterId && subIndex && currentName) {
+                await handleRenameSubWallet(masterId, parseInt(subIndex, 10), currentName);
+            }
+        });
+    });
+
+    // Delete sub-wallet
+    document.querySelectorAll('.delete-sub-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const subIndex = target.getAttribute('data-sub-index');
+            if (masterId && subIndex) {
+                await handleDeleteSubWallet(masterId, parseInt(subIndex, 10));
+            }
+        });
+    });
+}
+
+// ========================================
+// Hierarchical Wallet Operations
+// ========================================
+
+/**
+ * Toggle master key expand/collapse state
+ */
+function handleToggleMasterKeyExpand(masterId: string): void {
+    console.log(`[Wallet Management] Toggling master key expansion: ${masterId}`);
+
+    toggleMasterKeyExpandedState(masterId);
+
+    // Update UI
+    const masterKeyItem = document.querySelector(`.master-key-item[data-master-id="${masterId}"]`);
+    const subWalletList = masterKeyItem?.querySelector('.sub-wallet-list');
+    const expandIcon = masterKeyItem?.querySelector('.expand-icon');
+
+    if (masterKeyItem && subWalletList && expandIcon) {
+        const isNowExpanded = expandedMasterKeys.has(masterId);
+        masterKeyItem.classList.toggle('expanded', isNowExpanded);
+        masterKeyItem.classList.toggle('collapsed', !isNowExpanded);
+        subWalletList.classList.toggle('hidden', !isNowExpanded);
+        expandIcon.textContent = isNowExpanded ? '▼' : '▶';
+    }
+
+    // Persist expansion state
+    ExtensionMessaging.toggleMasterKeyExpanded(masterId).catch(console.error);
+}
+
+/**
+ * Handle rename master key
+ */
+async function handleRenameMasterKey(masterId: string, currentName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Renaming master key ${masterId}`);
+
+        // Store context for rename
+        setRenameWalletId(`master:${masterId}`);
+        setRenameWalletCurrentName(currentName);
+
+        showRenameInterface(currentName);
+    } catch (error) {
+        console.error('[Wallet Management] Failed to show rename interface:', error);
+        showError('Failed to open rename screen');
+    }
+}
+
+/**
+ * Handle delete master key
+ */
+async function handleDeleteMasterKey(masterId: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Deleting master key ${masterId}`);
+
+        const masterKey = masterKeys.find(mk => mk.id === masterId);
+        const masterName = masterKey?.nickname || 'this master key';
+        const subWalletCount = masterKey?.subWalletCount || 0;
+
+        const confirmed = confirm(
+            `Are you sure you want to delete "${masterName}" and ALL ${subWalletCount} sub-wallet(s)?\n\n` +
+            `This action cannot be undone. Make sure you have backed up your recovery phrase!`
+        );
+        if (!confirmed) return;
+
+        const pin = await showPINModal('Enter your PIN to delete master key');
+        if (!pin) return;
+
+        const response = await ExtensionMessaging.removeMasterKey(masterId, pin);
+        if (response.success) {
+            showSuccess('Master key deleted successfully!');
+            await loadWalletManagementList();
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to delete master key');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Delete master key failed:', error);
+        showError('Failed to delete master key');
+    }
+}
+
+/**
+ * Handle add sub-wallet to a master key
+ */
+async function handleAddSubWallet(masterId: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Adding sub-wallet to master key ${masterId}`);
+
+        // Prompt for nickname
+        const nickname = prompt('Enter a name for the new sub-wallet:', 'Sub-Wallet');
+        if (!nickname || !nickname.trim()) {
+            return; // User cancelled
+        }
+
+        const response = await ExtensionMessaging.addSubWallet(masterId, nickname.trim());
+        if (response.success) {
+            showSuccess(`Sub-wallet "${nickname}" created!`);
+            await loadWalletManagementList();
+        } else {
+            showError(response.error || 'Failed to create sub-wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Add sub-wallet failed:', error);
+        showError('Failed to create sub-wallet');
+    }
+}
+
+/**
+ * Handle rename sub-wallet
+ */
+async function handleRenameSubWallet(masterId: string, subIndex: number, currentName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Renaming sub-wallet ${masterId}:${subIndex}`);
+
+        // Store context for rename
+        setRenameWalletId(`sub:${masterId}:${subIndex}`);
+        setRenameWalletCurrentName(currentName);
+
+        showRenameInterface(currentName);
+    } catch (error) {
+        console.error('[Wallet Management] Failed to show rename interface:', error);
+        showError('Failed to open rename screen');
+    }
+}
+
+/**
+ * Handle delete sub-wallet
+ */
+async function handleDeleteSubWallet(masterId: string, subIndex: number): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Deleting sub-wallet ${masterId}:${subIndex}`);
+
+        const confirmed = confirm(
+            'Are you sure you want to delete this sub-wallet?\n\n' +
+            'This action cannot be undone. Make sure you have backed up your recovery phrase!'
+        );
+        if (!confirmed) return;
+
+        const pin = await showPINModal('Enter your PIN to delete sub-wallet');
+        if (!pin) return;
+
+        const response = await ExtensionMessaging.removeSubWallet(masterId, subIndex, pin);
+        if (response.success) {
+            showSuccess('Sub-wallet deleted successfully!');
+            await loadWalletManagementList();
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to delete sub-wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Delete sub-wallet failed:', error);
+        showError('Failed to delete sub-wallet');
     }
 }
 
@@ -550,6 +939,11 @@ export function showRenameInterface(currentName: string): void {
 
 /**
  * Handle rename save action
+ * Supports v1 wallet renaming, v2 master key renaming, and v2 sub-wallet renaming
+ * Format of renameWalletId:
+ * - v1 wallet: "<walletId>"
+ * - v2 master key: "master:<masterKeyId>"
+ * - v2 sub-wallet: "sub:<masterKeyId>:<subWalletIndex>"
  */
 export async function handleRenameSave(): Promise<void> {
     try {
@@ -573,24 +967,39 @@ export async function handleRenameSave(): Promise<void> {
 
         if (!newName) {
             if (errorEl) {
-                errorEl.textContent = 'Please enter a wallet name';
+                errorEl.textContent = 'Please enter a name';
                 errorEl.classList.remove('hidden');
             }
             return;
         }
 
-        const pin = sessionPin || '';
-        if (!pin) {
-            showError('Session expired. Please unlock wallet again.');
-            return;
+        console.log('[Rename] Saving new name', { id: renameWalletId, newName });
+
+        let response;
+
+        // Determine rename type based on ID format
+        if (renameWalletId.startsWith('master:')) {
+            // Renaming a master key (v2)
+            const masterKeyId = renameWalletId.substring(7); // Remove "master:" prefix
+            response = await ExtensionMessaging.renameMasterKey(masterKeyId, newName);
+        } else if (renameWalletId.startsWith('sub:')) {
+            // Renaming a sub-wallet (v2)
+            const parts = renameWalletId.split(':');
+            const masterKeyId = parts[1];
+            const subWalletIndex = parseInt(parts[2], 10);
+            response = await ExtensionMessaging.renameSubWallet(masterKeyId, subWalletIndex, newName);
+        } else {
+            // Renaming a v1 wallet
+            const pin = sessionPin || '';
+            if (!pin) {
+                showError('Session expired. Please unlock wallet again.');
+                return;
+            }
+            response = await ExtensionMessaging.renameWallet(renameWalletId, newName, pin);
         }
 
-        console.log('[Rename] Saving new wallet name', { walletId: renameWalletId, newName });
-
-        const response = await ExtensionMessaging.renameWallet(renameWalletId, newName, pin);
-
         if (response.success) {
-            showSuccess('Wallet renamed successfully!');
+            showSuccess('Renamed successfully!');
 
             setRenameWalletId(null);
             setRenameWalletCurrentName(null);
@@ -601,7 +1010,7 @@ export async function handleRenameSave(): Promise<void> {
             await initializeMultiWalletUI();
         } else {
             if (errorEl) {
-                errorEl.textContent = response.error || 'Failed to rename wallet';
+                errorEl.textContent = response.error || 'Failed to rename';
                 errorEl.classList.remove('hidden');
             }
         }
@@ -609,7 +1018,7 @@ export async function handleRenameSave(): Promise<void> {
         console.error('[Rename] Save failed:', error);
         const errorEl = document.getElementById('rename-error-message');
         if (errorEl) {
-            errorEl.textContent = 'Failed to rename wallet';
+            errorEl.textContent = 'Failed to rename';
             errorEl.classList.remove('hidden');
         }
     } finally {

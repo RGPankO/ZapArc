@@ -770,4 +770,105 @@ export class WalletManager {
       return false;
     }
   }
+
+  // ========================================
+  // Hierarchical Multi-Wallet Methods (v2)
+  // ========================================
+
+  /**
+   * Get the current wallet storage version
+   * @returns 0 = legacy single, 1 = flat multi-wallet, 2 = hierarchical
+   */
+  async getWalletVersion(): Promise<number> {
+    return this.storage.getWalletVersion();
+  }
+
+  /**
+   * Get all master key metadata (without decryption)
+   */
+  async getMasterKeyMetadata(): Promise<import('../types').MasterKeyMetadata[]> {
+    return this.storage.getMasterKeyMetadata();
+  }
+
+  /**
+   * Get sub-wallets for a specific master key
+   */
+  async getSubWallets(masterKeyId: string): Promise<import('../types').SubWalletEntry[]> {
+    return this.storage.getSubWallets(masterKeyId);
+  }
+
+  /**
+   * Add a new master key with mnemonic
+   */
+  async addMasterKey(
+    mnemonic: string,
+    nickname: string,
+    pin: string,
+    createDefaultSubWallet: boolean = true
+  ): Promise<string> {
+    return this.storage.addMasterKey(mnemonic, nickname, pin, createDefaultSubWallet);
+  }
+
+  /**
+   * Add a sub-wallet to an existing master key
+   */
+  async addSubWallet(masterKeyId: string, nickname: string): Promise<number> {
+    return this.storage.addSubWallet(masterKeyId, nickname);
+  }
+
+  /**
+   * Remove a master key and all its sub-wallets
+   */
+  async removeMasterKey(masterKeyId: string): Promise<void> {
+    return this.storage.removeMasterKey(masterKeyId);
+  }
+
+  /**
+   * Remove a sub-wallet from a master key
+   */
+  async removeSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    return this.storage.removeSubWallet(masterKeyId, subWalletIndex);
+  }
+
+  /**
+   * Set the active wallet (master key + sub-wallet)
+   */
+  async setActiveHierarchicalWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    return this.storage.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
+  }
+
+  /**
+   * Rename a master key
+   */
+  async renameMasterKey(masterKeyId: string, newNickname: string): Promise<void> {
+    return this.storage.renameMasterKey(masterKeyId, newNickname);
+  }
+
+  /**
+   * Rename a sub-wallet
+   */
+  async renameSubWallet(masterKeyId: string, subWalletIndex: number, newNickname: string): Promise<void> {
+    return this.storage.renameSubWallet(masterKeyId, subWalletIndex, newNickname);
+  }
+
+  /**
+   * Toggle master key expansion state in UI
+   */
+  async toggleMasterKeyExpanded(masterKeyId: string): Promise<void> {
+    return this.storage.toggleMasterKeyExpanded(masterKeyId);
+  }
+
+  /**
+   * Check if migration to hierarchical (v2) is needed
+   */
+  async needsHierarchicalMigration(): Promise<boolean> {
+    return this.storage.needsHierarchicalMigration();
+  }
+
+  /**
+   * Migrate from v1 to v2 hierarchical storage
+   */
+  async migrateToHierarchical(): Promise<void> {
+    return this.storage.migrateToHierarchical();
+  }
 }

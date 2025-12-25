@@ -636,6 +636,205 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      // ========================================
+      // Hierarchical Multi-Wallet Messages (v2)
+      // ========================================
+
+      case 'GET_WALLET_VERSION':
+        try {
+          const version = await walletManager.getWalletVersion();
+          sendResponse({ success: true, data: version });
+        } catch (error) {
+          console.error('[Background] GET_WALLET_VERSION - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get wallet version' });
+        }
+        break;
+
+      case 'GET_MASTER_KEY_METADATA':
+        try {
+          const metadata = await walletManager.getMasterKeyMetadata();
+          sendResponse({ success: true, data: metadata });
+        } catch (error) {
+          console.error('[Background] GET_MASTER_KEY_METADATA - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get master key metadata' });
+        }
+        break;
+
+      case 'GET_SUB_WALLETS':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          const subWallets = await walletManager.getSubWallets(masterKeyId);
+          sendResponse({ success: true, data: subWallets });
+        } catch (error) {
+          console.error('[Background] GET_SUB_WALLETS - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get sub-wallets' });
+        }
+        break;
+
+      case 'ADD_MASTER_KEY':
+        try {
+          const { mnemonic, nickname, pin, createDefaultSubWallet } = message;
+          if (!mnemonic || !nickname || !pin) {
+            throw new Error('Mnemonic, nickname, and PIN are required');
+          }
+          const masterKeyId = await walletManager.addMasterKey(
+            mnemonic,
+            nickname,
+            pin,
+            createDefaultSubWallet !== false
+          );
+          sendResponse({ success: true, data: masterKeyId });
+        } catch (error) {
+          console.error('[Background] ADD_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to add master key'
+          });
+        }
+        break;
+
+      case 'ADD_SUB_WALLET':
+        try {
+          const { masterKeyId, nickname } = message;
+          if (!masterKeyId || !nickname) {
+            throw new Error('Master key ID and nickname are required');
+          }
+          const subWalletIndex = await walletManager.addSubWallet(masterKeyId, nickname);
+          sendResponse({ success: true, data: subWalletIndex });
+        } catch (error) {
+          console.error('[Background] ADD_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to add sub-wallet'
+          });
+        }
+        break;
+
+      case 'REMOVE_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          await walletManager.removeMasterKey(masterKeyId);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] REMOVE_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to remove master key'
+          });
+        }
+        break;
+
+      case 'REMOVE_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          await walletManager.removeSubWallet(masterKeyId, subWalletIndex);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] REMOVE_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to remove sub-wallet'
+          });
+        }
+        break;
+
+      case 'SET_ACTIVE_HIERARCHICAL_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          await walletManager.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] SET_ACTIVE_HIERARCHICAL_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to set active wallet'
+          });
+        }
+        break;
+
+      case 'RENAME_MASTER_KEY':
+        try {
+          const { masterKeyId, newNickname } = message;
+          if (!masterKeyId || !newNickname) {
+            throw new Error('Master key ID and new nickname are required');
+          }
+          await walletManager.renameMasterKey(masterKeyId, newNickname);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RENAME_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to rename master key'
+          });
+        }
+        break;
+
+      case 'RENAME_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex, newNickname } = message;
+          if (!masterKeyId || subWalletIndex === undefined || !newNickname) {
+            throw new Error('Master key ID, sub-wallet index, and new nickname are required');
+          }
+          await walletManager.renameSubWallet(masterKeyId, subWalletIndex, newNickname);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RENAME_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to rename sub-wallet'
+          });
+        }
+        break;
+
+      case 'TOGGLE_MASTER_KEY_EXPANDED':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          await walletManager.toggleMasterKeyExpanded(masterKeyId);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] TOGGLE_MASTER_KEY_EXPANDED - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to toggle expansion' });
+        }
+        break;
+
+      case 'NEEDS_HIERARCHICAL_MIGRATION':
+        try {
+          const needsMigration = await walletManager.needsHierarchicalMigration();
+          sendResponse({ success: true, data: needsMigration });
+        } catch (error) {
+          console.error('[Background] NEEDS_HIERARCHICAL_MIGRATION - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to check migration status' });
+        }
+        break;
+
+      case 'MIGRATE_TO_HIERARCHICAL':
+        try {
+          await walletManager.migrateToHierarchical();
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] MIGRATE_TO_HIERARCHICAL - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to migrate'
+          });
+        }
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown message type' });
     }

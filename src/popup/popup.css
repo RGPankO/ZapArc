@@ -1744,6 +1744,172 @@ body.modal-open {
   cursor: not-allowed;
 }
 
+/* ========================================
+   Hierarchical Wallet Management (v2)
+   ======================================== */
+
+/* Master Key Item */
+.master-key-item {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.master-key-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.master-key-item.active {
+  border-color: #4caf50;
+  background: #f1f8f4;
+}
+
+/* Master Key Header (clickable for expand/collapse) */
+.master-key-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.master-key-header:hover {
+  opacity: 0.8;
+}
+
+.master-key-icon {
+  font-size: 16px;
+}
+
+.master-key-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.sub-wallet-count {
+  font-size: 12px;
+  color: #666;
+  margin-right: 8px;
+}
+
+.expand-icon {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.2s;
+}
+
+.master-key-item.collapsed .expand-icon {
+  transform: rotate(0deg);
+}
+
+.master-key-item.expanded .expand-icon {
+  transform: rotate(0deg);
+}
+
+/* Master Key Metadata */
+.master-key-meta {
+  font-size: 12px;
+  color: #888;
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+/* Master Key Actions */
+.master-key-actions {
+  display: flex;
+  gap: 8px;
+  padding-left: 24px;
+  margin-bottom: 8px;
+}
+
+/* Sub-Wallet List (nested) */
+.sub-wallet-list {
+  margin-left: 24px;
+  margin-top: 12px;
+  border-left: 2px solid #e0e0e0;
+  padding-left: 12px;
+}
+
+.sub-wallet-list.hidden {
+  display: none;
+}
+
+/* Add Sub-Wallet Button */
+.add-sub-wallet-btn {
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed #ccc;
+  background: transparent;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.add-sub-wallet-btn:hover {
+  border-color: #4caf50;
+  color: #4caf50;
+  background: #f9fff9;
+}
+
+/* Sub-Wallet Item */
+.sub-wallet-item {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.sub-wallet-item:hover {
+  background: #f0f0f0;
+}
+
+.sub-wallet-item.active {
+  border-color: #4caf50;
+  background: #e8f5e9;
+}
+
+/* Sub-Wallet Header */
+.sub-wallet-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sub-wallet-icon {
+  font-size: 14px;
+}
+
+.sub-wallet-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  flex: 1;
+}
+
+/* Sub-Wallet Actions */
+.sub-wallet-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sub-wallet-actions .wallet-mgmt-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 /* Deposit and Withdraw Interface Styles */
 #deposit-interface,
 #withdraw-interface {
