@@ -118,28 +118,54 @@ export async function initializeMultiWalletUI(): Promise<void> {
 /**
  * Update wallet selector UI with current wallets
  */
-export function updateWalletSelectorUI(): void {
-    // Find active wallet
-    const activeWallet = currentWallets.find(w => {
-        return w.lastUsedAt === Math.max(...currentWallets.map(w => w.lastUsedAt));
-    });
+export async function updateWalletSelectorUI(): Promise<void> {
+    try {
+        // Get active hierarchical wallet info
+        const result = await chrome.storage.local.get(['multiWalletData']);
+        if (!result.multiWalletData) return;
 
-    if (!activeWallet) return;
+        const multiWalletData = JSON.parse(result.multiWalletData);
+        const activeWalletId = multiWalletData.activeWalletId;
+        const activeSubWalletIndex = multiWalletData.activeSubWalletIndex || 0;
 
-    // Update current wallet button
-    const currentWalletName = document.getElementById('current-wallet-name');
-    if (currentWalletName) {
-        currentWalletName.textContent = activeWallet.nickname;
+        if (!activeWalletId) return;
+
+        // Find the active wallet
+        const activeWallet = multiWalletData.wallets?.find((w: any) => w.metadata.id === activeWalletId);
+        if (!activeWallet) return;
+
+        // Determine display name based on active sub-wallet
+        let displayName = activeWallet.metadata.nickname;
+        
+        if (activeSubWalletIndex === 0) {
+            // Master wallet is active (index 0)
+            displayName = activeWallet.metadata.nickname;
+        } else if (activeWallet.subWallets) {
+            // Find the active sub-wallet
+            const activeSubWallet = activeWallet.subWallets.find((sw: any) => sw.index === activeSubWalletIndex);
+            if (activeSubWallet) {
+                displayName = activeSubWallet.nickname;
+            }
+        }
+
+        // Update current wallet button
+        const currentWalletName = document.getElementById('current-wallet-name');
+        if (currentWalletName) {
+            currentWalletName.textContent = displayName;
+        }
+
+        // Update wallet count badge
+        const walletCountBadge = document.getElementById('wallet-count-badge');
+        if (walletCountBadge) {
+            const totalWallets = multiWalletData.wallets?.length || 0;
+            walletCountBadge.textContent = totalWallets.toString();
+        }
+
+        // Populate wallet dropdown list
+        await populateWalletDropdown();
+    } catch (error) {
+        console.error('[Wallet Management] Error updating wallet selector UI:', error);
     }
-
-    // Update wallet count badge
-    const walletCountBadge = document.getElementById('wallet-count-badge');
-    if (walletCountBadge) {
-        walletCountBadge.textContent = currentWallets.length.toString();
-    }
-
-    // Populate wallet dropdown list
-    populateWalletDropdown();
 }
 
 /**
