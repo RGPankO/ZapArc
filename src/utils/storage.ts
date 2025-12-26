@@ -1122,19 +1122,14 @@ export class ChromeStorageManager {
         activeWalletId: v1Data.activeWalletId
       });
 
-      // 3. Convert each wallet to a master key with one sub-wallet
+      // 3. Convert each wallet to a master key (no automatic sub-wallets)
       const masterKeys: MasterKeyEntry[] = v1Data.wallets.map(wallet => ({
         id: wallet.metadata.id,
         nickname: wallet.metadata.nickname,
         encryptedMnemonic: wallet.encryptedMnemonic as EncryptedData,
         createdAt: wallet.metadata.createdAt,
         lastUsedAt: wallet.metadata.lastUsedAt,
-        subWallets: [{
-          index: 0, // Original mnemonic unchanged
-          nickname: 'Default',
-          createdAt: wallet.metadata.createdAt,
-          lastUsedAt: wallet.metadata.lastUsedAt
-        }],
+        subWallets: [], // Empty - no automatic sub-wallets
         isExpanded: false
       }));
 
@@ -1205,7 +1200,7 @@ export class ChromeStorageManager {
         nickname: wallet.metadata.nickname,
         createdAt: wallet.metadata.createdAt,
         lastUsedAt: wallet.metadata.lastUsedAt,
-        subWalletCount: (wallet.subWallets?.length || 0) + 1, // +1 for the wallet itself (index 0)
+        subWalletCount: wallet.subWallets?.length || 0, // Only count actual sub-wallets, not the master
         isExpanded: false // Default collapsed
       }));
 
@@ -1241,20 +1236,8 @@ export class ChromeStorageManager {
         return [];
       }
 
-      // Create a list starting with the wallet itself (index 0 = original mnemonic)
-      const subWallets: SubWalletEntry[] = [
-        {
-          index: 0,
-          nickname: 'Default', // The original wallet
-          createdAt: wallet.metadata.createdAt,
-          lastUsedAt: wallet.metadata.lastUsedAt
-        }
-      ];
-
-      // Add any additional sub-wallets
-      if (wallet.subWallets) {
-        subWallets.push(...wallet.subWallets);
-      }
+      // Return only actual sub-wallets (index > 0), not the master wallet itself
+      const subWallets: SubWalletEntry[] = wallet.subWallets || [];
 
       console.log('✅ [Storage] GET_SUB_WALLETS SUCCESS', {
         count: subWallets.length

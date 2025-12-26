@@ -745,7 +745,7 @@ async function loadHierarchicalWalletList(): Promise<void> {
                     </div>
                     ${subWallets.map(sw => {
                         const isActiveSubWallet = isActiveMasterKey && sw.index === currentActiveSubWalletIndex;
-                        const canDeleteSubWallet = subWallets.length > 1;
+                        const canDeleteSubWallet = subWallets.length > 0; // Can delete any sub-wallet
 
                         return `
                             <div class="sub-wallet-item ${isActiveSubWallet ? 'active' : ''}"
