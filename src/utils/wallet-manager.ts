@@ -867,13 +867,6 @@ export class WalletManager {
   }
 
   /**
-   * Migrate from v1 to v2 hierarchical storage
-   */
-  async migrateToHierarchical(): Promise<void> {
-    return this.storage.migrateToHierarchical();
-  }
-
-  /**
    * Get the derived mnemonic for a specific hierarchical wallet
    * This is used when switching wallets to get the correct mnemonic for SDK connection
    *

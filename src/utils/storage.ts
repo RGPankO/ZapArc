@@ -9,9 +9,6 @@ import {
   EncryptedWalletEntry,
   WalletMetadata,
   MultiWalletStorage,
-  // Hierarchical wallet types (v2)
-  HierarchicalWalletStorage,
-  MasterKeyEntry,
   SubWalletEntry,
   MasterKeyMetadata,
   EncryptedData,
@@ -1092,85 +1089,6 @@ export class ChromeStorageManager {
     } catch (error) {
       console.error('❌ [Storage] Failed to check hierarchical migration status', error);
       return false;
-    }
-  }
-
-  /**
-   * Migrate from v1 (flat multi-wallet) to v2 (hierarchical)
-   * Each existing wallet becomes a master key with one sub-wallet (index 0)
-   * Note: PIN not needed as we're copying already-encrypted data
-   */
-  async migrateToHierarchical(_pin?: string): Promise<void> {
-    console.log('🔵 [Storage] MIGRATE_TO_HIERARCHICAL START', {
-      timestamp: new Date().toISOString()
-    });
-
-    try {
-      // 1. Check if migration is needed
-      const needsMigration = await this.needsHierarchicalMigration();
-      if (!needsMigration) {
-        console.log('⚠️ [Storage] Hierarchical migration not needed or already completed');
-        return;
-      }
-
-      // 2. Load existing v1 data
-      const result = await chrome.storage.local.get(['multiWalletData']);
-      const v1Data: MultiWalletStorage = JSON.parse(result.multiWalletData);
-
-      console.log('🔍 [Storage] Migrating v1 wallets to v2 hierarchical', {
-        walletCount: v1Data.wallets.length,
-        activeWalletId: v1Data.activeWalletId
-      });
-
-      // 3. Convert each wallet to a master key (no automatic sub-wallets)
-      const masterKeys: MasterKeyEntry[] = v1Data.wallets.map(wallet => ({
-        id: wallet.metadata.id,
-        nickname: wallet.metadata.nickname,
-        encryptedMnemonic: wallet.encryptedMnemonic as EncryptedData,
-        createdAt: wallet.metadata.createdAt,
-        lastUsedAt: wallet.metadata.lastUsedAt,
-        subWallets: [], // Empty - no automatic sub-wallets
-        isExpanded: false
-      }));
-
-      // 4. Create v2 hierarchical structure
-      const v2Data: HierarchicalWalletStorage = {
-        version: 2,
-        masterKeys,
-        activeMasterKeyId: v1Data.activeWalletId,
-        activeSubWalletIndex: 0,
-        masterKeyOrder: v1Data.walletOrder
-      };
-
-      // 5. Backup v1 data
-      await chrome.storage.local.set({
-        backup_v1_multiWalletData: result.multiWalletData
-      });
-
-      // 6. Save v2 data
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(v2Data),
-        walletVersion: 2
-      });
-
-      console.log('✅ [Storage] MIGRATE_TO_HIERARCHICAL SUCCESS', {
-        timestamp: new Date().toISOString(),
-        masterKeyCount: masterKeys.length
-      });
-
-      // 7. Verify migration
-      const verification = await chrome.storage.local.get(['multiWalletData']);
-      const verifyData = JSON.parse(verification.multiWalletData);
-      if (verifyData.version !== 2) {
-        throw new Error('Migration verification failed');
-      }
-
-    } catch (error) {
-      console.error('❌ [Storage] MIGRATE_TO_HIERARCHICAL FAILED', {
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString()
-      });
-      throw error;
     }
   }
 

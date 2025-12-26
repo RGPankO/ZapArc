@@ -80,34 +80,8 @@ export interface SubWalletEntry {
   //       and recalculating the 12th word (checksum)
 }
 
-/**
- * Master key entry containing the root mnemonic and derived sub-wallets
- */
-export interface MasterKeyEntry {
-  id: string;                        // UUID for stable identification
-  nickname: string;                  // User-friendly name (e.g., "Main Wallet")
-  encryptedMnemonic: EncryptedData;  // The master mnemonic (encrypted)
-  createdAt: number;                 // Timestamp of master key creation
-  lastUsedAt: number;                // Timestamp of last usage
-  subWallets: SubWalletEntry[];      // Array of derived sub-wallets
-  isExpanded: boolean;               // UI state: is this master key expanded in dropdown?
-}
-
-/**
- * Hierarchical multi-key multi-wallet storage structure (v2)
- *
- * Architecture:
- * - Multiple master keys (each with its own mnemonic)
- * - Each master key can have multiple sub-wallets (max 20)
- * - Sub-wallets are derived by modifying the 11th word and recalculating checksum
- */
-export interface HierarchicalWalletStorage {
-  version: 2;                        // Schema version (2 for hierarchical)
-  masterKeys: MasterKeyEntry[];      // All master key entries
-  activeMasterKeyId: string;         // Currently selected master key UUID
-  activeSubWalletIndex: number;      // Which sub-wallet within the master key (0-19)
-  masterKeyOrder: string[];          // User-defined master key ordering (UUIDs)
-}
+// Note: The above SubWalletEntry is added to EncryptedWalletEntry.subWallets array
+// No separate v2 migration needed - just adding optional subWallets to existing structure
 
 /**
  * Metadata for a master key (for UI display without decryption)

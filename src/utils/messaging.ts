@@ -872,15 +872,6 @@ export class ExtensionMessaging {
   }
 
   /**
-   * Migrate from v1 to v2 hierarchical storage
-   */
-  static async migrateToHierarchical(): Promise<MessageResponse<void>> {
-    return this.sendToBackground({
-      type: 'MIGRATE_TO_HIERARCHICAL'
-    });
-  }
-
-  /**
    * Switch to a specific hierarchical wallet (master key + sub-wallet)
    * Returns the derived mnemonic for SDK connection
    *

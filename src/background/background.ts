@@ -833,28 +833,6 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
-      case 'NEEDS_HIERARCHICAL_MIGRATION':
-        try {
-          const needsMigration = await walletManager.needsHierarchicalMigration();
-          sendResponse({ success: true, data: needsMigration });
-        } catch (error) {
-          console.error('[Background] NEEDS_HIERARCHICAL_MIGRATION - Failed:', error);
-          sendResponse({ success: false, error: 'Failed to check migration status' });
-        }
-        break;
-
-      case 'MIGRATE_TO_HIERARCHICAL':
-        try {
-          await walletManager.migrateToHierarchical();
-          sendResponse({ success: true });
-        } catch (error) {
-          console.error('[Background] MIGRATE_TO_HIERARCHICAL - Failed:', error);
-          sendResponse({
-            success: false,
-            error: error instanceof Error ? error.message : 'Failed to migrate'
-          });
-        }
-        break;
 
       case 'SWITCH_HIERARCHICAL_WALLET':
         try {
