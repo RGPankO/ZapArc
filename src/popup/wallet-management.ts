@@ -35,7 +35,7 @@ import {
 import type { MasterKeyMetadata, SubWalletEntry } from '../types';
 import { connectBreezSDK } from './sdk';
 import { showError, showSuccess, showInfo } from './notifications';
-import { showPINModal, promptForPIN, showModal, hideModal } from './modals';
+import { showPINModal, promptForPIN, promptForText, showModal, hideModal } from './modals';
 
 // Callback type for wallet operations that need main popup functions
 export type WalletManagementCallbacks = {
@@ -185,11 +185,10 @@ export async function populateWalletDropdown(): Promise<void> {
                             <span class="dropdown-expand-icon">▼</span>
                             <span class="master-key-icon">🔑</span>
                             <div class="master-key-dropdown-info">
-                                <div class="master-key-dropdown-name">
-                                    ${wallet.nickname}
-                                </div>
+                                <div class="master-key-dropdown-name">${wallet.nickname}</div>
                                 <div class="master-key-dropdown-meta">Last used: ${createdDate}</div>
                             </div>
+                            ${isMasterActive ? '<span class="active-check">✓</span>' : ''}
                         </div>
 
                         <!-- Sub-wallets wrapper for proper indentation -->
@@ -202,6 +201,7 @@ export async function populateWalletDropdown(): Promise<void> {
                                          data-master-id="${wallet.id}" data-sub-index="${sw.index}">
                                         <span class="sub-wallet-indent">${isLast ? '└──' : '├──'}</span>
                                         <span class="sub-wallet-name">${sw.nickname}</span>
+                                        ${isActiveSubWallet ? '<span class="active-check">✓</span>' : ''}
                                     </div>
                                 `;
                             }).join('')}
@@ -954,18 +954,35 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
     try {
         console.log(`[Wallet Management] Adding sub-wallet to master key ${masterId}`);
 
-        // Prompt for nickname
-        const nickname = prompt('Enter a name for the new sub-wallet:', 'Sub-Wallet');
-        if (!nickname || !nickname.trim()) {
+        // Get current sub-wallets to determine the next index
+        const response = await ExtensionMessaging.getSubWallets(masterId);
+        if (!response.success || !response.data) {
+            showError('Failed to load sub-wallets');
+            return;
+        }
+        
+        const subWallets = response.data;
+        const nextIndex = subWallets.length + 1;
+        const defaultName = `Sub-wallet ${nextIndex}`;
+
+        // Prompt for wallet name using modal
+        const walletName = await promptForText(
+            'Enter a name for the new sub-wallet:',
+            defaultName,
+            'e.g., Savings, Trading'
+        );
+
+        if (!walletName) {
             return; // User cancelled
         }
 
-        const response = await ExtensionMessaging.addSubWallet(masterId, nickname.trim());
-        if (response.success) {
-            showSuccess(`Sub-wallet "${nickname}" created!`);
+        // Add the sub-wallet
+        const addResponse = await ExtensionMessaging.addSubWallet(masterId, walletName.trim());
+        if (addResponse.success) {
+            showSuccess(`Sub-wallet "${walletName}" created!`);
             await loadWalletManagementList();
         } else {
-            showError(response.error || 'Failed to create sub-wallet');
+            showError(addResponse.error || 'Failed to create sub-wallet');
         }
     } catch (error) {
         console.error('[Wallet Management] Add sub-wallet failed:', error);

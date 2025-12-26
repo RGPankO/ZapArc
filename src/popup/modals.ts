@@ -139,6 +139,13 @@ export async function showPINModal(message: string): Promise<string | null> {
         inputEl.value = '';
         errorEl?.classList.add('hidden');
 
+        // Force numeric PIN input (only digits allowed) with 6-digit limit
+        inputEl.setAttribute('type', 'password');
+        inputEl.setAttribute('placeholder', 'Enter PIN');
+        inputEl.setAttribute('inputmode', 'numeric');
+        inputEl.setAttribute('pattern', '[0-9]*');
+        inputEl.setAttribute('maxlength', '6');
+
         // Remove old listeners
         const newConfirmBtn = confirmBtn.cloneNode(true) as HTMLButtonElement;
         const newCancelBtn = cancelBtn.cloneNode(true) as HTMLButtonElement;
@@ -155,6 +162,13 @@ export async function showPINModal(message: string): Promise<string | null> {
                 }
                 return;
             }
+            if (!/^\d+$/.test(pin)) {
+                if (errorEl) {
+                    errorEl.textContent = 'PIN must contain only numbers';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
             closeCurrentModal(pin);
         });
 
@@ -162,6 +176,19 @@ export async function showPINModal(message: string): Promise<string | null> {
         newCancelBtn.addEventListener('click', () => {
             closeCurrentModal(null);
         });
+
+        // Filter input to only allow digits
+        const filterInput = (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            const value = target.value;
+            // Remove any non-digit characters
+            const filtered = value.replace(/\D/g, '');
+            if (value !== filtered) {
+                target.value = filtered;
+            }
+        };
+
+        inputEl.addEventListener('input', filterInput);
 
         // Enter key to confirm
         inputEl.addEventListener('keydown', (e) => {
@@ -197,6 +224,75 @@ export async function showPINModal(message: string): Promise<string | null> {
 // Legacy function for backward compatibility
 export async function promptForPIN(message: string): Promise<string | null> {
     return showPINModal(message);
+}
+
+/**
+ * Show a text input modal with a message and optional default value
+ */
+export async function promptForText(message: string, defaultValue: string = '', placeholder: string = ''): Promise<string | null> {
+    return new Promise((resolve, reject) => {
+        modalState.resolveCallback = resolve;
+        modalState.rejectCallback = reject;
+
+        const messageEl = document.getElementById('pin-modal-message');
+        const inputEl = document.getElementById('pin-modal-input') as HTMLInputElement;
+        const errorEl = document.getElementById('pin-modal-error');
+        const confirmBtn = document.getElementById('pin-modal-confirm');
+        const cancelBtn = document.getElementById('pin-modal-cancel');
+
+        if (!messageEl || !inputEl || !confirmBtn || !cancelBtn) {
+            resolve(null);
+            return;
+        }
+
+        // Setup modal for text input
+        messageEl.textContent = message;
+        inputEl.value = defaultValue;
+        inputEl.setAttribute('type', 'text');
+        inputEl.setAttribute('placeholder', placeholder || 'Enter text');
+        inputEl.removeAttribute('inputmode');
+        inputEl.removeAttribute('pattern');
+        inputEl.removeAttribute('maxlength');
+        errorEl?.classList.add('hidden');
+
+        // Remove old listeners
+        const newConfirmBtn = confirmBtn.cloneNode(true) as HTMLButtonElement;
+        const newCancelBtn = cancelBtn.cloneNode(true) as HTMLButtonElement;
+        confirmBtn.replaceWith(newConfirmBtn);
+        cancelBtn.replaceWith(newCancelBtn);
+
+        // Confirm button
+        newConfirmBtn.addEventListener('click', () => {
+            const text = inputEl.value.trim();
+            if (!text) {
+                if (errorEl) {
+                    errorEl.textContent = 'Please enter a value';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+            closeCurrentModal(text);
+        });
+
+        // Cancel button
+        newCancelBtn.addEventListener('click', () => {
+            closeCurrentModal(null);
+        });
+
+        // Enter key to confirm
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                newConfirmBtn.click();
+            }
+        });
+
+        // Hide error on input
+        inputEl.addEventListener('input', () => {
+            errorEl?.classList.add('hidden');
+        });
+
+        showModal('pin-modal');
+    });
 }
 
 // ========================================

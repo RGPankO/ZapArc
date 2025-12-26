@@ -709,7 +709,6 @@ header h1 {
 }
 
 .wallet-list {
-  padding: 8px 0;
 }
 
 .wallet-item {
@@ -2083,11 +2082,6 @@ body.modal-open {
    Hierarchical Wallet Dropdown Styles
    ======================================== */
 
-/* Master Key Dropdown Item */
-.master-key-dropdown-item {
-  margin-bottom: 4px;
-}
-
 .master-key-dropdown-header {
   display: flex;
   align-items: center;
@@ -2126,9 +2120,6 @@ body.modal-open {
 }
 
 .master-key-dropdown-name {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   font-size: 14px;
   font-weight: 600;
   color: #333;
@@ -2139,12 +2130,28 @@ body.modal-open {
   color: #888;
 }
 
+.active-check {
+  color: white;
+  background: #4caf50;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 /* Sub-Wallet Dropdown Items */
 .sub-wallet-dropdown-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: transparent;
   cursor: pointer;
   transition: all 0.15s;
@@ -2153,11 +2160,15 @@ body.modal-open {
 .sub-wallet-dropdown-item:hover {
   background: #f0f7ff;
   border-radius: 4px;
+  margin-left: -36px;
+  padding-left: 48px;
 }
 
 .sub-wallet-dropdown-item.active {
   background: #e8f5e9;
   border-radius: 4px;
+  margin-left: -36px;
+  padding-left: 48px;
 }
 
 .sub-wallet-indent {

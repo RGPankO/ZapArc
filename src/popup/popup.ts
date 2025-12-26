@@ -40,7 +40,7 @@ import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks } from './sdk
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
 
 // Modal imports
-import { setupModalListeners, showPINModal, promptForPIN } from './modals';
+import { setupModalListeners, showPINModal, promptForPIN, promptForText } from './modals';
 
 // Utility imports
 import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
@@ -448,14 +448,45 @@ async function handleAddSubWalletFromWizard(): Promise<void> {
         const activeWallet = multiWalletData.wallets?.find((w: any) => w.metadata.id === activeWalletId);
         const existingSubWalletCount = activeWallet?.subWallets?.length || 0;
         
-        // Auto-generate name: "Sub-Wallet 1", "Sub-Wallet 2", etc.
-        const nickname = `Sub-Wallet ${existingSubWalletCount + 1}`;
+        // Auto-generate default name: "Sub-wallet 1", "Sub-wallet 2", etc.
+        const defaultName = `Sub-wallet ${existingSubWalletCount + 1}`;
+
+        // Prompt for wallet name using modal
+        const walletName = await promptForText(
+            'Enter a name for the new sub-wallet:',
+            defaultName,
+            'e.g., Savings, Trading'
+        );
+
+        if (!walletName) {
+            return; // User cancelled
+        }
 
         // Add the sub-wallet to the currently active wallet
-        const response = await ExtensionMessaging.addSubWallet(activeWalletId, nickname);
+        const response = await ExtensionMessaging.addSubWallet(activeWalletId, walletName.trim());
 
-        if (response.success) {
-            showSuccess(`${nickname} created!`);
+        if (response.success && response.data) {
+            const newSubWalletIndex = response.data; // response.data is the index number directly
+            
+            // Switch to the newly created sub-wallet
+            if (sessionPin) {
+                const switchResponse = await ExtensionMessaging.switchHierarchicalWallet(
+                    activeWalletId,
+                    newSubWalletIndex,
+                    sessionPin
+                );
+
+                if (switchResponse.success && switchResponse.data) {
+                    // Reconnect SDK with new sub-wallet mnemonic
+                    await connectBreezSDK(switchResponse.data.mnemonic);
+                    showSuccess(`${walletName} created and activated!`);
+                } else {
+                    showSuccess(`${walletName} created!`);
+                    console.warn('[Wizard] Could not switch to new sub-wallet:', switchResponse.error);
+                }
+            } else {
+                showSuccess(`${walletName} created!`);
+            }
 
             // Hide wizard, show main interface
             const wizard = document.getElementById('onboarding-wizard');
