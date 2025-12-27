@@ -701,7 +701,7 @@ async function loadHierarchicalWalletList(): Promise<void> {
 
     for (const mk of masterKeyList) {
         const isActiveMasterKey = mk.id === currentActiveMasterKeyId;
-        const isExpanded = expandedMasterKeys.has(mk.id) || mk.isExpanded;
+        const isExpanded = true; // Always expanded by default
         const canDeleteMasterKey = masterKeyList.length > 1;
         const createdDate = new Date(mk.createdAt).toLocaleDateString();
 
@@ -733,16 +733,14 @@ async function loadHierarchicalWalletList(): Promise<void> {
                         Delete
                     </button>
                 </div>
+                <div class="master-key-actions">
+                    <button class="wallet-mgmt-btn add-sub-wallet-btn"
+                            data-master-id="${mk.id}">
+                        + Add Sub-Wallet
+                    </button>
+                </div>
 
                 <div class="sub-wallet-list ${isExpanded ? '' : 'hidden'}">
-                    <div class="sub-wallet-actions-row">
-                        <button class="add-sub-wallet-btn" data-master-id="${mk.id}">
-                            + Add Sub-Wallet
-                        </button>
-                        <button class="scan-sub-wallets-btn" data-master-id="${mk.id}">
-                            🔍 Scan
-                        </button>
-                    </div>
                     ${subWallets.map(sw => {
                         const isActiveSubWallet = isActiveMasterKey && sw.index === currentActiveSubWalletIndex;
                         const canDeleteSubWallet = subWallets.length > 0; // Can delete any sub-wallet
@@ -830,18 +828,6 @@ function attachHierarchicalWalletListeners(): void {
             const masterId = target.getAttribute('data-master-id');
             if (masterId) {
                 await handleAddSubWallet(masterId);
-            }
-        });
-    });
-
-    // Scan for sub-wallets
-    document.querySelectorAll('.scan-sub-wallets-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const target = e.target as HTMLElement;
-            const masterId = target.getAttribute('data-master-id');
-            if (masterId) {
-                await handleScanSubWallets(masterId);
             }
         });
     });
@@ -1010,81 +996,6 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
     } catch (error) {
         console.error('[Wallet Management] Add sub-wallet failed:', error);
         showError('Failed to create sub-wallet');
-    }
-}
-
-/**
- * Handle scanning for existing sub-wallets with activity
- * This connects to each derived sub-wallet and checks for balance
- */
-async function handleScanSubWallets(masterId: string): Promise<void> {
-    try {
-        console.log(`[Wallet Management] Scanning for sub-wallets on master key ${masterId}`);
-
-        // Get PIN for decryption
-        const pin = sessionPin || await showPINModal('Enter your PIN to scan for sub-wallets');
-        if (!pin) return;
-
-        // Show scanning indicator
-        showInfo('Scanning for sub-wallets... This may take a moment.');
-
-        // Get the master key mnemonic
-        const mnemonicResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(masterId, 0, pin);
-        if (!mnemonicResponse.success || !mnemonicResponse.data) {
-            showError('Failed to decrypt master key');
-            return;
-        }
-
-        // Import discovery module dynamically (it uses Breez SDK which requires DOM context)
-        const { discoverSubWallets, getDiscoveredWalletNames } = await import('../utils/sub-wallet-discovery');
-        const { BREEZ_API_KEY } = await import('./state');
-
-        // Run discovery
-        const results = await discoverSubWallets(mnemonicResponse.data, {
-            maxIndexToScan: 5, // Scan up to 5 sub-wallets
-            stopAfterEmptyCount: 3, // Stop after 3 consecutive empty
-            apiKey: BREEZ_API_KEY,
-            onProgress: (progress) => {
-                console.log(`[Discovery] Scanning index ${progress.currentIndex}/${progress.totalToScan}`);
-            }
-        });
-
-        // Get discovered wallets (those with activity)
-        const discoveredWallets = getDiscoveredWalletNames(results);
-
-        if (discoveredWallets.length === 0) {
-            showInfo('No additional sub-wallets with activity found.');
-            return;
-        }
-
-        // Filter out index 0 (already exists as main wallet)
-        const newWallets = discoveredWallets.filter(w => w.index > 0);
-
-        if (newWallets.length === 0) {
-            showInfo('No additional sub-wallets with activity found.');
-            return;
-        }
-
-        // Confirm with user
-        const walletList = newWallets.map(w => `  - Index ${w.index}: ${w.nickname}`).join('\n');
-        const confirmed = confirm(
-            `Found ${newWallets.length} sub-wallet(s) with activity:\n\n${walletList}\n\nAdd these sub-wallets?`
-        );
-
-        if (!confirmed) return;
-
-        // Add discovered sub-wallets
-        const addResponse = await ExtensionMessaging.addDiscoveredSubWallets(masterId, newWallets);
-
-        if (addResponse.success) {
-            showSuccess(`Added ${newWallets.length} discovered sub-wallet(s)!`);
-            await loadWalletManagementList();
-        } else {
-            showError(addResponse.error || 'Failed to add discovered sub-wallets');
-        }
-    } catch (error) {
-        console.error('[Wallet Management] Scan sub-wallets failed:', error);
-        showError('Failed to scan for sub-wallets');
     }
 }
 
