@@ -1488,6 +1488,54 @@ export class ChromeStorageManager {
   }
 
   /**
+   * Try to unlock a SPECIFIC master key with the given PIN
+   * Only validates against the specified wallet, not all wallets
+   */
+  async tryUnlockSpecificMasterKey(masterKeyId: string, subWalletIndex: number, pin: string): Promise<{ masterKeyId: string, mnemonic: string } | null> {
+    console.log('🔵 [Storage] TRY_UNLOCK_SPECIFIC_MASTER_KEY', { masterKeyId, subWalletIndex });
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        console.log('❌ [Storage] No multiWalletData found');
+        return null;
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+
+      if (!data.wallets || data.wallets.length === 0) {
+        console.log('❌ [Storage] No wallets found');
+        return null;
+      }
+
+      // Find the specific wallet
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+      if (!wallet) {
+        console.log(`❌ [Storage] Wallet ${masterKeyId} not found`);
+        return null;
+      }
+
+      try {
+        // Try to decrypt with the provided PIN
+        const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
+        console.log(`✅ [Storage] PIN matched wallet: ${wallet.metadata.nickname}`);
+
+        // Set this as active wallet with the specified sub-wallet index
+        await this.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
+
+        return { masterKeyId, mnemonic };
+      } catch (error) {
+        console.log(`❌ [Storage] PIN did not match wallet: ${wallet.metadata.nickname}`);
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ [Storage] TRY_UNLOCK_SPECIFIC_MASTER_KEY FAILED', error);
+      return null;
+    }
+  }
+
+  /**
    * Rename a wallet (master key)
    */
   async renameMasterKey(masterKeyId: string, newNickname: string): Promise<void> {
@@ -1759,6 +1807,9 @@ export class ChromeStorageManager {
   /**
    * Try to unlock any wallet with the given PIN
    * Returns the mnemonic for the active wallet (derived if sub-wallet is active)
+   *
+   * If a wallet is selected for unlock (via selectedWalletForUnlock in storage),
+   * only that specific wallet is validated. Otherwise, iterates through all wallets.
    */
   async tryUnlockAnyWalletUnified(pin: string): Promise<{
     wallet: WalletData;
@@ -1774,8 +1825,26 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED');
 
     try {
-      // Try to unlock any wallet with the PIN
-      const unlocked = await this.tryUnlockAnyMasterKey(pin);
+      // Check if a specific wallet is selected for unlock
+      const selectedResult = await chrome.storage.local.get(['selectedWalletForUnlock']);
+      const selectedWallet = selectedResult.selectedWalletForUnlock;
+
+      let unlocked: { masterKeyId: string, mnemonic: string } | null;
+
+      if (selectedWallet && selectedWallet.masterKeyId) {
+        // A specific wallet is selected - only validate against that wallet
+        console.log('🔵 [Storage] Selected wallet found, validating against specific wallet:', selectedWallet);
+        unlocked = await this.tryUnlockSpecificMasterKey(
+          selectedWallet.masterKeyId,
+          selectedWallet.subWalletIndex || 0,
+          pin
+        );
+      } else {
+        // No specific wallet selected - try all wallets (legacy behavior)
+        console.log('🔵 [Storage] No selected wallet, trying all wallets');
+        unlocked = await this.tryUnlockAnyMasterKey(pin);
+      }
+
       if (!unlocked) {
         console.log('❌ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED - No wallet matched PIN');
         return null;

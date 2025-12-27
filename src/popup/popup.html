@@ -381,6 +381,7 @@
         <!-- Unlock Interface -->
         <div id="unlock-interface" class="hidden">
             <div class="unlock-container">
+                <button id="show-wallet-selector-btn" class="back-btn" style="position: absolute; top: 16px; left: 16px; text-decoration: underline;">Show all wallets</button>
                 <h2>🔒 Wallet Locked</h2>
                 <p>Enter your PIN to unlock your wallet</p>
                 <div class="pin-input-container">
@@ -389,6 +390,18 @@
                 </div>
                 <div id="unlock-error" class="error-message hidden"></div>
                 <a href="#" id="forgot-pin-link" style="display: block; text-align: center; margin-top: 12px; font-size: 12px; color: #666; text-decoration: underline; cursor: pointer;">Forgot PIN?</a>
+            </div>
+        </div>
+
+        <!-- Wallet Selection Interface (for locked screen) -->
+        <div id="wallet-selection-interface" class="hidden">
+            <div class="wallet-selection-container">
+                <button id="wallet-selection-back-btn" class="back-btn">← Back</button>
+                <h2>Select Wallet</h2>
+                <p>Choose a wallet to unlock</p>
+                <div id="wallet-selection-list" class="wallet-selection-list">
+                    <!-- Populated dynamically with wallets and sub-wallets -->
+                </div>
             </div>
         </div>
 

@@ -896,6 +896,157 @@ header h1 {
   margin-top: 8px;
 }
 
+/* Wallet Selection Interface (for locked screen) */
+#wallet-selection-interface {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wallet-selection-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.wallet-selection-container h2 {
+  margin: 8px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.wallet-selection-container p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.wallet-selection-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wallet-selection-master-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.wallet-selection-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.wallet-selection-header:hover {
+  background-color: #f5f5f5;
+}
+
+.wallet-selection-header.selected {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196F3;
+}
+
+.wallet-selection-header .wallet-icon {
+  font-size: 20px;
+}
+
+.wallet-selection-header .wallet-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wallet-selection-header .wallet-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wallet-selection-header .wallet-meta {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.wallet-selection-header .selection-check {
+  color: #2196F3;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.wallet-selection-sub-list {
+  border-top: 1px solid #f0f0f0;
+  background-color: #fafafa;
+}
+
+.wallet-selection-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 32px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.wallet-selection-sub-item:hover {
+  background-color: #f0f0f0;
+}
+
+.wallet-selection-sub-item.selected {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196F3;
+}
+
+.wallet-selection-sub-item .sub-wallet-indent {
+  color: #999;
+  font-size: 12px;
+  font-family: monospace;
+  margin-right: 4px;
+}
+
+.wallet-selection-sub-item .sub-wallet-name {
+  flex: 1;
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wallet-selection-sub-item .selection-check {
+  color: #2196F3;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.loading-wallets,
+.no-wallets,
+.error-wallets {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.error-wallets {
+  color: #dc3545;
+}
+
 /* QR Only Interface */
 #qr-only-interface {
   padding: 20px;

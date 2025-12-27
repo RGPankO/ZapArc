@@ -57,6 +57,9 @@ import {
     setWalletManagementCallbacks,
 } from './wallet-management';
 
+// Wallet Selection imports
+import { showWalletSelectionInterface } from './wallet-selection';
+
 // Deposit imports
 import {
     showDepositInterface,
@@ -1289,8 +1292,9 @@ function showUnlockPrompt() {
             const walletResponse = await ExtensionMessaging.loadWallet(pin);
 
             if (!walletResponse.success || !walletResponse.data) {
-                // Only show error for manual attempts or if PIN looks complete
-                if (!isAutoAttempt) {
+                // Show error for manual attempts OR auto-attempts with complete PIN (6+ digits)
+                const shouldShowError = !isAutoAttempt || pin.length >= 6;
+                if (shouldShowError) {
                     const errorMsg = walletResponse.error || 'Invalid PIN';
                     showError(errorMsg);
                     if (unlockError) {
@@ -1354,13 +1358,17 @@ function showUnlockPrompt() {
         } catch (error) {
             console.error('❌ [Unlock] Failed:', error);
             const errorMsg = error instanceof Error ? error.message : 'Failed to unlock';
-            if (!isAutoAttempt) {
+
+            // Show error for manual attempts OR auto-attempts with complete PIN (6+ digits)
+            const shouldShowError = !isAutoAttempt || pin.length >= 6;
+            if (shouldShowError) {
                 showError(errorMsg);
                 if (unlockError) {
                     unlockError.textContent = errorMsg;
                     unlockError.classList.remove('hidden');
                 }
             }
+
             newUnlockBtn.disabled = false;
             newUnlockBtn.textContent = 'Unlock';
             if (!isAutoAttempt) {
@@ -1404,6 +1412,14 @@ function showUnlockPrompt() {
         forgotPinLink.onclick = (e) => {
             e.preventDefault();
             showForgotPinModal();
+        };
+    }
+
+    // Show wallet selector button handler
+    const showWalletSelectorBtn = document.getElementById('show-wallet-selector-btn');
+    if (showWalletSelectorBtn) {
+        showWalletSelectorBtn.onclick = () => {
+            showWalletSelectionInterface();
         };
     }
 }
