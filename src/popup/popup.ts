@@ -1974,8 +1974,12 @@ async function initializePopup() {
 document.addEventListener('DOMContentLoaded', initializePopup);
 
 // ========================================
-// Hierarchical Wallet Switch Handler
+// Hierarchical Wallet Switching Event Handler
 // ========================================
+
+// De-duplication tracking to prevent multiple notifications for the same switch
+let lastWalletSwitchKey = '';
+let lastWalletSwitchTime = 0;
 
 /**
  * Handle wallet switch events from wallet-management.ts
@@ -2003,20 +2007,36 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
             setBreezSDK(null);
             setIsSDKInitialized(false);
         }
-
+        
         // Connect with new derived mnemonic
         console.log('🔄 [Popup] Connecting SDK with derived mnemonic...');
         const sdk = await connectBreezSDK(customEvent.detail.mnemonic);
         setBreezSDK(sdk);
         setIsSDKInitialized(true);
 
-        // Update balance
+        // Clear old data first
+        const transactionList = document.getElementById('transaction-list');
+        if (transactionList) {
+            transactionList.innerHTML = '<div class="transaction-item">Loading transactions...</div>';
+        }
+
+        // Update balance and reload transactions
+        console.log('🔄 [Popup] Fetching balance and transactions...');
         await updateBalanceDisplay();
+        
+        // Small delay to allow SDK to sync before loading transactions
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadTransactionHistory();
 
         console.log('✅ [Popup] SDK reconnected for new wallet', {
             masterKeyNickname: customEvent.detail.masterKeyNickname,
-            subWalletNickname: customEvent.detail.subWalletNickname
+            subWalletNickname: customEvent.detail.subWalletNickname,
+            subWalletIndex: customEvent.detail.subWalletIndex
         });
+        
+        // Don't show notification here - let the caller decide
+        // This prevents duplicate notifications when the event fires multiple times
+        console.log('[Popup] Wallet switched successfully, balance and transactions refreshed');
     } catch (error) {
         console.error('❌ [Popup] Failed to reconnect SDK after wallet switch:', error);
         showError('Failed to connect to new wallet');

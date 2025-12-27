@@ -363,11 +363,13 @@ async function handleHierarchicalWalletSwitch(masterKeyId: string, subWalletInde
             });
             window.dispatchEvent(event);
 
-            // Show correct name: master wallet name for index 0, sub-wallet name for others
+            // Show success notification
             const displayName = subWalletIndex === 0 
                 ? response.data.masterKeyNickname 
                 : response.data.subWalletNickname;
-            showSuccess(`Switched to ${displayName}`);
+            if (displayName) {
+                showSuccess(`Switched to ${displayName}`);
+            }
 
             // Refresh UI
             await initializeMultiWalletUI();
@@ -989,8 +991,6 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
         if (addResponse.success && addResponse.data) {
             const newSubWalletIndex = addResponse.data; // The newly created sub-wallet index
             
-            showSuccess(`Sub-wallet "${walletName}" created!`);
-            
             // Switch to the newly created sub-wallet
             if (sessionPin) {
                 const switchResponse = await ExtensionMessaging.switchHierarchicalWallet(
@@ -1011,28 +1011,35 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
                             masterKeyId: masterId,
                             subWalletIndex: newSubWalletIndex,
                             masterKeyNickname: switchResponse.data.masterKeyNickname,
-                            subWalletNickname: switchResponse.data.subWalletNickname
+                            subWalletNickname: walletName.trim() // Use the wallet name we just created
                         }
                     });
                     window.dispatchEvent(event);
                     
-                    // Refresh UI lists after wallet switch
+                    // Refresh UI lists BEFORE clicking back to avoid duplicate events
                     await loadWalletManagementList();
                     await populateWalletDropdown();
-                    await updateWalletSelectorUI(); // Update the displayed wallet name
+                    await updateWalletSelectorUI();
                     
                     // Close wallet management - simulate back button click
                     const backBtn = document.getElementById('wallet-mgmt-back-btn');
                     if (backBtn) {
                         backBtn.click();
                     }
+                    
+                    // Show success notification AFTER everything is done
+                    showSuccess(`Switched to ${walletName.trim()}`);
                 } else {
                     console.warn('[Wallet Management] Could not switch to new sub-wallet:', switchResponse.error);
+                    // Only update lists if switch failed
+                    await loadWalletManagementList();
+                    await populateWalletDropdown();
                 }
+            } else {
+                // No session PIN, just update the lists
+                await loadWalletManagementList();
+                await populateWalletDropdown();
             }
-            
-            await loadWalletManagementList();
-            await populateWalletDropdown(); // Refresh main dropdown to show new sub-wallet
         } else {
             showError(addResponse.error || 'Failed to create sub-wallet');
         }
@@ -1123,9 +1130,6 @@ async function handleSelectSubWallet(masterId: string, subIndex: number): Promis
         const pin = sessionPin || await showPINModal('Enter your PIN to switch wallet');
         if (!pin) return;
 
-        // Show loading state
-        showInfo('Switching wallet...');
-
         // Switch wallet via background (this derives the sub-wallet mnemonic)
         const response = await ExtensionMessaging.switchHierarchicalWallet(masterId, subIndex, pin);
 
@@ -1147,7 +1151,10 @@ async function handleSelectSubWallet(masterId: string, subIndex: number): Promis
             });
             window.dispatchEvent(event);
 
-            showSuccess(`Switched to ${response.data.subWalletNickname}`);
+            // Show success notification
+            if (response.data.subWalletNickname) {
+                showSuccess(`Switched to ${response.data.subWalletNickname}`);
+            }
 
             // Refresh the wallet list UI
             await loadWalletManagementList();
