@@ -873,23 +873,6 @@ function attachHierarchicalWalletListeners(): void {
         });
     });
 
-    // Select sub-wallet (switch to it)
-    document.querySelectorAll('.sub-wallet-item').forEach(item => {
-        item.addEventListener('click', async (e) => {
-            // Don't trigger if clicking on action buttons
-            const target = e.target as HTMLElement;
-            if (target.closest('.sub-wallet-actions')) {
-                return;
-            }
-
-            const itemEl = e.currentTarget as HTMLElement;
-            const masterId = itemEl.getAttribute('data-master-id');
-            const subIndex = itemEl.getAttribute('data-sub-index');
-            if (masterId && subIndex) {
-                await handleSelectSubWallet(masterId, parseInt(subIndex, 10));
-            }
-        });
-    });
 }
 
 // ========================================
@@ -946,30 +929,43 @@ async function handleDeleteMasterKey(masterId: string): Promise<void> {
     try {
         console.log(`[Wallet Management] Deleting master key ${masterId}`);
 
-        const masterKey = masterKeys.find(mk => mk.id === masterId);
+        // Get wallet info for confirmation message
+        const masterKeys = await ExtensionMessaging.getMasterKeyMetadata();
+        if (!masterKeys.success || !masterKeys.data) {
+            showError('Failed to load wallet information');
+            return;
+        }
+
+        const masterKey = masterKeys.data.find(mk => mk.id === masterId);
         const masterName = masterKey?.nickname || 'this master key';
         const subWalletCount = masterKey?.subWalletCount || 0;
 
-        const confirmed = confirm(
-            `Are you sure you want to delete "${masterName}" and ALL ${subWalletCount} sub-wallet(s)?\n\n` +
-            `This action cannot be undone. Make sure you have backed up your recovery phrase!`
-        );
-        if (!confirmed) return;
+        const message = subWalletCount > 0
+            ? `Enter PIN to delete "${masterName}" and ${subWalletCount} sub-wallet(s)`
+            : `Enter PIN to delete "${masterName}"`;
 
-        const pin = await showPINModal('Enter your PIN to delete master key');
+        // Request PIN to confirm deletion
+        const pin = await showPINModal(message);
         if (!pin) return;
+
+        // Verify PIN is correct by trying to decrypt the wallet
+        const verifyResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(masterId, 0, pin);
+        if (!verifyResponse.success) {
+            showError('Incorrect PIN');
+            return;
+        }
 
         const response = await ExtensionMessaging.removeMasterKey(masterId, pin);
         if (response.success) {
-            showSuccess('Master key deleted successfully!');
+            showSuccess(`Wallet "${masterName}" deleted successfully!`);
             await loadWalletManagementList();
             await initializeMultiWalletUI();
         } else {
-            showError(response.error || 'Failed to delete master key');
+            showError(response.error || 'Failed to delete wallet');
         }
     } catch (error) {
         console.error('[Wallet Management] Delete master key failed:', error);
-        showError('Failed to delete master key');
+        showError('Failed to delete wallet');
     }
 }
 
@@ -1007,6 +1003,7 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
         if (addResponse.success) {
             showSuccess(`Sub-wallet "${walletName}" created!`);
             await loadWalletManagementList();
+            await populateWalletDropdown(); // Refresh main dropdown to show new sub-wallet
         } else {
             showError(addResponse.error || 'Failed to create sub-wallet');
         }
@@ -1116,22 +1113,37 @@ async function handleDeleteSubWallet(masterId: string, subIndex: number): Promis
     try {
         console.log(`[Wallet Management] Deleting sub-wallet ${masterId}:${subIndex}`);
 
-        const confirmed = confirm(
-            'Are you sure you want to delete this sub-wallet?\n\n' +
-            'This action cannot be undone. Make sure you have backed up your recovery phrase!'
-        );
-        if (!confirmed) return;
+        // Get sub-wallet name for confirmation message
+        const response = await ExtensionMessaging.getSubWallets(masterId);
+        if (!response.success || !response.data) {
+            showError('Failed to load sub-wallet information');
+            return;
+        }
 
-        const pin = await showPINModal('Enter your PIN to delete sub-wallet');
+        const subWallet = response.data.find(sw => sw.index === subIndex);
+        if (!subWallet) {
+            showError('Sub-wallet not found');
+            return;
+        }
+
+        // Request PIN to confirm deletion
+        const pin = await showPINModal(`Enter PIN to delete "${subWallet.nickname}"`);
         if (!pin) return;
 
-        const response = await ExtensionMessaging.removeSubWallet(masterId, subIndex, pin);
-        if (response.success) {
-            showSuccess('Sub-wallet deleted successfully!');
+        // Verify PIN is correct by trying to decrypt the wallet
+        const verifyResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(masterId, 0, pin);
+        if (!verifyResponse.success) {
+            showError('Incorrect PIN');
+            return;
+        }
+
+        const deleteResponse = await ExtensionMessaging.removeSubWallet(masterId, subIndex, pin);
+        if (deleteResponse.success) {
+            showSuccess(`Sub-wallet "${subWallet.nickname}" deleted successfully!`);
             await loadWalletManagementList();
             await initializeMultiWalletUI();
         } else {
-            showError(response.error || 'Failed to delete sub-wallet');
+            showError(deleteResponse.error || 'Failed to delete sub-wallet');
         }
     } catch (error) {
         console.error('[Wallet Management] Delete sub-wallet failed:', error);
