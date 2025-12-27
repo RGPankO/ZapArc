@@ -986,8 +986,51 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
 
         // Add the sub-wallet
         const addResponse = await ExtensionMessaging.addSubWallet(masterId, walletName.trim());
-        if (addResponse.success) {
+        if (addResponse.success && addResponse.data) {
+            const newSubWalletIndex = addResponse.data; // The newly created sub-wallet index
+            
             showSuccess(`Sub-wallet "${walletName}" created!`);
+            
+            // Switch to the newly created sub-wallet
+            if (sessionPin) {
+                const switchResponse = await ExtensionMessaging.switchHierarchicalWallet(
+                    masterId,
+                    newSubWalletIndex,
+                    sessionPin
+                );
+
+                if (switchResponse.success && switchResponse.data) {
+                    // Update state
+                    setActiveMasterKeyId(masterId);
+                    setActiveSubWalletIndex(newSubWalletIndex);
+                    
+                    // Dispatch event for popup.ts to handle SDK reconnection + balance refresh
+                    const event = new CustomEvent('hierarchical-wallet-switched', {
+                        detail: {
+                            mnemonic: switchResponse.data.mnemonic,
+                            masterKeyId: masterId,
+                            subWalletIndex: newSubWalletIndex,
+                            masterKeyNickname: switchResponse.data.masterKeyNickname,
+                            subWalletNickname: switchResponse.data.subWalletNickname
+                        }
+                    });
+                    window.dispatchEvent(event);
+                    
+                    // Refresh UI lists after wallet switch
+                    await loadWalletManagementList();
+                    await populateWalletDropdown();
+                    await updateWalletSelectorUI(); // Update the displayed wallet name
+                    
+                    // Close wallet management - simulate back button click
+                    const backBtn = document.getElementById('wallet-mgmt-back-btn');
+                    if (backBtn) {
+                        backBtn.click();
+                    }
+                } else {
+                    console.warn('[Wallet Management] Could not switch to new sub-wallet:', switchResponse.error);
+                }
+            }
+            
             await loadWalletManagementList();
             await populateWalletDropdown(); // Refresh main dropdown to show new sub-wallet
         } else {

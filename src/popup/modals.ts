@@ -145,6 +145,13 @@ export async function showPINModal(message: string): Promise<string | null> {
         inputEl.setAttribute('inputmode', 'numeric');
         inputEl.setAttribute('pattern', '[0-9]*');
         inputEl.setAttribute('maxlength', '6');
+        
+        // Restore PIN modal title
+        const modal = document.getElementById('pin-modal');
+        const titleEl = modal?.querySelector('h2, h3');
+        if (titleEl) {
+            titleEl.textContent = 'Enter PIN';
+        }
 
         // Remove old listeners
         const newConfirmBtn = confirmBtn.cloneNode(true) as HTMLButtonElement;
@@ -254,6 +261,13 @@ export async function promptForText(message: string, defaultValue: string = '', 
         inputEl.removeAttribute('pattern');
         inputEl.removeAttribute('maxlength');
         errorEl?.classList.add('hidden');
+        
+        // Update modal title (find h2/h3 in the modal)
+        const modal = document.getElementById('pin-modal');
+        const titleEl = modal?.querySelector('h2, h3');
+        if (titleEl) {
+            titleEl.textContent = 'Enter Name';
+        }
 
         // Remove old listeners
         const newConfirmBtn = confirmBtn.cloneNode(true) as HTMLButtonElement;
