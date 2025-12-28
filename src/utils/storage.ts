@@ -2159,4 +2159,230 @@ export class ChromeStorageManager {
       return false;
     }
   }
+
+  // ========================================
+  // Sub-Wallet Archive/Restore Methods
+  // ========================================
+
+  /**
+   * Archive a sub-wallet (mark as archived, not deleted)
+   * The sub-wallet stays in the master key's subWallets array but with archivedAt set
+   */
+  async archiveSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    console.log('🔵 [Storage] ARCHIVE_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Master key ${masterKeyId} not found`);
+      }
+
+      if (!wallet.subWallets || wallet.subWallets.length === 0) {
+        throw new Error('No sub-wallets found for this master key');
+      }
+
+      const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
+      if (!subWallet) {
+        throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+      }
+
+      if (subWallet.archivedAt) {
+        throw new Error('Sub-wallet is already archived');
+      }
+
+      // Mark as archived
+      subWallet.archivedAt = Date.now();
+
+      // If this was the active sub-wallet, switch to another active one
+      if (data.activeWalletId === masterKeyId && data.activeSubWalletIndex === subWalletIndex) {
+        // Find another active sub-wallet in this master key
+        const activeSubWallet = wallet.subWallets.find(sw => !sw.archivedAt && sw.index !== subWalletIndex);
+        if (activeSubWallet) {
+          data.activeSubWalletIndex = activeSubWallet.index;
+        } else {
+          // No active sub-wallets left, switch to first wallet's first active sub-wallet
+          for (const w of data.wallets) {
+            if (w.metadata.id !== masterKeyId) {
+              const firstActive = w.subWallets?.find(sw => !sw.archivedAt);
+              if (firstActive) {
+                data.activeWalletId = w.metadata.id;
+                data.activeSubWalletIndex = firstActive.index;
+                break;
+              } else if (!w.subWallets || w.subWallets.length === 0) {
+                // Master key without sub-wallets uses index 0
+                data.activeWalletId = w.metadata.id;
+                data.activeSubWalletIndex = 0;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
+
+      console.log('✅ [Storage] ARCHIVE_SUB_WALLET SUCCESS', { masterKeyId, subWalletIndex });
+    } catch (error) {
+      console.error('❌ [Storage] ARCHIVE_SUB_WALLET FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore an archived sub-wallet
+   */
+  async restoreSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    console.log('🔵 [Storage] RESTORE_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Master key ${masterKeyId} not found`);
+      }
+
+      if (!wallet.subWallets || wallet.subWallets.length === 0) {
+        throw new Error('No sub-wallets found for this master key');
+      }
+
+      const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
+      if (!subWallet) {
+        throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+      }
+
+      if (!subWallet.archivedAt) {
+        throw new Error('Sub-wallet is not archived');
+      }
+
+      // Remove archived status
+      delete subWallet.archivedAt;
+
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
+
+      console.log('✅ [Storage] RESTORE_SUB_WALLET SUCCESS', { masterKeyId, subWalletIndex });
+    } catch (error) {
+      console.error('❌ [Storage] RESTORE_SUB_WALLET FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Permanently delete an archived sub-wallet
+   */
+  async deleteArchivedSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    console.log('🔵 [Storage] DELETE_ARCHIVED_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Master key ${masterKeyId} not found`);
+      }
+
+      if (!wallet.subWallets || wallet.subWallets.length === 0) {
+        throw new Error('No sub-wallets found for this master key');
+      }
+
+      const subWalletIdx = wallet.subWallets.findIndex(sw => sw.index === subWalletIndex);
+      if (subWalletIdx === -1) {
+        throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+      }
+
+      const subWallet = wallet.subWallets[subWalletIdx];
+      if (!subWallet.archivedAt) {
+        throw new Error('Can only delete archived sub-wallets. Archive first.');
+      }
+
+      // Remove from array
+      wallet.subWallets.splice(subWalletIdx, 1);
+
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
+
+      console.log('✅ [Storage] DELETE_ARCHIVED_SUB_WALLET SUCCESS', { masterKeyId, subWalletIndex });
+    } catch (error) {
+      console.error('❌ [Storage] DELETE_ARCHIVED_SUB_WALLET FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all archived sub-wallets across all master keys
+   * Returns sub-wallets with their parent master key info
+   */
+  async getArchivedSubWallets(): Promise<{
+    masterKeyId: string;
+    masterKeyNickname: string;
+    subWalletIndex: number;
+    subWalletNickname: string;
+    archivedAt: number;
+  }[]> {
+    console.log('🔵 [Storage] GET_ARCHIVED_SUB_WALLETS');
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        return [];
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const archivedSubWallets: {
+        masterKeyId: string;
+        masterKeyNickname: string;
+        subWalletIndex: number;
+        subWalletNickname: string;
+        archivedAt: number;
+      }[] = [];
+
+      for (const wallet of data.wallets) {
+        if (wallet.subWallets) {
+          for (const subWallet of wallet.subWallets) {
+            if (subWallet.archivedAt) {
+              archivedSubWallets.push({
+                masterKeyId: wallet.metadata.id,
+                masterKeyNickname: wallet.metadata.nickname,
+                subWalletIndex: subWallet.index,
+                subWalletNickname: subWallet.nickname,
+                archivedAt: subWallet.archivedAt
+              });
+            }
+          }
+        }
+      }
+
+      console.log('✅ [Storage] GET_ARCHIVED_SUB_WALLETS SUCCESS', { count: archivedSubWallets.length });
+      return archivedSubWallets;
+    } catch (error) {
+      console.error('❌ [Storage] GET_ARCHIVED_SUB_WALLETS FAILED', error);
+      return [];
+    }
+  }
 }

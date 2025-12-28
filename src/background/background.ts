@@ -1022,6 +1022,85 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      // ========================================
+      // Sub-Wallet Archive/Restore Handlers
+      // ========================================
+
+      case 'ARCHIVE_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          console.log('[Background] ARCHIVE_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+          await storageManager.archiveSubWallet(masterKeyId, subWalletIndex);
+          console.log('[Background] ARCHIVE_SUB_WALLET - Sub-wallet archived successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] ARCHIVE_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to archive sub-wallet'
+          });
+        }
+        break;
+
+      case 'RESTORE_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          console.log('[Background] RESTORE_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+          await storageManager.restoreSubWallet(masterKeyId, subWalletIndex);
+          console.log('[Background] RESTORE_SUB_WALLET - Sub-wallet restored successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RESTORE_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to restore sub-wallet'
+          });
+        }
+        break;
+
+      case 'DELETE_ARCHIVED_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          console.log('[Background] DELETE_ARCHIVED_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+          await storageManager.deleteArchivedSubWallet(masterKeyId, subWalletIndex);
+          console.log('[Background] DELETE_ARCHIVED_SUB_WALLET - Sub-wallet permanently deleted');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] DELETE_ARCHIVED_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete archived sub-wallet'
+          });
+        }
+        break;
+
+      case 'GET_ARCHIVED_SUB_WALLETS':
+        try {
+          console.log('[Background] GET_ARCHIVED_SUB_WALLETS');
+          const archivedSubWallets = await storageManager.getArchivedSubWallets();
+          console.log('[Background] GET_ARCHIVED_SUB_WALLETS - Retrieved:', { count: archivedSubWallets.length });
+          sendResponse({ success: true, data: archivedSubWallets });
+        } catch (error) {
+          console.error('[Background] GET_ARCHIVED_SUB_WALLETS - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get archived sub-wallets'
+          });
+        }
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown message type' });
     }

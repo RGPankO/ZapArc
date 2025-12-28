@@ -717,11 +717,13 @@ async function loadHierarchicalWalletList(): Promise<void> {
         const canDeleteMasterKey = masterKeyList.length > 1;
         const createdDate = new Date(mk.createdAt).toLocaleDateString();
 
-        // Fetch sub-wallets for this master key
+        // Fetch sub-wallets for this master key (filter out archived ones)
         const subWalletsResponse = await ExtensionMessaging.getSubWallets(mk.id);
-        const subWallets: SubWalletEntry[] = subWalletsResponse.success && subWalletsResponse.data
+        const allSubWallets: SubWalletEntry[] = subWalletsResponse.success && subWalletsResponse.data
             ? subWalletsResponse.data
             : [];
+        // Only show active (non-archived) sub-wallets
+        const subWallets = allSubWallets.filter(sw => !sw.archivedAt);
 
         html += `
             <div class="master-key-item ${isExpanded ? 'expanded' : 'collapsed'} ${isActiveMasterKey ? 'active' : ''}"
@@ -778,6 +780,12 @@ async function loadHierarchicalWalletList(): Promise<void> {
                                             data-sub-index="${sw.index}"
                                             data-sub-name="${sw.nickname}">
                                         Rename
+                                    </button>
+                                    <button class="wallet-mgmt-btn archive-sub-btn"
+                                            data-master-id="${mk.id}"
+                                            data-sub-index="${sw.index}"
+                                            data-sub-name="${sw.nickname}">
+                                        Archive
                                     </button>
                                     <button class="wallet-mgmt-btn delete-sub-btn"
                                             data-master-id="${mk.id}"
@@ -890,6 +898,19 @@ function attachHierarchicalWalletListeners(): void {
         });
     });
 
+    // Archive sub-wallet
+    document.querySelectorAll('.archive-sub-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const subIndex = target.getAttribute('data-sub-index');
+            const subName = target.getAttribute('data-sub-name');
+            if (masterId && subIndex && subName) {
+                await handleArchiveSubWallet(masterId, parseInt(subIndex, 10), subName);
+            }
+        });
+    });
 }
 
 // ========================================
@@ -1138,6 +1159,35 @@ async function handleDeleteSubWallet(masterId: string, subIndex: number): Promis
     } catch (error) {
         console.error('[Wallet Management] Delete sub-wallet failed:', error);
         showError('Failed to delete sub-wallet');
+    }
+}
+
+/**
+ * Handle archive sub-wallet
+ * Archives the sub-wallet without requiring PIN
+ */
+async function handleArchiveSubWallet(masterId: string, subIndex: number, subName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Archiving sub-wallet ${masterId}:${subIndex}`);
+
+        // Show confirmation modal
+        const confirmed = await showArchiveConfirmation(subName);
+        if (!confirmed) {
+            console.log('[Wallet Management] Archive cancelled by user');
+            return;
+        }
+
+        const response = await ExtensionMessaging.archiveSubWallet(masterId, subIndex);
+        if (response.success) {
+            showSuccess(`"${subName}" has been archived`);
+            await loadWalletManagementList();
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to archive sub-wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Archive sub-wallet failed:', error);
+        showError('Failed to archive sub-wallet');
     }
 }
 
@@ -1554,6 +1604,7 @@ export function hideArchivedWalletsInterface(): void {
 
 /**
  * Load and display archived wallets list
+ * Shows both archived master wallets and archived sub-wallets
  */
 async function loadArchivedWalletsList(): Promise<void> {
     const listContainer = document.getElementById('archived-wallets-list');
@@ -1562,48 +1613,92 @@ async function loadArchivedWalletsList(): Promise<void> {
     listContainer.innerHTML = '<div class="loading-wallets">Loading archived wallets...</div>';
 
     try {
-        const response = await ExtensionMessaging.getArchivedWallets();
-        if (!response.success || !response.data) {
-            listContainer.innerHTML = '<div class="no-wallets">Failed to load archived wallets</div>';
-            return;
-        }
+        // Fetch both archived master wallets and archived sub-wallets
+        const [masterResponse, subResponse] = await Promise.all([
+            ExtensionMessaging.getArchivedWallets(),
+            ExtensionMessaging.getArchivedSubWallets()
+        ]);
 
-        const archivedWallets = response.data;
+        const archivedMasterWallets = masterResponse.success && masterResponse.data ? masterResponse.data : [];
+        const archivedSubWallets = subResponse.success && subResponse.data ? subResponse.data : [];
 
-        if (archivedWallets.length === 0) {
+        if (archivedMasterWallets.length === 0 && archivedSubWallets.length === 0) {
             listContainer.innerHTML = '<div class="no-wallets">No archived wallets</div>';
             return;
         }
 
         let html = '';
-        for (const wallet of archivedWallets) {
-            const archivedDate = wallet.archivedAt
-                ? new Date(wallet.archivedAt).toLocaleDateString()
-                : 'Unknown';
 
-            html += `
-                <div class="archived-wallet-item" data-wallet-id="${wallet.id}">
-                    <div class="archived-wallet-header">
-                        <span class="archived-wallet-icon">📦</span>
-                        <div class="archived-wallet-info">
-                            <div class="archived-wallet-name">${wallet.nickname}</div>
-                            <div class="archived-wallet-meta">Archived: ${archivedDate}</div>
+        // Archived Master Wallets section
+        if (archivedMasterWallets.length > 0) {
+            html += '<div class="archived-section-header">Master Wallets</div>';
+            for (const wallet of archivedMasterWallets) {
+                const archivedDate = wallet.archivedAt
+                    ? new Date(wallet.archivedAt).toLocaleDateString()
+                    : 'Unknown';
+
+                html += `
+                    <div class="archived-wallet-item" data-wallet-id="${wallet.id}">
+                        <div class="archived-wallet-header">
+                            <span class="archived-wallet-icon">🔑</span>
+                            <div class="archived-wallet-info">
+                                <div class="archived-wallet-name">${wallet.nickname}</div>
+                                <div class="archived-wallet-meta">Archived: ${archivedDate}</div>
+                            </div>
+                        </div>
+                        <div class="archived-wallet-actions">
+                            <button class="wallet-mgmt-btn restore-archived-btn"
+                                    data-wallet-id="${wallet.id}"
+                                    data-wallet-name="${wallet.nickname}">
+                                Restore
+                            </button>
+                            <button class="wallet-mgmt-btn delete-archived-btn danger"
+                                    data-wallet-id="${wallet.id}"
+                                    data-wallet-name="${wallet.nickname}">
+                                Delete Forever
+                            </button>
                         </div>
                     </div>
-                    <div class="archived-wallet-actions">
-                        <button class="wallet-mgmt-btn restore-archived-btn"
-                                data-wallet-id="${wallet.id}"
-                                data-wallet-name="${wallet.nickname}">
-                            Restore
-                        </button>
-                        <button class="wallet-mgmt-btn delete-archived-btn danger"
-                                data-wallet-id="${wallet.id}"
-                                data-wallet-name="${wallet.nickname}">
-                            Delete Forever
-                        </button>
+                `;
+            }
+        }
+
+        // Archived Sub-Wallets section
+        if (archivedSubWallets.length > 0) {
+            html += '<div class="archived-section-header">Sub-Wallets</div>';
+            for (const subWallet of archivedSubWallets) {
+                const archivedDate = new Date(subWallet.archivedAt).toLocaleDateString();
+
+                html += `
+                    <div class="archived-wallet-item archived-sub-wallet"
+                         data-master-id="${subWallet.masterKeyId}"
+                         data-sub-index="${subWallet.subWalletIndex}">
+                        <div class="archived-wallet-header">
+                            <span class="archived-wallet-icon">💼</span>
+                            <div class="archived-wallet-info">
+                                <div class="archived-wallet-name">${subWallet.subWalletNickname}</div>
+                                <div class="archived-wallet-meta">
+                                    From: ${subWallet.masterKeyNickname} • Archived: ${archivedDate}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="archived-wallet-actions">
+                            <button class="wallet-mgmt-btn restore-archived-sub-btn"
+                                    data-master-id="${subWallet.masterKeyId}"
+                                    data-sub-index="${subWallet.subWalletIndex}"
+                                    data-sub-name="${subWallet.subWalletNickname}">
+                                Restore
+                            </button>
+                            <button class="wallet-mgmt-btn delete-archived-sub-btn danger"
+                                    data-master-id="${subWallet.masterKeyId}"
+                                    data-sub-index="${subWallet.subWalletIndex}"
+                                    data-sub-name="${subWallet.subWalletNickname}">
+                                Delete Forever
+                            </button>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
         }
 
         listContainer.innerHTML = html;
@@ -1618,7 +1713,7 @@ async function loadArchivedWalletsList(): Promise<void> {
  * Attach event listeners for archived wallet actions
  */
 function attachArchivedWalletsListeners(): void {
-    // Restore archived wallet
+    // Restore archived master wallet
     document.querySelectorAll('.restore-archived-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const target = e.target as HTMLElement;
@@ -1630,7 +1725,7 @@ function attachArchivedWalletsListeners(): void {
         });
     });
 
-    // Delete archived wallet permanently
+    // Delete archived master wallet permanently
     document.querySelectorAll('.delete-archived-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const target = e.target as HTMLElement;
@@ -1638,6 +1733,32 @@ function attachArchivedWalletsListeners(): void {
             const walletName = target.getAttribute('data-wallet-name');
             if (walletId && walletName) {
                 await handleDeleteArchivedWallet(walletId, walletName);
+            }
+        });
+    });
+
+    // Restore archived sub-wallet
+    document.querySelectorAll('.restore-archived-sub-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const subIndex = target.getAttribute('data-sub-index');
+            const subName = target.getAttribute('data-sub-name');
+            if (masterId && subIndex && subName) {
+                await handleRestoreArchivedSubWallet(masterId, parseInt(subIndex, 10), subName);
+            }
+        });
+    });
+
+    // Delete archived sub-wallet permanently
+    document.querySelectorAll('.delete-archived-sub-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const subIndex = target.getAttribute('data-sub-index');
+            const subName = target.getAttribute('data-sub-name');
+            if (masterId && subIndex && subName) {
+                await handleDeleteArchivedSubWallet(masterId, parseInt(subIndex, 10), subName);
             }
         });
     });
@@ -1654,6 +1775,9 @@ async function handleRestoreArchivedWallet(walletId: string, walletName: string)
         if (response.success) {
             showSuccess(`"${walletName}" has been restored`);
             await loadArchivedWalletsList();
+            // Also refresh the main wallet management list so restored wallet appears there
+            await loadWalletManagementList();
+            await initializeMultiWalletUI();
         } else {
             showError(response.error || 'Failed to restore wallet');
         }
@@ -1695,5 +1819,63 @@ async function handleDeleteArchivedWallet(walletId: string, walletName: string):
     } catch (error) {
         console.error('[Wallet Management] Delete archived wallet failed:', error);
         showError('Failed to delete wallet');
+    }
+}
+
+/**
+ * Handle restore archived sub-wallet
+ */
+async function handleRestoreArchivedSubWallet(masterId: string, subIndex: number, subName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Restoring archived sub-wallet ${masterId}:${subIndex}`);
+
+        const response = await ExtensionMessaging.restoreSubWallet(masterId, subIndex);
+        if (response.success) {
+            showSuccess(`"${subName}" has been restored`);
+            await loadArchivedWalletsList();
+            // Also refresh the main wallet management list so restored wallet appears there
+            await loadWalletManagementList();
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to restore sub-wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Restore archived sub-wallet failed:', error);
+        showError('Failed to restore sub-wallet');
+    }
+}
+
+/**
+ * Handle permanently delete archived sub-wallet
+ * Requires PIN verification for security
+ */
+async function handleDeleteArchivedSubWallet(masterId: string, subIndex: number, subName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Permanently deleting archived sub-wallet ${masterId}:${subIndex}`);
+
+        // Request PIN to confirm deletion
+        const pin = await showPINModal(`Enter PIN to permanently delete "${subName}"`);
+        if (!pin) {
+            console.log('[Wallet Management] Delete cancelled by user');
+            return;
+        }
+
+        // Verify PIN is correct by trying to decrypt the master wallet
+        const verifyResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(masterId, 0, pin);
+        if (!verifyResponse.success) {
+            showError('Incorrect PIN');
+            return;
+        }
+
+        const response = await ExtensionMessaging.deleteArchivedSubWallet(masterId, subIndex);
+        if (response.success) {
+            showSuccess(`"${subName}" has been permanently deleted`);
+            await loadArchivedWalletsList();
+        } else {
+            showError(response.error || 'Failed to delete sub-wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Delete archived sub-wallet failed:', error);
+        showError('Failed to delete sub-wallet');
     }
 }

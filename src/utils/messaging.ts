@@ -1024,4 +1024,70 @@ export class ExtensionMessaging {
       pin
     });
   }
+
+  // ========================================
+  // Sub-Wallet Archive/Restore Methods
+  // ========================================
+
+  /**
+   * Archive a sub-wallet
+   *
+   * @param masterKeyId - UUID of the parent master key
+   * @param subWalletIndex - Index of the sub-wallet to archive
+   * @returns Success status
+   */
+  static async archiveSubWallet(masterKeyId: string, subWalletIndex: number): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'ARCHIVE_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex
+    });
+  }
+
+  /**
+   * Restore an archived sub-wallet
+   *
+   * @param masterKeyId - UUID of the parent master key
+   * @param subWalletIndex - Index of the sub-wallet to restore
+   * @returns Success status
+   */
+  static async restoreSubWallet(masterKeyId: string, subWalletIndex: number): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'RESTORE_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex
+    });
+  }
+
+  /**
+   * Permanently delete an archived sub-wallet
+   *
+   * @param masterKeyId - UUID of the parent master key
+   * @param subWalletIndex - Index of the sub-wallet to delete
+   * @returns Success status
+   */
+  static async deleteArchivedSubWallet(masterKeyId: string, subWalletIndex: number): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'DELETE_ARCHIVED_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex
+    });
+  }
+
+  /**
+   * Get all archived sub-wallets across all master keys
+   *
+   * @returns Array of archived sub-wallet info with parent master key details
+   */
+  static async getArchivedSubWallets(): Promise<MessageResponse<{
+    masterKeyId: string;
+    masterKeyNickname: string;
+    subWalletIndex: number;
+    subWalletNickname: string;
+    archivedAt: number;
+  }[]>> {
+    return this.sendToBackground({
+      type: 'GET_ARCHIVED_SUB_WALLETS'
+    });
+  }
 }

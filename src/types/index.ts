@@ -76,6 +76,7 @@ export interface SubWalletEntry {
   nickname: string;    // User-friendly name (e.g., "Sub-Wallet 1", "Savings")
   createdAt: number;   // Timestamp of sub-wallet creation
   lastUsedAt: number;  // Timestamp of last usage
+  archivedAt?: number; // Timestamp when sub-wallet was archived (undefined = active)
   // Note: Mnemonic is derived by incrementing master key's 11th word by `index`
   //       and recalculating the 12th word (checksum)
 }
