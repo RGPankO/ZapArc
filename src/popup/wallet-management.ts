@@ -708,6 +708,21 @@ async function loadHierarchicalWalletList(): Promise<void> {
         return;
     }
 
+    // Check if current active wallet has transactions (for add sub-wallet button)
+    let activeWalletHasTransactions = false;
+    if (breezSDK) {
+        try {
+            const response = await breezSDK.listPayments({});
+            const payments = response?.payments || [];
+            activeWalletHasTransactions = payments.length > 0;
+            console.log(`[Wallet Management] Active wallet has ${payments.length} transaction(s)`);
+        } catch (error) {
+            console.warn('[Wallet Management] Could not check transaction history:', error);
+            // If we can't check, assume no transactions (safer default)
+            activeWalletHasTransactions = false;
+        }
+    }
+
     // Build hierarchical HTML
     let html = '';
 
@@ -724,6 +739,18 @@ async function loadHierarchicalWalletList(): Promise<void> {
             : [];
         // Only show active (non-archived) sub-wallets
         const subWallets = allSubWallets.filter(sw => !sw.archivedAt);
+
+        // Determine if adding sub-wallet is allowed:
+        // - If no sub-wallets exist (only master wallet), allow adding
+        // - If this is the active master key, only allow if current sub-wallet has transactions
+        // - If this is NOT the active master key, don't allow (user needs to switch first and use it)
+        const hasNoSubWallets = subWallets.length === 0;
+        const canAddSubWallet = hasNoSubWallets || (isActiveMasterKey && activeWalletHasTransactions);
+        const addSubWalletDisabledReason = !canAddSubWallet
+            ? (isActiveMasterKey
+                ? 'Make a transaction first before adding another sub-wallet'
+                : 'Switch to this wallet and make a transaction first')
+            : '';
 
         html += `
             <div class="master-key-item ${isExpanded ? 'expanded' : 'collapsed'} ${isActiveMasterKey ? 'active' : ''}"
@@ -755,7 +782,9 @@ async function loadHierarchicalWalletList(): Promise<void> {
                 </div>
                 <div class="master-key-actions">
                     <button class="wallet-mgmt-btn add-sub-wallet-btn"
-                            data-master-id="${mk.id}">
+                            data-master-id="${mk.id}"
+                            ${!canAddSubWallet ? 'disabled' : ''}
+                            ${addSubWalletDisabledReason ? `title="${addSubWalletDisabledReason}"` : ''}>
                         + Add Sub-Wallet
                     </button>
                 </div>
@@ -763,7 +792,6 @@ async function loadHierarchicalWalletList(): Promise<void> {
                 <div class="sub-wallet-list ${isExpanded ? '' : 'hidden'}">
                     ${subWallets.map(sw => {
                         const isActiveSubWallet = isActiveMasterKey && sw.index === currentActiveSubWalletIndex;
-                        const canDeleteSubWallet = subWallets.length > 0; // Can delete any sub-wallet
 
                         return `
                             <div class="sub-wallet-item ${isActiveSubWallet ? 'active' : ''}"
@@ -786,12 +814,6 @@ async function loadHierarchicalWalletList(): Promise<void> {
                                             data-sub-index="${sw.index}"
                                             data-sub-name="${sw.nickname}">
                                         Archive
-                                    </button>
-                                    <button class="wallet-mgmt-btn delete-sub-btn"
-                                            data-master-id="${mk.id}"
-                                            data-sub-index="${sw.index}"
-                                            ${!canDeleteSubWallet ? 'disabled' : ''}>
-                                        Delete
                                     </button>
                                 </div>
                             </div>
@@ -881,19 +903,6 @@ function attachHierarchicalWalletListeners(): void {
             const currentName = target.getAttribute('data-sub-name');
             if (masterId && subIndex && currentName) {
                 await handleRenameSubWallet(masterId, parseInt(subIndex, 10), currentName);
-            }
-        });
-    });
-
-    // Delete sub-wallet
-    document.querySelectorAll('.delete-sub-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const target = e.target as HTMLElement;
-            const masterId = target.getAttribute('data-master-id');
-            const subIndex = target.getAttribute('data-sub-index');
-            if (masterId && subIndex) {
-                await handleDeleteSubWallet(masterId, parseInt(subIndex, 10));
             }
         });
     });
@@ -1114,51 +1123,6 @@ async function handleRenameSubWallet(masterId: string, subIndex: number, current
     } catch (error) {
         console.error('[Wallet Management] Failed to show rename interface:', error);
         showError('Failed to open rename screen');
-    }
-}
-
-/**
- * Handle delete sub-wallet
- */
-async function handleDeleteSubWallet(masterId: string, subIndex: number): Promise<void> {
-    try {
-        console.log(`[Wallet Management] Deleting sub-wallet ${masterId}:${subIndex}`);
-
-        // Get sub-wallet name for confirmation message
-        const response = await ExtensionMessaging.getSubWallets(masterId);
-        if (!response.success || !response.data) {
-            showError('Failed to load sub-wallet information');
-            return;
-        }
-
-        const subWallet = response.data.find(sw => sw.index === subIndex);
-        if (!subWallet) {
-            showError('Sub-wallet not found');
-            return;
-        }
-
-        // Request PIN to confirm deletion
-        const pin = await showPINModal(`Enter PIN to delete "${subWallet.nickname}"`);
-        if (!pin) return;
-
-        // Verify PIN is correct by trying to decrypt the wallet
-        const verifyResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(masterId, 0, pin);
-        if (!verifyResponse.success) {
-            showError('Incorrect PIN');
-            return;
-        }
-
-        const deleteResponse = await ExtensionMessaging.removeSubWallet(masterId, subIndex, pin);
-        if (deleteResponse.success) {
-            showSuccess(`Sub-wallet "${subWallet.nickname}" deleted successfully!`);
-            await loadWalletManagementList();
-            await initializeMultiWalletUI();
-        } else {
-            showError(deleteResponse.error || 'Failed to delete sub-wallet');
-        }
-    } catch (error) {
-        console.error('[Wallet Management] Delete sub-wallet failed:', error);
-        showError('Failed to delete sub-wallet');
     }
 }
 
@@ -1689,12 +1653,6 @@ async function loadArchivedWalletsList(): Promise<void> {
                                     data-sub-name="${subWallet.subWalletNickname}">
                                 Restore
                             </button>
-                            <button class="wallet-mgmt-btn delete-archived-sub-btn danger"
-                                    data-master-id="${subWallet.masterKeyId}"
-                                    data-sub-index="${subWallet.subWalletIndex}"
-                                    data-sub-name="${subWallet.subWalletNickname}">
-                                Delete Forever
-                            </button>
                         </div>
                     </div>
                 `;
@@ -1750,18 +1708,6 @@ function attachArchivedWalletsListeners(): void {
         });
     });
 
-    // Delete archived sub-wallet permanently
-    document.querySelectorAll('.delete-archived-sub-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            const target = e.target as HTMLElement;
-            const masterId = target.getAttribute('data-master-id');
-            const subIndex = target.getAttribute('data-sub-index');
-            const subName = target.getAttribute('data-sub-name');
-            if (masterId && subIndex && subName) {
-                await handleDeleteArchivedSubWallet(masterId, parseInt(subIndex, 10), subName);
-            }
-        });
-    });
 }
 
 /**
@@ -1845,37 +1791,3 @@ async function handleRestoreArchivedSubWallet(masterId: string, subIndex: number
     }
 }
 
-/**
- * Handle permanently delete archived sub-wallet
- * Requires PIN verification for security
- */
-async function handleDeleteArchivedSubWallet(masterId: string, subIndex: number, subName: string): Promise<void> {
-    try {
-        console.log(`[Wallet Management] Permanently deleting archived sub-wallet ${masterId}:${subIndex}`);
-
-        // Request PIN to confirm deletion
-        const pin = await showPINModal(`Enter PIN to permanently delete "${subName}"`);
-        if (!pin) {
-            console.log('[Wallet Management] Delete cancelled by user');
-            return;
-        }
-
-        // Verify PIN is correct by trying to decrypt the master wallet
-        const verifyResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(masterId, 0, pin);
-        if (!verifyResponse.success) {
-            showError('Incorrect PIN');
-            return;
-        }
-
-        const response = await ExtensionMessaging.deleteArchivedSubWallet(masterId, subIndex);
-        if (response.success) {
-            showSuccess(`"${subName}" has been permanently deleted`);
-            await loadArchivedWalletsList();
-        } else {
-            showError(response.error || 'Failed to delete sub-wallet');
-        }
-    } catch (error) {
-        console.error('[Wallet Management] Delete archived sub-wallet failed:', error);
-        showError('Failed to delete sub-wallet');
-    }
-}

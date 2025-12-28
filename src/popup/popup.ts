@@ -247,14 +247,69 @@ function showWizardStep(stepId: string) {
 
     // Show/hide "Add Sub-Wallet" button
     // Show when: 1) on setup-choice-step, 2) adding a wallet (not initial setup), 3) at least one wallet exists
+    // Disable when: current sub-wallet has no transactions (must use wallet before adding another)
     if (stepId === 'setup-choice-step') {
-        const addSubWalletBtn = document.getElementById('add-sub-wallet-btn');
+        const addSubWalletBtn = document.getElementById('add-sub-wallet-btn') as HTMLButtonElement;
         if (addSubWalletBtn) {
             const currentMasterKeys = getMasterKeys();
             const shouldShow = isAddingWallet && currentMasterKeys.length > 0;
             addSubWalletBtn.classList.toggle('hidden', !shouldShow);
             console.log(`[Wizard] Add Sub-Wallet button: ${shouldShow ? 'visible' : 'hidden'} (${currentMasterKeys.length} wallets)`);
+
+            // Check if we should disable based on transaction history
+            if (shouldShow) {
+                updateAddSubWalletButtonState(addSubWalletBtn);
+            }
         }
+    }
+}
+
+/**
+ * Check if current wallet has transactions and update button state accordingly
+ */
+async function updateAddSubWalletButtonState(btn: HTMLButtonElement): Promise<void> {
+    try {
+        // Get sub-wallet count for the active wallet
+        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+        if (!multiWalletResult.multiWalletData) {
+            return;
+        }
+
+        const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+        const activeWalletId = multiWalletData.activeWalletId;
+        const activeWallet = multiWalletData.wallets?.find((w: any) => w.metadata.id === activeWalletId);
+        const existingSubWallets = activeWallet?.subWallets?.filter((sw: any) => !sw.archivedAt) || [];
+
+        // If no sub-wallets exist, allow adding (first sub-wallet is always allowed)
+        if (existingSubWallets.length === 0) {
+            btn.disabled = false;
+            btn.removeAttribute('title');
+            return;
+        }
+
+        // Check if current wallet has transactions
+        if (breezSDK) {
+            const response = await breezSDK.listPayments({});
+            const payments = response?.payments || [];
+            const hasTransactions = payments.length > 0;
+
+            btn.disabled = !hasTransactions;
+            if (!hasTransactions) {
+                btn.setAttribute('title', 'Make a transaction first before adding another sub-wallet');
+            } else {
+                btn.removeAttribute('title');
+            }
+            console.log(`[Wizard] Add Sub-Wallet button: ${hasTransactions ? 'enabled' : 'disabled'} (${payments.length} transactions)`);
+        } else {
+            // No SDK connected, disable the button
+            btn.disabled = true;
+            btn.setAttribute('title', 'Wallet not connected');
+        }
+    } catch (error) {
+        console.warn('[Wizard] Could not check transaction history for sub-wallet button:', error);
+        // On error, disable to be safe
+        btn.disabled = true;
+        btn.setAttribute('title', 'Could not verify transaction history');
     }
 }
 
