@@ -1462,17 +1462,38 @@ export class ChromeStorageManager {
         return null;
       }
 
+      // Try the currently active wallet FIRST to preserve sub-wallet selection
+      if (data.activeWalletId) {
+        const activeWallet = data.wallets.find(w => w.metadata.id === data.activeWalletId);
+        if (activeWallet) {
+          try {
+            const mnemonic = await this.decryptMnemonic(activeWallet.encryptedMnemonic, pin);
+            console.log(`✅ [Storage] PIN matched active wallet: ${activeWallet.metadata.nickname}`);
+
+            // Keep current sub-wallet index
+            const subWalletIndex = data.activeSubWalletIndex ?? 0;
+            await this.setActiveHierarchicalWallet(activeWallet.metadata.id, subWalletIndex);
+
+            return { masterKeyId: activeWallet.metadata.id, mnemonic };
+          } catch {
+            console.log(`[Storage] PIN did not match active wallet, trying others...`);
+          }
+        }
+      }
+
+      // Fall back to trying all wallets if active wallet didn't match
       for (const wallet of data.wallets) {
+        // Skip the active wallet (already tried)
+        if (wallet.metadata.id === data.activeWalletId) {
+          continue;
+        }
+
         try {
           const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
           console.log(`✅ [Storage] PIN matched wallet: ${wallet.metadata.nickname}`);
 
-          // Set this as active with current sub-wallet index (or 0 if none set)
-          const subWalletIndex = (data.activeWalletId === wallet.metadata.id && data.activeSubWalletIndex)
-            ? data.activeSubWalletIndex
-            : 0;
-
-          await this.setActiveHierarchicalWallet(wallet.metadata.id, subWalletIndex);
+          // Different wallet matched - reset to sub-wallet 0
+          await this.setActiveHierarchicalWallet(wallet.metadata.id, 0);
 
           return { masterKeyId: wallet.metadata.id, mnemonic };
         } catch {
@@ -1863,6 +1884,7 @@ export class ChromeStorageManager {
         return null;
       }
 
+      // Use the active sub-wallet index from storage (already set by tryUnlockAnyMasterKey or tryUnlockSpecificMasterKey)
       const subWalletIndex = data.activeSubWalletIndex ?? 0;
 
       // Get sub-wallet nickname
@@ -1893,6 +1915,9 @@ export class ChromeStorageManager {
         createdAt: wallet.metadata.createdAt,
         lastUsedAt: wallet.metadata.lastUsedAt
       };
+
+      // Clear the selected wallet for unlock after successful unlock
+      await chrome.storage.local.remove(['selectedWalletForUnlock']);
 
       console.log('✅ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED SUCCESS', {
         masterKeyId: unlocked.masterKeyId,

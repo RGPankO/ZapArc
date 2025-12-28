@@ -71,9 +71,16 @@ async function populateWalletSelectionList(): Promise<void> {
 
         const wallets = walletsResponse.data;
 
-        // Get selected wallet for unlock from storage
+        // Get selected wallet for unlock and active wallet from storage
         const storageResult = await chrome.storage.local.get(['multiWalletData', 'selectedWalletForUnlock']);
-        const selectedWalletForUnlock = storageResult.selectedWalletForUnlock || null;
+        const multiWalletData = storageResult.multiWalletData ? JSON.parse(storageResult.multiWalletData) : null;
+
+        // Use selectedWalletForUnlock if set, otherwise fall back to active wallet
+        const selectedWalletForUnlock = storageResult.selectedWalletForUnlock ||
+            (multiWalletData ? {
+                masterKeyId: multiWalletData.activeWalletId,
+                subWalletIndex: multiWalletData.activeSubWalletIndex ?? 0
+            } : null);
 
         let html = '';
 
@@ -84,8 +91,8 @@ async function populateWalletSelectionList(): Promise<void> {
                 : false;
 
             // Get sub-wallets from storage
-            const subWalletsData = storageResult.multiWalletData
-                ? JSON.parse(storageResult.multiWalletData).wallets?.find((w: any) => w.metadata.id === wallet.id)?.subWallets || []
+            const subWalletsData = multiWalletData
+                ? multiWalletData.wallets?.find((w: any) => w.metadata.id === wallet.id)?.subWallets || []
                 : [];
 
             const hasSubWallets = subWalletsData.length > 0;

@@ -346,8 +346,9 @@ async function handleHierarchicalWalletSwitch(masterKeyId: string, subWalletInde
             setActiveSubWalletIndex(subWalletIndex);
 
             // Update session PIN if we switched to a different master wallet
-            if (isDifferentMasterWallet) {
+            if (isDifferentMasterWallet && pin) {
                 setSessionPin(pin);
+                await chrome.storage.session.set({ walletSessionPin: pin });
                 console.log('[Wallet Management] Updated session PIN for new master wallet');
             }
 
