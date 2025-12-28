@@ -93,6 +93,7 @@ export interface MasterKeyMetadata {
   lastUsedAt: number;
   subWalletCount: number;
   isExpanded: boolean;
+  archivedAt?: number; // Timestamp when wallet was archived (only set for archived wallets)
 }
 
 /**

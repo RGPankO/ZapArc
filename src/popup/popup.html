@@ -299,11 +299,29 @@
 
             <div class="wallet-mgmt-actions">
                 <button id="wallet-mgmt-add-btn" class="add-wallet-full-btn" title="Add New Wallet">+ Add Wallet</button>
+                <button id="view-archived-wallets-btn" class="view-archived-btn" title="View Archived Wallets">📦 Archived</button>
             </div>
 
             <main>
                 <div id="wallet-management-list" class="wallet-management-list">
                     <!-- Populated dynamically with wallet items -->
+                </div>
+            </main>
+        </div>
+
+        <!-- Archived Wallets Interface -->
+        <div id="archived-wallets-interface" class="hidden">
+            <header>
+                <button id="archived-wallets-back-btn" class="back-btn">← Back</button>
+                <h1>Archived Wallets</h1>
+            </header>
+
+            <main>
+                <p class="archived-wallets-description">
+                    Archived wallets are stored but not active. You can restore them at any time.
+                </p>
+                <div id="archived-wallets-list" class="archived-wallets-list">
+                    <!-- Populated dynamically with archived wallet items -->
                 </div>
             </main>
         </div>

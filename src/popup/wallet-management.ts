@@ -619,6 +619,15 @@ export async function showWalletManagementInterface(): Promise<void> {
             showAddWalletFlow();
         };
     }
+
+    // Setup view archived wallets button
+    const viewArchivedBtn = document.getElementById('view-archived-wallets-btn');
+    if (viewArchivedBtn) {
+        viewArchivedBtn.onclick = () => {
+            console.log('[Wallet Management] View archived wallets button clicked');
+            showArchivedWalletsInterface();
+        };
+    }
 }
 
 /**
@@ -730,6 +739,12 @@ async function loadHierarchicalWalletList(): Promise<void> {
                             data-master-name="${mk.nickname}">
                         Rename
                     </button>
+                    <button class="wallet-mgmt-btn archive-master-btn"
+                            data-master-id="${mk.id}"
+                            data-master-name="${mk.nickname}"
+                            ${!canDeleteMasterKey ? 'disabled' : ''}>
+                        Archive
+                    </button>
                     <button class="wallet-mgmt-btn delete-master-btn"
                             data-master-id="${mk.id}"
                             ${!canDeleteMasterKey ? 'disabled' : ''}>
@@ -807,6 +822,19 @@ function attachHierarchicalWalletListeners(): void {
             const currentName = target.getAttribute('data-master-name');
             if (masterId && currentName) {
                 await handleRenameMasterKey(masterId, currentName);
+            }
+        });
+    });
+
+    // Archive master key
+    document.querySelectorAll('.archive-master-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const masterName = target.getAttribute('data-master-name');
+            if (masterId && masterName) {
+                await handleArchiveMasterKey(masterId, masterName);
             }
         });
     });
@@ -1387,6 +1415,285 @@ export async function handleDeleteWallet(walletId: string): Promise<void> {
         }
     } catch (error) {
         console.error('[Wallet Management] Delete failed:', error);
+        showError('Failed to delete wallet');
+    }
+}
+
+// ========================================
+// Archive Wallet
+// ========================================
+
+/**
+ * Handle archive master key action
+ * Archives the wallet without requiring PIN (for forgotten PIN recovery)
+ */
+async function handleArchiveMasterKey(masterId: string, masterName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Archiving master key ${masterId}`);
+
+        // Show confirmation modal
+        const confirmed = await showArchiveConfirmation(masterName);
+        if (!confirmed) {
+            console.log('[Wallet Management] Archive cancelled by user');
+            return;
+        }
+
+        // Archive the wallet (no PIN required)
+        const response = await ExtensionMessaging.archiveMasterKey(masterId);
+        if (response.success) {
+            showSuccess(`"${masterName}" has been archived`);
+            await loadWalletManagementList();
+            await initializeMultiWalletUI();
+        } else {
+            showError(response.error || 'Failed to archive wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Archive master key failed:', error);
+        showError('Failed to archive wallet');
+    }
+}
+
+/**
+ * Show archive confirmation modal
+ */
+async function showArchiveConfirmation(walletName: string): Promise<boolean> {
+    return new Promise((resolve) => {
+        const modalHtml = `
+            <div id="archive-confirm-modal" class="modal-overlay">
+                <div class="modal-content">
+                    <h3>Archive Wallet</h3>
+                    <p>Are you sure you want to archive "${walletName}"?</p>
+                    <p class="modal-note">Archived wallets can be restored later from the Archived Wallets list.</p>
+                    <div class="modal-buttons">
+                        <button id="archive-cancel-btn" class="modal-btn secondary">Cancel</button>
+                        <button id="archive-confirm-btn" class="modal-btn primary">Archive</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Insert modal into DOM
+        const modalContainer = document.createElement('div');
+        modalContainer.innerHTML = modalHtml;
+        document.body.appendChild(modalContainer);
+
+        const modal = document.getElementById('archive-confirm-modal');
+        const cancelBtn = document.getElementById('archive-cancel-btn');
+        const confirmBtn = document.getElementById('archive-confirm-btn');
+
+        const cleanup = () => {
+            modalContainer.remove();
+        };
+
+        cancelBtn?.addEventListener('click', () => {
+            cleanup();
+            resolve(false);
+        });
+
+        confirmBtn?.addEventListener('click', () => {
+            cleanup();
+            resolve(true);
+        });
+
+        // Close on overlay click
+        modal?.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                cleanup();
+                resolve(false);
+            }
+        });
+    });
+}
+
+/**
+ * Show archived wallets interface
+ */
+export async function showArchivedWalletsInterface(): Promise<void> {
+    console.log('[Wallet Management] Showing archived wallets interface');
+
+    // Hide wallet management interface
+    const managementInterface = document.getElementById('wallet-management-interface');
+    if (managementInterface) {
+        managementInterface.classList.add('hidden');
+    }
+
+    // Show archived wallets interface
+    const archivedInterface = document.getElementById('archived-wallets-interface');
+    if (archivedInterface) {
+        archivedInterface.classList.remove('hidden');
+    }
+
+    // Load and display archived wallets
+    await loadArchivedWalletsList();
+
+    // Setup back button
+    const backBtn = document.getElementById('archived-wallets-back-btn');
+    if (backBtn) {
+        backBtn.onclick = () => {
+            hideArchivedWalletsInterface();
+        };
+    }
+}
+
+/**
+ * Hide archived wallets interface and return to wallet management
+ */
+export function hideArchivedWalletsInterface(): void {
+    console.log('[Wallet Management] Hiding archived wallets interface');
+
+    const archivedInterface = document.getElementById('archived-wallets-interface');
+    if (archivedInterface) {
+        archivedInterface.classList.add('hidden');
+    }
+
+    const managementInterface = document.getElementById('wallet-management-interface');
+    if (managementInterface) {
+        managementInterface.classList.remove('hidden');
+    }
+}
+
+/**
+ * Load and display archived wallets list
+ */
+async function loadArchivedWalletsList(): Promise<void> {
+    const listContainer = document.getElementById('archived-wallets-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '<div class="loading-wallets">Loading archived wallets...</div>';
+
+    try {
+        const response = await ExtensionMessaging.getArchivedWallets();
+        if (!response.success || !response.data) {
+            listContainer.innerHTML = '<div class="no-wallets">Failed to load archived wallets</div>';
+            return;
+        }
+
+        const archivedWallets = response.data;
+
+        if (archivedWallets.length === 0) {
+            listContainer.innerHTML = '<div class="no-wallets">No archived wallets</div>';
+            return;
+        }
+
+        let html = '';
+        for (const wallet of archivedWallets) {
+            const archivedDate = wallet.archivedAt
+                ? new Date(wallet.archivedAt).toLocaleDateString()
+                : 'Unknown';
+
+            html += `
+                <div class="archived-wallet-item" data-wallet-id="${wallet.id}">
+                    <div class="archived-wallet-header">
+                        <span class="archived-wallet-icon">📦</span>
+                        <div class="archived-wallet-info">
+                            <div class="archived-wallet-name">${wallet.nickname}</div>
+                            <div class="archived-wallet-meta">Archived: ${archivedDate}</div>
+                        </div>
+                    </div>
+                    <div class="archived-wallet-actions">
+                        <button class="wallet-mgmt-btn restore-archived-btn"
+                                data-wallet-id="${wallet.id}"
+                                data-wallet-name="${wallet.nickname}">
+                            Restore
+                        </button>
+                        <button class="wallet-mgmt-btn delete-archived-btn danger"
+                                data-wallet-id="${wallet.id}"
+                                data-wallet-name="${wallet.nickname}">
+                            Delete Forever
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        listContainer.innerHTML = html;
+        attachArchivedWalletsListeners();
+    } catch (error) {
+        console.error('[Wallet Management] Failed to load archived wallets:', error);
+        listContainer.innerHTML = '<div class="error-wallets">Error loading archived wallets</div>';
+    }
+}
+
+/**
+ * Attach event listeners for archived wallet actions
+ */
+function attachArchivedWalletsListeners(): void {
+    // Restore archived wallet
+    document.querySelectorAll('.restore-archived-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const walletId = target.getAttribute('data-wallet-id');
+            const walletName = target.getAttribute('data-wallet-name');
+            if (walletId && walletName) {
+                await handleRestoreArchivedWallet(walletId, walletName);
+            }
+        });
+    });
+
+    // Delete archived wallet permanently
+    document.querySelectorAll('.delete-archived-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const walletId = target.getAttribute('data-wallet-id');
+            const walletName = target.getAttribute('data-wallet-name');
+            if (walletId && walletName) {
+                await handleDeleteArchivedWallet(walletId, walletName);
+            }
+        });
+    });
+}
+
+/**
+ * Handle restore archived wallet
+ */
+async function handleRestoreArchivedWallet(walletId: string, walletName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Restoring archived wallet ${walletId}`);
+
+        const response = await ExtensionMessaging.restoreArchivedMasterKey(walletId);
+        if (response.success) {
+            showSuccess(`"${walletName}" has been restored`);
+            await loadArchivedWalletsList();
+        } else {
+            showError(response.error || 'Failed to restore wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Restore archived wallet failed:', error);
+        showError('Failed to restore wallet');
+    }
+}
+
+/**
+ * Handle permanently delete archived wallet
+ * Requires PIN verification for security
+ */
+async function handleDeleteArchivedWallet(walletId: string, walletName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Permanently deleting archived wallet ${walletId}`);
+
+        // Request PIN to confirm deletion (same as regular delete)
+        const pin = await showPINModal(`Enter PIN to permanently delete "${walletName}"`);
+        if (!pin) {
+            console.log('[Wallet Management] Delete cancelled by user');
+            return;
+        }
+
+        // Verify PIN is correct by trying to decrypt the archived wallet
+        const verifyResponse = await ExtensionMessaging.verifyArchivedWalletPin(walletId, pin);
+        if (!verifyResponse.success || !verifyResponse.data) {
+            showError('Incorrect PIN');
+            return;
+        }
+
+        const response = await ExtensionMessaging.deleteArchivedMasterKey(walletId);
+        if (response.success) {
+            showSuccess(`"${walletName}" has been permanently deleted`);
+            await loadArchivedWalletsList();
+        } else {
+            showError(response.error || 'Failed to delete wallet');
+        }
+    } catch (error) {
+        console.error('[Wallet Management] Delete archived wallet failed:', error);
         showError('Failed to delete wallet');
     }
 }

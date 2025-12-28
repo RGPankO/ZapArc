@@ -952,4 +952,76 @@ export class ExtensionMessaging {
       subWallets
     });
   }
+
+  // ========================================
+  // Wallet Archive/Restore Methods
+  // ========================================
+
+  /**
+   * Archive a master key (move to archived list)
+   * Does NOT require PIN - used when user forgot PIN
+   *
+   * @param masterKeyId - UUID of the master key to archive
+   * @returns Success status
+   */
+  static async archiveMasterKey(masterKeyId: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'ARCHIVE_MASTER_KEY',
+      masterKeyId
+    });
+  }
+
+  /**
+   * Restore an archived master key back to active list
+   *
+   * @param masterKeyId - UUID of the archived master key
+   * @returns Success status
+   */
+  static async restoreArchivedMasterKey(masterKeyId: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'RESTORE_ARCHIVED_MASTER_KEY',
+      masterKeyId
+    });
+  }
+
+  /**
+   * Get all archived wallets (metadata only)
+   *
+   * @returns Array of archived wallet metadata
+   */
+  static async getArchivedWallets(): Promise<MessageResponse<(import('../types').WalletMetadata & { archivedAt?: number })[]>> {
+    return this.sendToBackground({
+      type: 'GET_ARCHIVED_WALLETS'
+    });
+  }
+
+  /**
+   * Permanently delete an archived master key
+   * This is irreversible - the wallet data will be lost
+   *
+   * @param masterKeyId - UUID of the archived master key
+   * @returns Success status
+   */
+  static async deleteArchivedMasterKey(masterKeyId: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'DELETE_ARCHIVED_MASTER_KEY',
+      masterKeyId
+    });
+  }
+
+  /**
+   * Verify PIN against an archived wallet
+   * Used to confirm PIN before permanent deletion
+   *
+   * @param masterKeyId - UUID of the archived master key
+   * @param pin - PIN to verify
+   * @returns True if PIN is correct
+   */
+  static async verifyArchivedWalletPin(masterKeyId: string, pin: string): Promise<MessageResponse<boolean>> {
+    return this.sendToBackground({
+      type: 'VERIFY_ARCHIVED_WALLET_PIN',
+      masterKeyId,
+      pin
+    });
+  }
 }

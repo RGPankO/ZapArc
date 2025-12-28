@@ -1940,4 +1940,223 @@ export class ChromeStorageManager {
       return null;
     }
   }
+
+  // ========================================
+  // Wallet Archiving
+  // ========================================
+
+  /**
+   * Archive a master key (move to archived list without deleting)
+   * Does NOT require PIN - useful when user forgot their PIN
+   */
+  async archiveMasterKey(masterKeyId: string): Promise<void> {
+    console.log('🔵 [Storage] ARCHIVE_MASTER_KEY', { masterKeyId });
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData', 'archivedWallets']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+
+      // Prevent archiving last wallet
+      if (data.wallets.length === 1) {
+        throw new Error('Cannot archive the last wallet');
+      }
+
+      // Find the wallet to archive
+      const walletIndex = data.wallets.findIndex(w => w.metadata.id === masterKeyId);
+      if (walletIndex === -1) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
+      }
+
+      const walletToArchive = data.wallets[walletIndex];
+
+      // Get or initialize archived wallets list
+      const archivedWallets: EncryptedWalletEntry[] = result.archivedWallets
+        ? JSON.parse(result.archivedWallets)
+        : [];
+
+      // Add archived timestamp
+      const archivedEntry = {
+        ...walletToArchive,
+        archivedAt: Date.now()
+      };
+
+      archivedWallets.push(archivedEntry);
+
+      // Remove from active wallets
+      data.wallets.splice(walletIndex, 1);
+      data.walletOrder = data.walletOrder.filter(id => id !== masterKeyId);
+
+      // If archiving active wallet, switch to first remaining
+      if (data.activeWalletId === masterKeyId) {
+        data.activeWalletId = data.wallets[0].metadata.id;
+        data.activeSubWalletIndex = 0;
+        console.log('⚠️ [Storage] Archived active wallet, switched to', {
+          newActiveWalletId: data.activeWalletId
+        });
+      }
+
+      // Save both updates
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data),
+        archivedWallets: JSON.stringify(archivedWallets)
+      });
+
+      console.log('✅ [Storage] ARCHIVE_MASTER_KEY SUCCESS', { masterKeyId });
+    } catch (error) {
+      console.error('❌ [Storage] ARCHIVE_MASTER_KEY FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restore an archived master key back to active wallets
+   * Does NOT require PIN - wallet remains encrypted
+   */
+  async restoreArchivedMasterKey(masterKeyId: string): Promise<void> {
+    console.log('🔵 [Storage] RESTORE_ARCHIVED_MASTER_KEY', { masterKeyId });
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData', 'archivedWallets']);
+
+      if (!result.archivedWallets) {
+        throw new Error('No archived wallets found');
+      }
+
+      const archivedWallets: (EncryptedWalletEntry & { archivedAt?: number })[] = JSON.parse(result.archivedWallets);
+
+      // Find the wallet to restore
+      const archivedIndex = archivedWallets.findIndex(w => w.metadata.id === masterKeyId);
+      if (archivedIndex === -1) {
+        throw new Error(`Archived wallet ${masterKeyId} not found`);
+      }
+
+      const walletToRestore = archivedWallets[archivedIndex];
+
+      // Remove archivedAt property before restoring
+      delete walletToRestore.archivedAt;
+
+      // Get or initialize multiWalletData
+      const data: MultiWalletStorage = result.multiWalletData
+        ? JSON.parse(result.multiWalletData)
+        : { wallets: [], activeWalletId: '', activeSubWalletIndex: 0, walletOrder: [], version: 2 };
+
+      // Add back to active wallets
+      data.wallets.push(walletToRestore);
+      data.walletOrder.push(masterKeyId);
+
+      // Remove from archived list
+      archivedWallets.splice(archivedIndex, 1);
+
+      // Save both updates
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data),
+        archivedWallets: JSON.stringify(archivedWallets)
+      });
+
+      console.log('✅ [Storage] RESTORE_ARCHIVED_MASTER_KEY SUCCESS', { masterKeyId });
+    } catch (error) {
+      console.error('❌ [Storage] RESTORE_ARCHIVED_MASTER_KEY FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get list of archived wallets (metadata only, no decryption)
+   */
+  async getArchivedWallets(): Promise<(WalletMetadata & { archivedAt?: number })[]> {
+    console.log('🔵 [Storage] GET_ARCHIVED_WALLETS');
+
+    try {
+      const result = await chrome.storage.local.get(['archivedWallets']);
+
+      if (!result.archivedWallets) {
+        return [];
+      }
+
+      const archivedWallets: (EncryptedWalletEntry & { archivedAt?: number })[] = JSON.parse(result.archivedWallets);
+
+      // Return metadata only
+      const metadata = archivedWallets.map(w => ({
+        ...w.metadata,
+        archivedAt: w.archivedAt
+      }));
+
+      console.log('✅ [Storage] GET_ARCHIVED_WALLETS SUCCESS', { count: metadata.length });
+      return metadata;
+    } catch (error) {
+      console.error('❌ [Storage] GET_ARCHIVED_WALLETS FAILED', error);
+      return [];
+    }
+  }
+
+  /**
+   * Permanently delete an archived wallet
+   * This is the only way to truly delete a wallet - must be archived first
+   */
+  async deleteArchivedMasterKey(masterKeyId: string): Promise<void> {
+    console.log('🔵 [Storage] DELETE_ARCHIVED_MASTER_KEY', { masterKeyId });
+
+    try {
+      const result = await chrome.storage.local.get(['archivedWallets']);
+
+      if (!result.archivedWallets) {
+        throw new Error('No archived wallets found');
+      }
+
+      const archivedWallets: EncryptedWalletEntry[] = JSON.parse(result.archivedWallets);
+
+      const index = archivedWallets.findIndex(w => w.metadata.id === masterKeyId);
+      if (index === -1) {
+        throw new Error(`Archived wallet ${masterKeyId} not found`);
+      }
+
+      archivedWallets.splice(index, 1);
+
+      await chrome.storage.local.set({
+        archivedWallets: JSON.stringify(archivedWallets)
+      });
+
+      console.log('✅ [Storage] DELETE_ARCHIVED_MASTER_KEY SUCCESS', { masterKeyId });
+    } catch (error) {
+      console.error('❌ [Storage] DELETE_ARCHIVED_MASTER_KEY FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verify PIN against an archived wallet
+   * Used to confirm PIN before permanent deletion
+   */
+  async verifyArchivedWalletPin(masterKeyId: string, pin: string): Promise<boolean> {
+    console.log('🔵 [Storage] VERIFY_ARCHIVED_WALLET_PIN', { masterKeyId });
+
+    try {
+      const result = await chrome.storage.local.get(['archivedWallets']);
+
+      if (!result.archivedWallets) {
+        throw new Error('No archived wallets found');
+      }
+
+      const archivedWallets: (EncryptedWalletEntry & { archivedAt?: number })[] = JSON.parse(result.archivedWallets);
+      const wallet = archivedWallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Archived wallet ${masterKeyId} not found`);
+      }
+
+      // Try to decrypt - if it succeeds, PIN is correct
+      await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
+
+      console.log('✅ [Storage] VERIFY_ARCHIVED_WALLET_PIN SUCCESS');
+      return true;
+    } catch (error) {
+      console.error('❌ [Storage] VERIFY_ARCHIVED_WALLET_PIN FAILED', error);
+      return false;
+    }
+  }
 }

@@ -2386,3 +2386,226 @@ body.modal-open {
 .error-wallets {
   color: #dc3545;
 }
+
+/* ========================================
+   Archive Wallet Styles
+   ======================================== */
+
+/* View Archived Button */
+.view-archived-btn {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s;
+}
+
+.view-archived-btn:hover {
+  background: #eee;
+}
+
+/* Wallet Management Actions Row */
+.wallet-mgmt-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+/* Archive Button in Master Key Actions */
+.archive-master-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Archive Confirmation Modal */
+#archive-confirm-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+#archive-confirm-modal .modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 320px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+#archive-confirm-modal h3 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+#archive-confirm-modal p {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #555;
+  line-height: 1.4;
+}
+
+#archive-confirm-modal .modal-note {
+  font-size: 12px;
+  color: #888;
+  background: #f5f5f5;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+#archive-confirm-modal .modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+#archive-confirm-modal .modal-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+
+#archive-confirm-modal .modal-btn.secondary {
+  background: #f5f5f5;
+  color: #333;
+}
+
+#archive-confirm-modal .modal-btn.secondary:hover {
+  background: #eee;
+}
+
+#archive-confirm-modal .modal-btn.primary {
+  background: #e65100;
+  color: white;
+}
+
+#archive-confirm-modal .modal-btn.primary:hover {
+  background: #bf360c;
+}
+
+/* Archived Wallets Interface */
+#archived-wallets-interface {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#archived-wallets-interface header {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#archived-wallets-interface h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+}
+
+#archived-wallets-interface main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.archived-wallets-description {
+  font-size: 13px;
+  color: #666;
+  margin: 0 0 16px 0;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.archived-wallets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Archived Wallet Item */
+.archived-wallet-item {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.archived-wallet-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.archived-wallet-icon {
+  font-size: 24px;
+}
+
+.archived-wallet-info {
+  flex: 1;
+}
+
+.archived-wallet-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.archived-wallet-meta {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.archived-wallet-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.archived-wallet-actions .wallet-mgmt-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.archived-wallet-actions .restore-archived-btn {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-color: #a5d6a7;
+}
+
+.archived-wallet-actions .restore-archived-btn:hover {
+  background: #c8e6c9;
+}
+
+.archived-wallet-actions .delete-archived-btn {
+  background: #ffebee;
+  color: #c62828;
+  border-color: #ef9a9a;
+}
+
+.archived-wallet-actions .delete-archived-btn:hover {
+  background: #ffcdd2;
+}

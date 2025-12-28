@@ -923,6 +923,105 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      // ========================================
+      // Wallet Archive/Restore Handlers
+      // ========================================
+
+      case 'ARCHIVE_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          console.log('[Background] ARCHIVE_MASTER_KEY', { masterKeyId });
+
+          await storageManager.archiveMasterKey(masterKeyId);
+          console.log('[Background] ARCHIVE_MASTER_KEY - Wallet archived successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] ARCHIVE_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to archive wallet'
+          });
+        }
+        break;
+
+      case 'RESTORE_ARCHIVED_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          console.log('[Background] RESTORE_ARCHIVED_MASTER_KEY', { masterKeyId });
+
+          await storageManager.restoreArchivedMasterKey(masterKeyId);
+          console.log('[Background] RESTORE_ARCHIVED_MASTER_KEY - Wallet restored successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RESTORE_ARCHIVED_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to restore wallet'
+          });
+        }
+        break;
+
+      case 'GET_ARCHIVED_WALLETS':
+        try {
+          console.log('[Background] GET_ARCHIVED_WALLETS');
+          const archivedWallets = await storageManager.getArchivedWallets();
+          console.log('[Background] GET_ARCHIVED_WALLETS - Retrieved:', { count: archivedWallets.length });
+          sendResponse({ success: true, data: archivedWallets });
+        } catch (error) {
+          console.error('[Background] GET_ARCHIVED_WALLETS - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get archived wallets'
+          });
+        }
+        break;
+
+      case 'DELETE_ARCHIVED_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          console.log('[Background] DELETE_ARCHIVED_MASTER_KEY', { masterKeyId });
+
+          await storageManager.deleteArchivedMasterKey(masterKeyId);
+          console.log('[Background] DELETE_ARCHIVED_MASTER_KEY - Wallet permanently deleted');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] DELETE_ARCHIVED_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete archived wallet'
+          });
+        }
+        break;
+
+      case 'VERIFY_ARCHIVED_WALLET_PIN':
+        try {
+          const { masterKeyId, pin } = message;
+          if (!masterKeyId || !pin) {
+            throw new Error('Master key ID and PIN are required');
+          }
+          console.log('[Background] VERIFY_ARCHIVED_WALLET_PIN', { masterKeyId });
+
+          const isValid = await storageManager.verifyArchivedWalletPin(masterKeyId, pin);
+          console.log('[Background] VERIFY_ARCHIVED_WALLET_PIN - Result:', isValid);
+          sendResponse({ success: true, data: isValid });
+        } catch (error) {
+          console.error('[Background] VERIFY_ARCHIVED_WALLET_PIN - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to verify PIN'
+          });
+        }
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown message type' });
     }
