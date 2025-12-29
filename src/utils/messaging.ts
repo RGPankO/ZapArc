@@ -737,10 +737,11 @@ export class ExtensionMessaging {
    * @param masterKeyId - UUID of the master key
    * @returns Array of sub-wallet entries
    */
-  static async getSubWallets(masterKeyId: string): Promise<MessageResponse<import('../types').SubWalletEntry[]>> {
+  static async getSubWallets(masterKeyId: string, includeArchived: boolean = false): Promise<MessageResponse<import('../types').SubWalletEntry[]>> {
     return this.sendToBackground({
       type: 'GET_SUB_WALLETS',
-      masterKeyId
+      masterKeyId,
+      includeArchived
     });
   }
 

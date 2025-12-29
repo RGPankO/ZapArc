@@ -90,10 +90,11 @@ async function populateWalletSelectionList(): Promise<void> {
                 ? selectedWalletForUnlock.masterKeyId === wallet.id
                 : false;
 
-            // Get sub-wallets from storage
-            const subWalletsData = multiWalletData
+            // Get sub-wallets from storage (filter out archived ones)
+            const allSubWalletsData = multiWalletData
                 ? multiWalletData.wallets?.find((w: any) => w.metadata.id === wallet.id)?.subWallets || []
                 : [];
+            const subWalletsData = allSubWalletsData.filter((sw: any) => !sw.archivedAt);
 
             const hasSubWallets = subWalletsData.length > 0;
             const createdDate = new Date(wallet.createdAt).toLocaleDateString();

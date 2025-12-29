@@ -195,7 +195,9 @@ export async function populateWalletDropdown(): Promise<void> {
         // Each wallet is a master key
         for (const wallet of currentWallets) {
             const isActiveWallet = wallet.id === activeWalletId;
-            const subWallets = (data.wallets?.find((w: any) => w.metadata.id === wallet.id)?.subWallets) || [];
+            const allSubWallets = (data.wallets?.find((w: any) => w.metadata.id === wallet.id)?.subWallets) || [];
+            // Filter out archived sub-wallets
+            const subWallets = allSubWallets.filter((sw: any) => !sw.archivedAt);
             const hasSubWallets = subWallets.length > 0;
             const createdDate = new Date(wallet.createdAt).toLocaleDateString();
 
@@ -732,13 +734,11 @@ async function loadHierarchicalWalletList(): Promise<void> {
         const canDeleteMasterKey = masterKeyList.length > 1;
         const createdDate = new Date(mk.createdAt).toLocaleDateString();
 
-        // Fetch sub-wallets for this master key (filter out archived ones)
+        // Fetch sub-wallets for this master key (archived filtered out by default at source)
         const subWalletsResponse = await ExtensionMessaging.getSubWallets(mk.id);
-        const allSubWallets: SubWalletEntry[] = subWalletsResponse.success && subWalletsResponse.data
+        const subWallets: SubWalletEntry[] = subWalletsResponse.success && subWalletsResponse.data
             ? subWalletsResponse.data
             : [];
-        // Only show active (non-archived) sub-wallets
-        const subWallets = allSubWallets.filter(sw => !sw.archivedAt);
 
         // Determine if adding sub-wallet is allowed:
         // - If no sub-wallets exist (only master wallet), allow adding
@@ -1023,15 +1023,16 @@ async function handleAddSubWallet(masterId: string): Promise<void> {
     try {
         console.log(`[Wallet Management] Adding sub-wallet to master key ${masterId}`);
 
-        // Get current sub-wallets to determine the next index
-        const response = await ExtensionMessaging.getSubWallets(masterId);
+        // Get ALL sub-wallets (including archived) to determine the next index
+        // This ensures archived wallets keep their indices reserved
+        const response = await ExtensionMessaging.getSubWallets(masterId, true);
         if (!response.success || !response.data) {
             showError('Failed to load sub-wallets');
             return;
         }
-        
-        const subWallets = response.data;
-        const nextIndex = subWallets.length + 1;
+
+        const allSubWallets = response.data;
+        const nextIndex = allSubWallets.length + 1;
         const defaultName = `Sub-wallet ${nextIndex}`;
 
         // Prompt for wallet name using modal
@@ -1568,7 +1569,7 @@ export function hideArchivedWalletsInterface(): void {
 
 /**
  * Load and display archived wallets list
- * Shows both archived master wallets and archived sub-wallets
+ * Shows hierarchical structure: master wallets with their archived sub-wallets nested below
  */
 async function loadArchivedWalletsList(): Promise<void> {
     const listContainer = document.getElementById('archived-wallets-list');
@@ -1577,33 +1578,42 @@ async function loadArchivedWalletsList(): Promise<void> {
     listContainer.innerHTML = '<div class="loading-wallets">Loading archived wallets...</div>';
 
     try {
-        // Fetch both archived master wallets and archived sub-wallets
-        const [masterResponse, subResponse] = await Promise.all([
+        // Fetch archived wallets, archived sub-wallets, and active wallets (for parent context)
+        const [masterResponse, subResponse, activeWalletsResponse] = await Promise.all([
             ExtensionMessaging.getArchivedWallets(),
-            ExtensionMessaging.getArchivedSubWallets()
+            ExtensionMessaging.getArchivedSubWallets(),
+            ExtensionMessaging.getAllWallets()
         ]);
 
         const archivedMasterWallets = masterResponse.success && masterResponse.data ? masterResponse.data : [];
         const archivedSubWallets = subResponse.success && subResponse.data ? subResponse.data : [];
+        const activeWallets = activeWalletsResponse.success && activeWalletsResponse.data ? activeWalletsResponse.data : [];
 
         if (archivedMasterWallets.length === 0 && archivedSubWallets.length === 0) {
             listContainer.innerHTML = '<div class="no-wallets">No archived wallets</div>';
             return;
         }
 
+        // Group archived sub-wallets by their master key ID
+        const subWalletsByMaster = new Map<string, typeof archivedSubWallets>();
+        for (const subWallet of archivedSubWallets) {
+            const existing = subWalletsByMaster.get(subWallet.masterKeyId) || [];
+            existing.push(subWallet);
+            subWalletsByMaster.set(subWallet.masterKeyId, existing);
+        }
+
         let html = '';
 
-        // Archived Master Wallets section
+        // 1. Archived Master Wallets (with any archived sub-wallets nested)
         if (archivedMasterWallets.length > 0) {
-            html += '<div class="archived-section-header">Master Wallets</div>';
             for (const wallet of archivedMasterWallets) {
                 const archivedDate = wallet.archivedAt
                     ? new Date(wallet.archivedAt).toLocaleDateString()
                     : 'Unknown';
 
                 html += `
-                    <div class="archived-wallet-item" data-wallet-id="${wallet.id}">
-                        <div class="archived-wallet-header">
+                    <div class="archived-master-item" data-wallet-id="${wallet.id}">
+                        <div class="archived-master-header archived">
                             <span class="archived-wallet-icon">🔑</span>
                             <div class="archived-wallet-info">
                                 <div class="archived-wallet-name">${wallet.nickname}</div>
@@ -1624,39 +1634,53 @@ async function loadArchivedWalletsList(): Promise<void> {
                         </div>
                     </div>
                 `;
+
+                // Remove from map since we've handled this master's sub-wallets implicitly
+                subWalletsByMaster.delete(wallet.id);
             }
         }
 
-        // Archived Sub-Wallets section
-        if (archivedSubWallets.length > 0) {
-            html += '<div class="archived-section-header">Sub-Wallets</div>';
-            for (const subWallet of archivedSubWallets) {
-                const archivedDate = new Date(subWallet.archivedAt).toLocaleDateString();
+        // 2. Active Master Wallets that have archived sub-wallets (show parent for context)
+        for (const [masterKeyId, subWallets] of subWalletsByMaster) {
+            // Find the active parent wallet
+            const parentWallet = activeWallets.find(w => w.id === masterKeyId);
+            const parentName = parentWallet?.nickname || subWallets[0]?.masterKeyNickname || 'Unknown Wallet';
 
-                html += `
-                    <div class="archived-wallet-item archived-sub-wallet"
-                         data-master-id="${subWallet.masterKeyId}"
-                         data-sub-index="${subWallet.subWalletIndex}">
-                        <div class="archived-wallet-header">
-                            <span class="archived-wallet-icon">💼</span>
-                            <div class="archived-wallet-info">
-                                <div class="archived-wallet-name">${subWallet.subWalletNickname}</div>
-                                <div class="archived-wallet-meta">
-                                    From: ${subWallet.masterKeyNickname} • Archived: ${archivedDate}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="archived-wallet-actions">
-                            <button class="wallet-mgmt-btn restore-archived-sub-btn"
-                                    data-master-id="${subWallet.masterKeyId}"
-                                    data-sub-index="${subWallet.subWalletIndex}"
-                                    data-sub-name="${subWallet.subWalletNickname}">
-                                Restore
-                            </button>
+            html += `
+                <div class="archived-master-item" data-wallet-id="${masterKeyId}">
+                    <div class="archived-master-header active-parent">
+                        <span class="archived-wallet-icon">🔑</span>
+                        <div class="archived-wallet-info">
+                            <div class="archived-wallet-name">${parentName}</div>
+                            <div class="archived-wallet-meta active-indicator">Active wallet</div>
                         </div>
                     </div>
-                `;
-            }
+                    <div class="archived-sub-wallet-list">
+                        ${subWallets.map((subWallet, i) => {
+                            const archivedDate = new Date(subWallet.archivedAt).toLocaleDateString();
+                            const isLast = i === subWallets.length - 1;
+                            return `
+                                <div class="archived-sub-wallet-item"
+                                     data-master-id="${subWallet.masterKeyId}"
+                                     data-sub-index="${subWallet.subWalletIndex}">
+                                    <span class="sub-wallet-indent">${isLast ? '└──' : '├──'}</span>
+                                    <span class="archived-wallet-icon">💼</span>
+                                    <div class="archived-wallet-info">
+                                        <div class="archived-wallet-name">${subWallet.subWalletNickname}</div>
+                                        <div class="archived-wallet-meta">Archived: ${archivedDate}</div>
+                                    </div>
+                                    <button class="wallet-mgmt-btn restore-archived-sub-btn"
+                                            data-master-id="${subWallet.masterKeyId}"
+                                            data-sub-index="${subWallet.subWalletIndex}"
+                                            data-sub-name="${subWallet.subWalletNickname}">
+                                        Restore
+                                    </button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
         }
 
         listContainer.innerHTML = html;

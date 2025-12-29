@@ -1137,28 +1137,34 @@ export class ChromeStorageManager {
    * Get sub-wallets for a specific wallet (master key)
    * Returns the wallet itself (index 0) plus any derived sub-wallets
    */
-  async getSubWallets(masterKeyId: string): Promise<SubWalletEntry[]> {
-    console.log('🔵 [Storage] GET_SUB_WALLETS', { masterKeyId });
-    
+  async getSubWallets(masterKeyId: string, includeArchived: boolean = false): Promise<SubWalletEntry[]> {
+    console.log('🔵 [Storage] GET_SUB_WALLETS', { masterKeyId, includeArchived });
+
     try {
       const result = await chrome.storage.local.get(['multiWalletData']);
-      
+
       if (!result.multiWalletData) {
         return [];
       }
 
       const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
       const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
-      
+
       if (!wallet) {
         return [];
       }
 
       // Return only actual sub-wallets (index > 0), not the master wallet itself
-      const subWallets: SubWalletEntry[] = wallet.subWallets || [];
+      const allSubWallets: SubWalletEntry[] = wallet.subWallets || [];
+
+      // Filter out archived sub-wallets by default
+      const subWallets = includeArchived
+        ? allSubWallets
+        : allSubWallets.filter(sw => !sw.archivedAt);
 
       console.log('✅ [Storage] GET_SUB_WALLETS SUCCESS', {
-        count: subWallets.length
+        count: subWallets.length,
+        includeArchived
       });
 
       return subWallets;

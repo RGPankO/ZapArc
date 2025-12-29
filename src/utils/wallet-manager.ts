@@ -793,9 +793,11 @@ export class WalletManager {
 
   /**
    * Get sub-wallets for a specific master key
+   * @param masterKeyId - The master key ID to get sub-wallets for
+   * @param includeArchived - Whether to include archived sub-wallets (default: false)
    */
-  async getSubWallets(masterKeyId: string): Promise<import('../types').SubWalletEntry[]> {
-    return this.storage.getSubWallets(masterKeyId);
+  async getSubWallets(masterKeyId: string, includeArchived: boolean = false): Promise<import('../types').SubWalletEntry[]> {
+    return this.storage.getSubWallets(masterKeyId, includeArchived);
   }
 
   /**

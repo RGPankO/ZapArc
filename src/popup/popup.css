@@ -2651,3 +2651,90 @@ body.modal-open {
 .archived-wallet-actions .delete-archived-sub-btn:hover {
   background: #ffcdd2;
 }
+
+/* Hierarchical Archived Wallets Structure */
+.archived-master-item {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.archived-master-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.archived-master-header.archived {
+  margin-bottom: 12px;
+}
+
+.archived-master-header.active-parent {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #ddd;
+}
+
+.archived-master-header.active-parent .archived-wallet-icon {
+  opacity: 0.6;
+}
+
+.archived-master-header.active-parent .archived-wallet-name {
+  color: #666;
+}
+
+.active-indicator {
+  color: #4caf50 !important;
+  font-weight: 500;
+}
+
+/* Archived Sub-wallet List */
+.archived-sub-wallet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.archived-sub-wallet-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+}
+
+.archived-sub-wallet-item .sub-wallet-indent {
+  color: #bbb;
+  font-family: monospace;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.archived-sub-wallet-item .archived-wallet-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.archived-sub-wallet-item .archived-wallet-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.archived-sub-wallet-item .archived-wallet-name {
+  font-size: 14px;
+}
+
+.archived-sub-wallet-item .archived-wallet-meta {
+  font-size: 11px;
+}
+
+.archived-sub-wallet-item .restore-archived-sub-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  flex-shrink: 0;
+}

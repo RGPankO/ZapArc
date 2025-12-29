@@ -683,11 +683,11 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'GET_SUB_WALLETS':
         try {
-          const { masterKeyId } = message;
+          const { masterKeyId, includeArchived } = message;
           if (!masterKeyId) {
             throw new Error('Master key ID is required');
           }
-          const subWallets = await walletManager.getSubWallets(masterKeyId);
+          const subWallets = await walletManager.getSubWallets(masterKeyId, includeArchived);
           sendResponse({ success: true, data: subWallets });
         } catch (error) {
           console.error('[Background] GET_SUB_WALLETS - Failed:', error);
