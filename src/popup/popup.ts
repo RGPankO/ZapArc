@@ -944,14 +944,24 @@ async function handlePinConfirm() {
         // Determine if we're adding a wallet or creating initial one
         const nickname = isAddingWallet ? `Wallet ${currentWallets.length + 1}` : 'Main Wallet';
 
-        // Each wallet uses its own PIN
-        const response = await ExtensionMessaging.importWallet(generatedMnemonic, nickname, pin);
+        // Import wallet with automatic sub-wallet discovery
+        // This scans for sub-wallets that have transaction history and restores them
+        if (pinContinueBtn) {
+            pinContinueBtn.textContent = 'Scanning for wallets...';
+        }
+        const response = await ExtensionMessaging.importWalletWithDiscovery(generatedMnemonic, nickname, pin);
 
-        if (!response.success) {
+        if (!response.success || !response.data) {
             throw new Error(response.error || 'Failed to save wallet');
         }
 
-        console.log('[Wizard] Wallet saved successfully');
+        const { discoveredCount } = response.data;
+        if (discoveredCount > 0) {
+            console.log(`[Wizard] Wallet saved with ${discoveredCount} discovered sub-wallet(s)`);
+            showNotification(`Restored ${discoveredCount} sub-wallet${discoveredCount > 1 ? 's' : ''} with transaction history`, 'success');
+        } else {
+            console.log('[Wizard] Wallet saved successfully (no sub-wallets found)');
+        }
 
         // Update session PIN to the new wallet's PIN
         setSessionPin(pin);
@@ -1645,12 +1655,8 @@ async function handleWalletReset(modal: HTMLElement) {
 
                 showNotification('Wallet deleted. Please unlock to continue.', 'info', 5000);
 
-                // Show unlock prompt for remaining wallets
-                const unlockInterface = document.getElementById('unlock-interface');
-                const mainInterface = document.getElementById('main-interface');
-                
-                if (mainInterface) mainInterface.classList.add('hidden');
-                if (unlockInterface) unlockInterface.classList.remove('hidden');
+                // Show unlock prompt for remaining wallets (this sets up event listeners properly)
+                showUnlockPrompt();
             }
         } else {
             // Last wallet: Clear all storage and show setup

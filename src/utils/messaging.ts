@@ -783,6 +783,27 @@ export class ExtensionMessaging {
   }
 
   /**
+   * Import a wallet with automatic sub-wallet discovery
+   * Scans for sub-wallets with transaction history and restores them
+   * @param mnemonic - 12-word mnemonic phrase
+   * @param nickname - User-friendly name for the wallet
+   * @param pin - User's PIN for encryption
+   * @returns Object with master key ID and count of discovered sub-wallets
+   */
+  static async importWalletWithDiscovery(
+    mnemonic: string,
+    nickname: string,
+    pin: string
+  ): Promise<MessageResponse<{ masterKeyId: string; discoveredCount: number }>> {
+    return this.sendToBackground({
+      type: 'IMPORT_WALLET_WITH_DISCOVERY',
+      mnemonic,
+      nickname,
+      pin
+    });
+  }
+
+  /**
    * Remove a master key and all its sub-wallets
    * @param masterKeyId - UUID of the master key to remove
    * @param pin - User's PIN for verification

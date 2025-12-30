@@ -309,6 +309,119 @@ export class BreezSDKWrapper {
   }
 
   /**
+   * Check if a wallet has been used (has balance or transaction history)
+   * Temporarily connects to the wallet, checks for balance and payments, then disconnects
+   * Used for sub-wallet discovery during import
+   *
+   * Note: Breez SDK Spark stores transaction history locally, so a fresh connection
+   * may not show historical transactions. We primarily check for balance which
+   * is synced from the LSP and indicates wallet usage.
+   */
+  async checkWalletHasTransactions(
+    mnemonic: string,
+    config: BreezConfig = { network: 'mainnet' }
+  ): Promise<{ hasTransactions: boolean; transactionCount: number; balanceSats: number }> {
+    console.log('[BreezSDK] checkWalletHasTransactions - Starting...');
+
+    if (!this.isInitialized) {
+      await this.initializeSDK();
+    }
+
+    // Save current state if already connected
+    const wasConnected = this.isConnected;
+    const previousSdk = this.sdk;
+
+    try {
+      const { connect, defaultConfig } = await import('@breeztech/breez-sdk-spark');
+
+      // Configure Breez SDK
+      const breezConfig = defaultConfig(config.network);
+      if (config.apiKey) {
+        breezConfig.apiKey = config.apiKey;
+      }
+
+      console.log('[BreezSDK] checkWalletHasTransactions - Connecting to wallet...');
+
+      // Connect with the provided mnemonic using a unique storage dir
+      // Use a timeout to prevent hanging
+      const connectPromise = connect({
+        config: breezConfig,
+        mnemonic: mnemonic,
+        storageDir: `breez_discovery_${Date.now()}`
+      });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 5000)
+      );
+      
+      const tempSdk = await Promise.race([connectPromise, timeoutPromise]) as any;
+
+      console.log('[BreezSDK] checkWalletHasTransactions - Connected, checking wallet state...');
+
+      // Check for balance and payments
+      let hasActivity = false;
+      let transactionCount = 0;
+      let balanceSats = 0;
+
+      try {
+        // Get node info to check balance - this syncs with LSP
+        // Use timeout to prevent hanging
+        const nodeInfoPromise = tempSdk.nodeInfo();
+        const nodeInfoTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Node info timeout')), 3000)
+        );
+        
+        const nodeInfo = await Promise.race([nodeInfoPromise, nodeInfoTimeout]) as any;
+        balanceSats = nodeInfo.channelsBalanceSats || 0;
+
+        console.log('[BreezSDK] checkWalletHasTransactions - Node info:', {
+          channelsBalance: nodeInfo.channelsBalanceSats,
+          totalBalance: balanceSats
+        });
+
+        // If there's any balance, this wallet was definitely used
+        if (balanceSats > 0) {
+          hasActivity = true;
+          console.log(`[BreezSDK] checkWalletHasTransactions - Wallet has balance: ${balanceSats} sats`);
+        }
+      } catch (nodeError) {
+        console.warn('[BreezSDK] checkWalletHasTransactions - Could not get node info:', nodeError);
+      }
+
+      // Also check payments (may be empty for fresh storage, but worth checking)
+      try {
+        const payments = await tempSdk.listPayments();
+        transactionCount = payments.length;
+        if (transactionCount > 0) {
+          hasActivity = true;
+        }
+        console.log(`[BreezSDK] checkWalletHasTransactions - Found ${transactionCount} payments in local storage`);
+      } catch (paymentError) {
+        console.warn('[BreezSDK] checkWalletHasTransactions - Could not check payments:', paymentError);
+      }
+
+      // Disconnect the temporary connection
+      console.log('[BreezSDK] checkWalletHasTransactions - Disconnecting...');
+      try {
+        await tempSdk.disconnect();
+      } catch (disconnectError) {
+        console.warn('[BreezSDK] checkWalletHasTransactions - Disconnect error (ignoring):', disconnectError);
+      }
+
+      console.log(`[BreezSDK] checkWalletHasTransactions - Result: hasActivity=${hasActivity}, balance=${balanceSats}, payments=${transactionCount}`);
+      return { hasTransactions: hasActivity, transactionCount, balanceSats };
+    } catch (error) {
+      console.error('[BreezSDK] checkWalletHasTransactions - Failed:', error);
+      // On error, return no activity found
+      return { hasTransactions: false, transactionCount: 0, balanceSats: 0 };
+    } finally {
+      // Restore previous state
+      this.sdk = previousSdk;
+      this.isConnected = wasConnected;
+    }
+  }
+
+  /**
    * Ensure wallet is connected before operations
    */
   private ensureConnected(): void {

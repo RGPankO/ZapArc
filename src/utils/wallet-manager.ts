@@ -4,7 +4,7 @@
 import * as bip39 from 'bip39';
 import { BreezSDKWrapper, BreezConfig, LnurlPayResult } from './breez-sdk';
 import { ChromeStorageManager } from './storage';
-import { WalletData, Transaction, UserSettings } from '../types';
+import { WalletData, Transaction, UserSettings, HIERARCHICAL_WALLET_CONSTANTS } from '../types';
 import { deriveSubWalletMnemonic } from './mnemonic-derivation';
 
 export interface WalletStatus {
@@ -970,5 +970,108 @@ export class WalletManager {
     subWallets: { index: number; nickname: string }[]
   ): Promise<void> {
     return this.storage.addDiscoveredSubWallets(masterKeyId, subWallets);
+  }
+
+  /**
+   * Discover sub-wallets with transaction history for a master mnemonic
+   * Scans sub-wallet indices (1, 2, 3...) until finding one with no transactions
+   *
+   * @param masterMnemonic - The 12-word master mnemonic
+   * @param onProgress - Optional callback for progress updates
+   * @returns Array of discovered sub-wallet indices that have transactions
+   */
+  async discoverSubWallets(
+    masterMnemonic: string,
+    onProgress?: (index: number, found: number) => void
+  ): Promise<{ index: number; transactionCount: number; balanceSats: number }[]> {
+    console.log('WalletManager: Starting sub-wallet discovery...');
+
+    const discoveredWallets: { index: number; transactionCount: number; balanceSats: number }[] = [];
+    const maxIndex = HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS;
+    let consecutiveEmpty = 0;
+    const MAX_CONSECUTIVE_EMPTY = 3; // Stop after 3 consecutive empty wallets
+
+    // Start from index 1 (index 0 is the master wallet itself)
+    for (let index = 1; index < maxIndex; index++) {
+      try {
+        // Derive the mnemonic for this sub-wallet index
+        const derivedMnemonic = deriveSubWalletMnemonic(masterMnemonic, index);
+
+        console.log(`WalletManager: Checking sub-wallet index ${index}...`);
+        onProgress?.(index, discoveredWallets.length);
+
+        // Check if this wallet has any activity (balance or transactions)
+        const { hasTransactions, transactionCount, balanceSats } =
+          await this.breezSDK.checkWalletHasTransactions(derivedMnemonic);
+
+        console.log(`WalletManager: Sub-wallet ${index} result:`, {
+          hasActivity: hasTransactions,
+          transactions: transactionCount,
+          balance: balanceSats
+        });
+
+        if (hasTransactions) {
+          console.log(`WalletManager: Found sub-wallet ${index} with activity (balance: ${balanceSats} sats, ${transactionCount} payments)`);
+          discoveredWallets.push({ index, transactionCount, balanceSats });
+          consecutiveEmpty = 0; // Reset counter
+        } else {
+          consecutiveEmpty++;
+          console.log(`WalletManager: Sub-wallet ${index} has no activity (${consecutiveEmpty}/${MAX_CONSECUTIVE_EMPTY} consecutive empty)`);
+
+          // Stop after N consecutive empty wallets
+          if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+            console.log(`WalletManager: Stopping discovery after ${MAX_CONSECUTIVE_EMPTY} consecutive empty wallets`);
+            break;
+          }
+        }
+      } catch (error) {
+        console.error(`WalletManager: Error checking sub-wallet ${index}:`, error);
+        consecutiveEmpty++;
+        // Continue to next index instead of stopping immediately
+        if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+          console.log('WalletManager: Too many errors, stopping discovery');
+          break;
+        }
+      }
+    }
+
+    console.log(`WalletManager: Discovery complete. Found ${discoveredWallets.length} sub-wallets with activity`);
+    return discoveredWallets;
+  }
+
+  /**
+   * Import a master wallet and automatically discover/restore any sub-wallets
+   * that have transaction history
+   *
+   * NOTE: Sub-wallet discovery is currently disabled because Breez SDK WASM
+   * requires DOM access which is not available in the background service worker.
+   * The wallet will be imported without scanning for sub-wallets.
+   *
+   * @param mnemonic - The 12-word mnemonic to import
+   * @param nickname - Nickname for the master wallet
+   * @param pin - PIN for encryption
+   * @param onProgress - Optional callback for discovery progress
+   * @returns Object with master key ID and discovered sub-wallets count
+   */
+  async importWalletWithDiscovery(
+    mnemonic: string,
+    nickname: string,
+    pin: string,
+    onProgress?: (status: string, index?: number, found?: number) => void
+  ): Promise<{ masterKeyId: string; discoveredCount: number }> {
+    console.log('WalletManager: Importing wallet...');
+
+    // Step 1: Add the master key
+    onProgress?.('Creating master wallet...');
+    const masterKeyId = await this.addMasterKey(mnemonic, nickname, pin, false);
+    console.log(`WalletManager: Master key created: ${masterKeyId}`);
+
+    // NOTE: Sub-wallet discovery is disabled because Breez SDK WASM requires DOM access
+    // which is not available in the background service worker context.
+    // Users can manually add sub-wallets after import if needed.
+    console.log('WalletManager: Sub-wallet discovery skipped (requires DOM - not available in background)');
+
+    onProgress?.('Import complete!');
+    return { masterKeyId, discoveredCount: 0 };
   }
 }

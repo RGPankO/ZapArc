@@ -734,6 +734,29 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      case 'IMPORT_WALLET_WITH_DISCOVERY':
+        try {
+          const { mnemonic, nickname, pin } = message;
+          if (!mnemonic || !nickname || !pin) {
+            throw new Error('Mnemonic, nickname, and PIN are required');
+          }
+          console.log('[Background] IMPORT_WALLET_WITH_DISCOVERY - Starting import with sub-wallet discovery');
+          const result = await walletManager.importWalletWithDiscovery(
+            mnemonic,
+            nickname,
+            pin
+          );
+          console.log(`[Background] IMPORT_WALLET_WITH_DISCOVERY - Complete: ${result.discoveredCount} sub-wallets found`);
+          sendResponse({ success: true, data: result });
+        } catch (error) {
+          console.error('[Background] IMPORT_WALLET_WITH_DISCOVERY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to import wallet'
+          });
+        }
+        break;
+
       case 'REMOVE_MASTER_KEY':
         try {
           const { masterKeyId } = message;
