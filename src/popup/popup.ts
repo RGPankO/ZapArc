@@ -1046,6 +1046,20 @@ async function handlePinConfirm() {
         setSessionPin(pin);
         await chrome.storage.session.set({ walletSessionPin: pin });
 
+        // Set the newly created wallet as the active wallet
+        console.log(`[Wizard] Setting newly created wallet ${masterKeyId} as active`);
+        setActiveMasterKeyId(masterKeyId);
+        setActiveSubWalletIndex(0);
+        
+        // Update storage with active wallet
+        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+        if (multiWalletResult.multiWalletData) {
+            const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+            multiWalletData.activeWalletId = masterKeyId;
+            multiWalletData.activeSubWalletIndex = 0;
+            await chrome.storage.local.set({ multiWalletData: JSON.stringify(multiWalletData) });
+        }
+
         // Skip the completion screen and directly finalize setup
         // This avoids the "Opening..." button getting stuck
         console.log('[Wizard] Skipping completion screen, opening wallet directly');
@@ -1738,15 +1752,22 @@ async function handleWalletReset(modal: HTMLElement) {
 
                 showNotification('Wallet deleted successfully', 'success', 3000);
 
-                // Hide main interface and unlock interface
+                // Hide all other interfaces first
                 const mainInterface = document.getElementById('main-interface');
                 if (mainInterface) mainInterface.classList.add('hidden');
                 
                 const unlockInterface = document.getElementById('unlock-interface');
                 if (unlockInterface) unlockInterface.classList.add('hidden');
+                
+                const wizard = document.getElementById('onboarding-wizard');
+                if (wizard) wizard.classList.add('hidden');
 
+                console.log('[Wallet] Showing wallet selection interface...');
+                
                 // Show wallet selection for remaining wallets
                 await showWalletSelectionInterface();
+                
+                console.log('[Wallet] Wallet selection interface should now be visible');
             }
         } else {
             // Last wallet: Clear all storage and show setup
@@ -1933,10 +1954,27 @@ function setupEventListeners() {
     }
 
     // Delete wallet button - shows reset/delete confirmation modal
+    // Delete wallet button
     const deleteWalletBtn = document.getElementById('delete-wallet-btn');
     if (deleteWalletBtn) {
         deleteWalletBtn.onclick = showForgotPinModal;
     }
+    
+    // Show all wallets button
+    const showWalletSelectorBtn = document.getElementById('show-wallet-selector-btn');
+    if (showWalletSelectorBtn) {
+        showWalletSelectorBtn.onclick = (e) => {
+            e.preventDefault();
+            console.log('[Popup] Show all wallets clicked');
+            showWalletSelectionInterface();
+        };
+    }
+    
+    // Listen for wallet selection changes
+    window.addEventListener('wallet-selected', () => {
+        console.log('[Popup] Wallet selected event received, updating unlock screen');
+        showUnlockPrompt();
+    });
 
     // Modal listeners
     setupModalListeners();

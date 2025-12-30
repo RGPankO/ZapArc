@@ -270,6 +270,9 @@ async function handleWalletSelectionChoice(masterKeyId: string, subWalletIndex: 
             }
         });
 
+        // Dispatch event to notify popup.ts to update the unlock screen
+        window.dispatchEvent(new CustomEvent('wallet-selected'));
+
         // Return to unlock screen
         hideWalletSelectionInterface();
 

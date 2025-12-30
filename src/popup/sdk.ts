@@ -125,10 +125,9 @@ export async function checkWalletHasTransactions(
             storageDir: storageDir
         });
 
-        // Listen for sync event with a shorter timeout (4s is usually enough for discovery)
-        // If we don't find anything by then, it's likely empty or we can't restore it right now
-        // Increased to 8s because 4s was missing valid wallets
-        const SYNC_TIMEOUT_MS = 8000;
+        // Listen for sync event with a shorter timeout
+        // 4s should be enough for most wallets, fast-track polling helps for active wallets
+        const SYNC_TIMEOUT_MS = 4000;
         
         const syncListenerPromise = new Promise<void>((resolve) => {
              const timeout = setTimeout(() => {
@@ -227,7 +226,7 @@ export async function discoverSubWalletsInPopup(
     masterMnemonic: string,
     onProgress?: (status: string, index: number, foundCount: number) => void
 ): Promise<{ index: number; balanceSats: number }[]> {
-    console.log('[Popup-SDK] Starting sub-wallet discovery...');
+    console.log('[Popup-SDK] Starting sub-wallet discovery (sequential)...');
 
     const discoveredWallets: { index: number; balanceSats: number }[] = [];
     const MAX_INDEX = 20; // Maximum sub-wallets to check
