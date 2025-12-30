@@ -87,7 +87,38 @@ function generateMnemonic(): string {
     return bip39.generateMnemonic();
 }
 
-// Module callbacks will be setup in setupModuleCallbacks() after functions are defined
+// Background discovery task and partial results
+let subWalletDiscoveryTask: Promise<{ index: number; balanceSats: number }[]> | null = null;
+let discoveredSubWalletsPartial: { index: number; balanceSats: number }[] = [];
+
+function startDiscoveryInBackground(mnemonic: string) {
+    if (subWalletDiscoveryTask) return; // Already running
+
+    console.log('[Wizard] Starting background sub-wallet discovery...');
+    discoveredSubWalletsPartial = []; // Reset partial results
+
+    subWalletDiscoveryTask = discoverSubWalletsInPopup(
+        mnemonic,
+        (status, index, foundCount) => {
+            console.log(`[Background-Discovery] ${status} (found so far: ${foundCount})`);
+        },
+        (wallet) => {
+            // Track each wallet as it's discovered (for partial results on timeout)
+            discoveredSubWalletsPartial.push(wallet);
+            console.log(`[Background-Discovery] Found sub-wallet ${wallet.index} (${wallet.balanceSats} sats)`);
+        }
+    );
+
+    subWalletDiscoveryTask.then(results => {
+        console.log(`[Background-Discovery] Complete: found ${results.length} sub-wallets`);
+    }).catch(err => {
+        console.error('[Background-Discovery] Error:', err);
+    });
+}
+
+function getDiscoveredSubWallets(): { index: number; balanceSats: number }[] {
+    return [...discoveredSubWalletsPartial]; // Return a copy
+}
 
 // ========================================
 // Balance & Transaction Functions
@@ -417,7 +448,13 @@ function setupWizardListeners() {
     }
 
     if (confirmContinueBtn) {
-        confirmContinueBtn.onclick = () => showWizardStep('pin-step');
+        confirmContinueBtn.onclick = () => {
+             // Start discovery in background now that seed is confirmed
+             if (generatedMnemonic) {
+                 startDiscoveryInBackground(generatedMnemonic);
+             }
+             showWizardStep('pin-step');
+        };
     }
 
     // Import Step
@@ -1002,13 +1039,39 @@ async function handlePinConfirm() {
 
         let discoveredCount = 0;
         try {
-            const discoveredWallets = await discoverSubWalletsInPopup(
-                generatedMnemonic,
-                // Simplify progress reporting - don't update UI text
-                (status, index, found) => {
-                    console.log(`[Discovery] ${status} (found: ${found})`);
+            let discoveredWallets: { index: number; balanceSats: number }[] = [];
+
+            // Use background discovery if started, with a timeout to not delay too long
+            if (subWalletDiscoveryTask) {
+                console.log('[Wizard] Waiting for background discovery (max 5s)...');
+
+                // Race between discovery completing and a 5s timeout
+                const timeoutPromise = new Promise<{ index: number; balanceSats: number }[] | null>((resolve) => {
+                    setTimeout(() => {
+                        console.log('[Wizard] Discovery timeout - using partial results');
+                        resolve(null); // null indicates timeout
+                    }, 5000);
+                });
+
+                const result = await Promise.race([subWalletDiscoveryTask, timeoutPromise]);
+
+                if (result === null) {
+                    // Timeout hit - use whatever partial results we have
+                    discoveredWallets = getDiscoveredSubWallets();
+                    console.log(`[Wizard] Using ${discoveredWallets.length} partial discovery results`);
+                } else {
+                    discoveredWallets = result;
                 }
-            );
+                subWalletDiscoveryTask = null; // Reset for next time
+            } else {
+                 console.log('[Wizard] Starting fresh discovery (background task not found)...');
+                 discoveredWallets = await discoverSubWalletsInPopup(
+                    generatedMnemonic,
+                    (status, index, found) => {
+                        console.log(`[Discovery] ${status} (found: ${found})`);
+                    }
+                );
+            }
 
             // Step 3: Add discovered sub-wallets via messaging
             if (discoveredWallets.length > 0) {
@@ -1375,6 +1438,10 @@ function checkImportComplete() {
 }
 
 function handleImportContinue() {
+    // Start discovery in background now that seed is imported
+    if (generatedMnemonic) {
+        startDiscoveryInBackground(generatedMnemonic);
+    }
     showWizardStep('pin-step');
 }
 

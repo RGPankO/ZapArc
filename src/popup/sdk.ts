@@ -125,9 +125,9 @@ export async function checkWalletHasTransactions(
             storageDir: storageDir
         });
 
-        // Listen for sync event with a shorter timeout
-        // 4s should be enough for most wallets, fast-track polling helps for active wallets
-        const SYNC_TIMEOUT_MS = 4000;
+        // Listen for sync event - need enough time for LSP to respond with wallet state
+        // 8 seconds was the working value that successfully detected sub-wallets
+        const SYNC_TIMEOUT_MS = 8000;
         
         const syncListenerPromise = new Promise<void>((resolve) => {
              const timeout = setTimeout(() => {
@@ -141,13 +141,13 @@ export async function checkWalletHasTransactions(
                     if (event.type === 'synced') {
                         console.log('[Popup-SDK] Temporary SDK synced!');
                         clearTimeout(timeout);
-                        // cleanup(); // Note: SDK doesn't provide easy cleanup for listener, but it disconnects shortly
+                        // cleanup(); 
                         resolve();
                     }
                 }
             });
 
-            // FAST TRACK: Poll for balance every 500ms while waiting for sync
+            // FAST TRACK: Poll for balance AND payments every 500ms while waiting for sync
             // If we see balance/payments, we don't need to wait for full sync to know it exists
             const pollInterval = setInterval(async () => {
                 if (!tempSdk) {
@@ -155,13 +155,33 @@ export async function checkWalletHasTransactions(
                     return;
                 }
                 try {
+                    // Check balance
                     const info = await tempSdk.getInfo({ ensureSynced: false });
                     const currentBalance = info.balanceSats || 0;
+                    const hasNodeId = !!info.id;
+                    
                     if (currentBalance > 0) {
                          console.log('[Popup-SDK] Fast track: Found balance before sync complete');
                          clearTimeout(timeout);
                          clearInterval(pollInterval);
                          resolve();
+                         return;
+                    }
+                    
+                    // Check payments ONLY if we have a node ID (SDK initialized)
+                    if (hasNodeId) {
+                        try {
+                            const payments = await tempSdk.listPayments({});
+                            if (payments && payments.payments && payments.payments.length > 0) {
+                                 console.log('[Popup-SDK] Fast track: Found payments before sync complete');
+                                 clearTimeout(timeout);
+                                 clearInterval(pollInterval);
+                                 resolve();
+                                 return;
+                            }
+                        } catch (e) {
+                            // Ignore listPayments error, might be too early
+                        }
                     }
                 } catch (e) { /* ignore polling errors */ }
             }, 500);
@@ -220,42 +240,45 @@ export async function checkWalletHasTransactions(
 /**
  * Discover sub-wallets with transaction history
  * MUST run in popup context (has DOM access for WASM)
- * Scans sub-wallet indices (1, 2, 3...) until finding consecutive empty ones
+ * Checks sub-wallets sequentially (WASM doesn't support parallel SDK connections)
+ *
+ * @param masterMnemonic - The master 12-word mnemonic
+ * @param onProgress - Optional callback for progress updates
+ * @param onWalletFound - Optional callback when a sub-wallet with activity is found (for partial results)
  */
 export async function discoverSubWalletsInPopup(
     masterMnemonic: string,
-    onProgress?: (status: string, index: number, foundCount: number) => void
+    onProgress?: (status: string, index: number, foundCount: number) => void,
+    onWalletFound?: (wallet: { index: number; balanceSats: number }) => void
 ): Promise<{ index: number; balanceSats: number }[]> {
     console.log('[Popup-SDK] Starting sub-wallet discovery (sequential)...');
 
     const discoveredWallets: { index: number; balanceSats: number }[] = [];
-    const MAX_INDEX = 20; // Maximum sub-wallets to check
-    const MAX_CONSECUTIVE_EMPTY = 1; // Stop after 1 consecutive empty wallet
+    const MAX_INDEX = 5; // Check indices 1, 2, 3, 4
+    const MAX_CONSECUTIVE_EMPTY = 3; // Stop after 3 consecutive empty (allows gaps)
     let consecutiveEmpty = 0;
 
-    // Start from index 1 (index 0 is the master wallet)
+    // Check sub-wallets sequentially (WASM can't handle parallel connections)
     for (let index = 1; index < MAX_INDEX; index++) {
         try {
             onProgress?.(`Checking sub-wallet ${index}...`, index, discoveredWallets.length);
 
-            // Derive the mnemonic for this sub-wallet
             const derivedMnemonic = deriveSubWalletMnemonic(masterMnemonic, index);
-
             console.log(`[Popup-SDK] Checking sub-wallet index ${index}...`);
 
-            // Check if this wallet has activity
             const { hasTransactions, balanceSats } = await checkWalletHasTransactions(derivedMnemonic);
 
             if (hasTransactions) {
-                console.log(`[Popup-SDK] Found sub-wallet ${index} with balance: ${balanceSats} sats`);
-                discoveredWallets.push({ index, balanceSats });
+                console.log(`[Popup-SDK] ✅ Found sub-wallet ${index} with balance: ${balanceSats} sats`);
+                const wallet = { index, balanceSats };
+                discoveredWallets.push(wallet);
+                onWalletFound?.(wallet);
                 consecutiveEmpty = 0;
             } else {
+                console.log(`[Popup-SDK] ❌ Sub-wallet ${index} is empty`);
                 consecutiveEmpty++;
-                console.log(`[Popup-SDK] Sub-wallet ${index} is empty (${consecutiveEmpty}/${MAX_CONSECUTIVE_EMPTY})`);
-
                 if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
-                    console.log('[Popup-SDK] Stopping discovery after consecutive empty wallets');
+                    console.log('[Popup-SDK] Stopping after consecutive empty wallets');
                     break;
                 }
             }
