@@ -67,6 +67,7 @@ import {
     showDepositInterface,
     hideDepositInterface,
     setDepositCallbacks,
+    handlePaymentReceivedFromSDK
 } from './deposit';
 
 // Withdrawal imports
@@ -973,8 +974,14 @@ async function handlePinConfirm() {
         }
 
         // Determine if we're adding a wallet or creating initial one
-        // If there are existing wallets, use numbered naming (Wallet 2, Wallet 3, etc.)
-        const nickname = currentWallets.length === 0 ? 'Main Wallet' : `Wallet ${currentWallets.length + 1}`;
+        // Fetch the actual wallet count from storage (currentWallets state may not be populated yet)
+        const walletsResponse = await ExtensionMessaging.getAllWallets();
+        const existingWalletCount = walletsResponse.success && walletsResponse.data 
+            ? walletsResponse.data.length 
+            : 0;
+        
+        const nickname = existingWalletCount === 0 ? 'Main Wallet' : `Wallet ${existingWalletCount + 1}`;
+        console.log(`[Wizard] Creating wallet with nickname: ${nickname} (existing count: ${existingWalletCount})`);
 
         // Step 1: Create the master wallet via background (without sub-wallet discovery)
         // Discovery is disabled in background because WASM needs DOM access
@@ -1039,7 +1046,11 @@ async function handlePinConfirm() {
         setSessionPin(pin);
         await chrome.storage.session.set({ walletSessionPin: pin });
 
-        showWizardStep('setup-complete-step');
+        // Skip the completion screen and directly finalize setup
+        // This avoids the "Opening..." button getting stuck
+        console.log('[Wizard] Skipping completion screen, opening wallet directly');
+        await finalizeWalletSetup();
+        
     } catch (error) {
         console.error('[Wizard] Error saving wallet:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to create wallet';
@@ -1725,10 +1736,17 @@ async function handleWalletReset(modal: HTMLElement) {
                 setCurrentBalance(0);
                 setBreezSDK(null);
 
-                showNotification('Wallet deleted. Please unlock to continue.', 'info', 5000);
+                showNotification('Wallet deleted successfully', 'success', 3000);
 
-                // Show unlock prompt for remaining wallets (this sets up event listeners properly)
-                showUnlockPrompt();
+                // Hide main interface and unlock interface
+                const mainInterface = document.getElementById('main-interface');
+                if (mainInterface) mainInterface.classList.add('hidden');
+                
+                const unlockInterface = document.getElementById('unlock-interface');
+                if (unlockInterface) unlockInterface.classList.add('hidden');
+
+                // Show wallet selection for remaining wallets
+                await showWalletSelectionInterface();
             }
         } else {
             // Last wallet: Clear all storage and show setup
@@ -1942,6 +1960,8 @@ function setupModuleCallbacks(): void {
         onPaymentReceived: async () => {
             await updateBalanceDisplay();
             await loadTransactionHistory();
+            // Also notify deposit interface for immediate UI update
+            await handlePaymentReceivedFromSDK();
         }
     });
 

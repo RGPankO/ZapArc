@@ -36,6 +36,7 @@ import type { MasterKeyMetadata, SubWalletEntry } from '../types';
 import { connectBreezSDK } from './sdk';
 import { showError, showSuccess, showInfo } from './notifications';
 import { showPINModal, promptForPIN, promptForText, showModal, hideModal } from './modals';
+import { showWalletSelectionInterface } from './wallet-selection';
 
 // Callback type for wallet operations that need main popup functions
 export type WalletManagementCallbacks = {
@@ -1027,8 +1028,12 @@ async function handleDeleteMasterKey(masterId: string): Promise<void> {
         const response = await ExtensionMessaging.removeMasterKey(masterId, pin);
         if (response.success) {
             showSuccess(`Wallet "${masterName}" deleted successfully!`);
-            await loadWalletManagementList();
-            await initializeMultiWalletUI();
+            
+            // Hide management interface
+            hideWalletManagementInterface();
+            
+            // Show wallet selection screen so user can select another wallet
+            await showWalletSelectionInterface();
         } else {
             showError(response.error || 'Failed to delete wallet');
         }
