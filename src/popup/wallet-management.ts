@@ -689,7 +689,7 @@ async function loadHierarchicalWalletList(): Promise<void> {
     if (activeData.multiWalletData) {
         try {
             const data = JSON.parse(activeData.multiWalletData);
-            currentActiveMasterKeyId = data.activeMasterKeyId || '';
+            currentActiveMasterKeyId = data.activeWalletId || ''; // Fixed: use activeWalletId not activeMasterKeyId
             currentActiveSubWalletIndex = data.activeSubWalletIndex || 0;
         } catch (e) {
             console.error('[Wallet Management] Failed to parse active wallet data');
@@ -710,17 +710,22 @@ async function loadHierarchicalWalletList(): Promise<void> {
         return;
     }
 
-    // Check if current active wallet has transactions (for add sub-wallet button)
+    // Check if current active wallet has transactions OR balance (for add sub-wallet button)
     let activeWalletHasTransactions = false;
     if (breezSDK) {
         try {
-            const response = await breezSDK.listPayments({});
-            const payments = response?.payments || [];
-            activeWalletHasTransactions = payments.length > 0;
-            console.log(`[Wallet Management] Active wallet has ${payments.length} transaction(s)`);
+            const [paymentsResponse, info] = await Promise.all([
+                breezSDK.listPayments({}).catch(() => ({ payments: [] })),
+                breezSDK.getInfo({ ensureSynced: false }).catch(() => ({ balanceSats: 0 }))
+            ]);
+            
+            const paymentCount = paymentsResponse?.payments?.length || 0;
+            const balance = info?.balanceSats || 0;
+            
+            activeWalletHasTransactions = paymentCount > 0 || balance > 0;
+            console.log(`[Wallet Management] Active wallet (master: ${currentActiveMasterKeyId}, index: ${currentActiveSubWalletIndex}): ${paymentCount} txs, ${balance} sats. Has usage: ${activeWalletHasTransactions}`);
         } catch (error) {
-            console.warn('[Wallet Management] Could not check transaction history:', error);
-            // If we can't check, assume no transactions (safer default)
+            console.warn('[Wallet Management] Could not check usage:', error);
             activeWalletHasTransactions = false;
         }
     }
@@ -734,26 +739,44 @@ async function loadHierarchicalWalletList(): Promise<void> {
         const canDeleteMasterKey = masterKeyList.length > 1;
         const createdDate = new Date(mk.createdAt).toLocaleDateString();
 
-        // Fetch sub-wallets for this master key (archived filtered out by default at source)
-        const subWalletsResponse = await ExtensionMessaging.getSubWallets(mk.id);
-        const subWallets: SubWalletEntry[] = subWalletsResponse.success && subWalletsResponse.data
-            ? subWalletsResponse.data
+        // Fetch sub-wallets including archived to check if the LAST one has been used
+        const subWalletsResponseAll = await ExtensionMessaging.getSubWallets(mk.id, true); // includeArchived = true
+        const allSubWallets: SubWalletEntry[] = subWalletsResponseAll.success && subWalletsResponseAll.data
+            ? subWalletsResponseAll.data
             : [];
+        
+        // Also get non-archived for display
+        const subWallets = allSubWallets.filter(sw => !sw.archivedAt);
 
-        // Determine if adding sub-wallet is allowed:
-        // - If no sub-wallets exist (only master wallet), allow adding
-        // - If this is the active master key, only allow if current sub-wallet has transactions
-        // - If this is NOT the active master key, don't allow (user needs to switch first and use it)
-        const hasNoSubWallets = subWallets.length === 0;
-        const canAddSubWallet = hasNoSubWallets || (isActiveMasterKey && activeWalletHasTransactions);
-        const addSubWalletDisabledReason = !canAddSubWallet
-            ? (isActiveMasterKey
-                ? 'Make a transaction first before adding another sub-wallet'
-                : 'Switch to this wallet and make a transaction first')
-            : '';
+        // Check if we can add a sub-wallet based on the LAST created sub-wallet's usage
+        let canAddSubWallet = false;
+        let addSubWalletDisabledReason = '';
+
+        if (allSubWallets.length === 0) {
+            // No sub-wallets exist yet - allow creating the first one
+            canAddSubWallet = true;
+        } else {
+            // Find the last sub-wallet by highest index
+            const lastSubWallet = allSubWallets.reduce((max, sw) => 
+                sw.index > max.index ? sw : max
+            );
+
+            // Check if it has been used (lastUsedAt exists and is different from createdAt)
+            const hasBeenUsed = lastSubWallet.lastUsedAt && 
+                                lastSubWallet.lastUsedAt !== lastSubWallet.createdAt;
+
+            if (hasBeenUsed) {
+                canAddSubWallet = true;
+            } else {
+                const lastName = lastSubWallet.index === 0 
+                    ? mk.nickname 
+                    : lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
+                addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
+            }
+        }
 
         html += `
-            <div class="master-key-item ${isExpanded ? 'expanded' : 'collapsed'} ${isActiveMasterKey ? 'active' : ''}"
+            <div class="master-key-item ${isExpanded ? 'expanded' : 'collapsed'}"
                  data-master-id="${mk.id}">
                 <div class="master-key-header" data-master-id="${mk.id}">
                     <span class="master-key-icon">🔑</span>
@@ -794,13 +817,12 @@ async function loadHierarchicalWalletList(): Promise<void> {
                         const isActiveSubWallet = isActiveMasterKey && sw.index === currentActiveSubWalletIndex;
 
                         return `
-                            <div class="sub-wallet-item ${isActiveSubWallet ? 'active' : ''}"
+                            <div class="sub-wallet-item"
                                  data-master-id="${mk.id}"
                                  data-sub-index="${sw.index}">
                                 <div class="sub-wallet-header">
                                     <span class="sub-wallet-icon">💼</span>
                                     <span class="sub-wallet-name">${sw.nickname}</span>
-                                    ${isActiveSubWallet ? '<span class="active-badge">Active</span>' : ''}
                                 </div>
                                 <div class="sub-wallet-actions">
                                     <button class="wallet-mgmt-btn rename-sub-btn"
