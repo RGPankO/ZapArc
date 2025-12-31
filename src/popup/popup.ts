@@ -59,6 +59,7 @@ import {
     setWalletManagementCallbacks,
     startSubWalletDiscovery,
     markWalletForDiscovery,
+    resumePendingDiscovery,
 } from './wallet-management';
 
 // Wallet Selection imports
@@ -1475,6 +1476,19 @@ function showUnlockPrompt() {
             enableWalletControls();
             await initializeMultiWalletUI();
 
+            // Check for any pending sub-wallet discovery to resume
+            resumePendingDiscovery(async (masterKeyId: string) => {
+                // Get master mnemonic for the wallet that has pending discovery
+                try {
+                    const result = await ExtensionMessaging.getMasterMnemonic(masterKeyId, pin);
+                    return result.success && result.data ? result.data.mnemonic : null;
+                } catch {
+                    return null;
+                }
+            }).catch(err => {
+                console.warn('[Popup] Resume discovery error (non-fatal):', err);
+            });
+
             // Start auto-lock
             await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
             await chrome.storage.local.set({ lastActivity: Date.now() });
@@ -2121,6 +2135,23 @@ async function initializePopup() {
 
                     enableWalletControls();
                     await initializeMultiWalletUI();
+
+                    // Check for any pending sub-wallet discovery to resume
+                    const pin = sessionData.walletSessionPin;
+                    console.log('🔍 [Popup] Auto-unlock: Checking for pending discovery to resume...');
+                    resumePendingDiscovery(async (masterKeyId: string) => {
+                        console.log(`🔍 [Popup] Resume getMnemonic callback called for: ${masterKeyId}`);
+                        try {
+                            const result = await ExtensionMessaging.getMasterMnemonic(masterKeyId, pin);
+                            console.log(`🔍 [Popup] getMasterMnemonic result:`, result.success, !!result.data);
+                            return result.success && result.data ? result.data.mnemonic : null;
+                        } catch (err) {
+                            console.error('[Popup] getMasterMnemonic failed:', err);
+                            return null;
+                        }
+                    }).catch(err => {
+                        console.warn('[Popup] Resume discovery error (non-fatal):', err);
+                    });
 
                     // Start auto-lock
                     await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });

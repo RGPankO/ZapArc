@@ -39,6 +39,9 @@ import { showError, showSuccess, showInfo, showNotification } from './notificati
 // Track which wallets are currently being discovered
 const walletsBeingDiscovered = new Set<string>();
 
+// Storage key for notification deduplication (persisted across popup sessions)
+const DISCOVERY_NOTIFICATION_KEY = 'lastDiscoveryNotification';
+
 // Track discovery progress for UI updates
 interface DiscoveryProgress {
     masterKeyId: string;
@@ -47,8 +50,39 @@ interface DiscoveryProgress {
     isComplete: boolean;
 }
 let currentDiscoveryProgress: DiscoveryProgress | null = null;
+
+// Persistent discovery state for resume functionality
+interface PendingDiscovery {
+    masterKeyId: string;
+    nextIndexToCheck: number;  // The next index to check when resuming
+    foundCount: number;        // How many sub-wallets have been found so far
+    startedAt: number;         // Timestamp when discovery started
+}
+
+const PENDING_DISCOVERY_KEY = 'pendingSubWalletDiscovery';
+
+/**
+ * Save pending discovery state to storage for resume
+ */
+async function savePendingDiscovery(state: PendingDiscovery | null): Promise<void> {
+    if (state) {
+        await chrome.storage.local.set({ [PENDING_DISCOVERY_KEY]: state });
+        console.log('[Discovery] Saved pending state:', state);
+    } else {
+        await chrome.storage.local.remove(PENDING_DISCOVERY_KEY);
+        console.log('[Discovery] Cleared pending state');
+    }
+}
+
+/**
+ * Load pending discovery state from storage
+ */
+async function loadPendingDiscovery(): Promise<PendingDiscovery | null> {
+    const result = await chrome.storage.local.get(PENDING_DISCOVERY_KEY);
+    return result[PENDING_DISCOVERY_KEY] || null;
+}
+
 import { showPINModal, promptForPIN, promptForText, showModal, hideModal } from './modals';
-import { showWalletSelectionInterface } from './wallet-selection';
 
 /**
  * Start sub-wallet discovery for a newly imported wallet
@@ -59,7 +93,8 @@ const activeDiscoveryRunning = new Set<string>();
 
 export async function startSubWalletDiscovery(
     masterKeyId: string,
-    mnemonic: string
+    mnemonic: string,
+    startFromIndex: number = 1
 ): Promise<void> {
     // Check if discovery is already RUNNING (not just marked for UI)
     if (activeDiscoveryRunning.has(masterKeyId)) {
@@ -67,9 +102,17 @@ export async function startSubWalletDiscovery(
         return;
     }
 
-    console.log('[Discovery] Starting discovery for wallet:', masterKeyId);
+    console.log(`[Discovery] Starting discovery for wallet: ${masterKeyId} from index ${startFromIndex}`);
     activeDiscoveryRunning.add(masterKeyId);
     walletsBeingDiscovered.add(masterKeyId);
+
+    // Save initial pending state
+    await savePendingDiscovery({
+        masterKeyId,
+        nextIndexToCheck: startFromIndex,
+        foundCount: 0,
+        startedAt: Date.now()
+    });
 
     // Update UI to show discovery in progress
     updateDiscoveryUI(masterKeyId, 'Scanning for sub-wallets...', 0, false);
@@ -77,7 +120,7 @@ export async function startSubWalletDiscovery(
     try {
         const discoveredWallets = await discoverSubWalletsInPopup(
             mnemonic,
-            (_status, index, foundCount) => {
+            async (_status, index, foundCount) => {
                 // Update progress in UI (keep message simple for users)
                 currentDiscoveryProgress = {
                     masterKeyId,
@@ -85,6 +128,14 @@ export async function startSubWalletDiscovery(
                     foundCount,
                     isComplete: false
                 };
+                // Save progress for resume - save CURRENT index since we're about to check it
+                // If popup closes during the check, we need to resume from this same index
+                await savePendingDiscovery({
+                    masterKeyId,
+                    nextIndexToCheck: index,  // Save the index we're about to check, not +1
+                    foundCount,
+                    startedAt: Date.now()
+                });
                 // Don't change the message - keep it simple as "Scanning for sub-wallets..."
                 updateDiscoveryUI(masterKeyId, 'Scanning for sub-wallets...', foundCount, false);
             },
@@ -102,8 +153,12 @@ export async function startSubWalletDiscovery(
                     // Refresh the wallet list to show new sub-wallet
                     await loadWalletManagementList();
                 }
-            }
+            },
+            startFromIndex
         );
+
+        // Discovery complete - clear pending state
+        await savePendingDiscovery(null);
 
         // Discovery complete
         currentDiscoveryProgress = {
@@ -113,11 +168,38 @@ export async function startSubWalletDiscovery(
             isComplete: true
         };
 
+        console.log(`[Discovery] Complete! Found ${discoveredWallets.length} new sub-wallets in this session (started from index ${startFromIndex})`);
+
+        // Only show notification if we found new sub-wallets in THIS discovery session
+        // (not counting ones found in previous sessions before resume)
+        // Deduplicate using persistent storage to prevent duplicates across popup sessions
         if (discoveredWallets.length > 0) {
-            showNotification(
-                `Found ${discoveredWallets.length} sub-wallet${discoveredWallets.length > 1 ? 's' : ''} with history`,
-                'success'
-            );
+            const notificationKey = `${masterKeyId}-${discoveredWallets.length}-${startFromIndex}`;
+            const now = Date.now();
+
+            // Check storage for last notification (persists across popup sessions)
+            const stored = await chrome.storage.local.get(DISCOVERY_NOTIFICATION_KEY);
+            const lastNotification = stored[DISCOVERY_NOTIFICATION_KEY] as { key: string; time: number } | undefined;
+
+            const isDuplicate = lastNotification &&
+                               lastNotification.key === notificationKey &&
+                               (now - lastNotification.time) < 30000; // 30 second window (longer for popup reopens)
+
+            if (!isDuplicate) {
+                // Save to storage before showing notification
+                await chrome.storage.local.set({
+                    [DISCOVERY_NOTIFICATION_KEY]: { key: notificationKey, time: now }
+                });
+                showNotification(
+                    `Found ${discoveredWallets.length} sub-wallet${discoveredWallets.length > 1 ? 's' : ''} with history`,
+                    'success'
+                );
+            } else {
+                console.log('[Discovery] Skipping duplicate notification (from storage check)');
+            }
+        } else if (startFromIndex > 1) {
+            // Resumed discovery but didn't find any more - that's fine, just log it
+            console.log('[Discovery] Resumed discovery completed - no additional sub-wallets found');
         }
 
         // Remove discovery indicator and clear state BEFORE refreshing UI
@@ -135,11 +217,64 @@ export async function startSubWalletDiscovery(
     } catch (error) {
         console.error('[Discovery] Error during discovery:', error);
         showError('Sub-wallet discovery failed');
-        // Clear state on error too
+        // Keep pending state on error so it can be resumed
+        // Clear in-memory state
         activeDiscoveryRunning.delete(masterKeyId);
         walletsBeingDiscovered.delete(masterKeyId);
         currentDiscoveryProgress = null;
     }
+}
+
+/**
+ * Check for and resume any pending discovery
+ * Should be called after wallet unlock
+ */
+export async function resumePendingDiscovery(getMnemonic: (masterKeyId: string) => Promise<string | null>): Promise<void> {
+    console.log('[Discovery] resumePendingDiscovery called');
+
+    const pending = await loadPendingDiscovery();
+    if (!pending) {
+        console.log('[Discovery] No pending discovery to resume');
+        return;
+    }
+
+    console.log('[Discovery] Found pending discovery:', JSON.stringify(pending));
+
+    // Check if the discovery is still relevant (not too old - 24 hours max)
+    const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+    const ageMs = Date.now() - pending.startedAt;
+    console.log(`[Discovery] Pending discovery age: ${ageMs}ms (max: ${MAX_AGE_MS}ms)`);
+
+    if (ageMs > MAX_AGE_MS) {
+        console.log('[Discovery] Pending discovery is too old, clearing');
+        await savePendingDiscovery(null);
+        return;
+    }
+
+    // Get the mnemonic for the wallet
+    console.log(`[Discovery] Requesting mnemonic for masterKeyId: ${pending.masterKeyId}`);
+    const mnemonic = await getMnemonic(pending.masterKeyId);
+
+    if (!mnemonic) {
+        console.log('[Discovery] Could not get mnemonic for pending discovery, clearing');
+        await savePendingDiscovery(null);
+        return;
+    }
+
+    console.log(`[Discovery] Got mnemonic (${mnemonic.split(' ').length} words)`);
+    console.log(`[Discovery] Resuming discovery for ${pending.masterKeyId} from index ${pending.nextIndexToCheck}`);
+
+    // Mark wallet for UI display before starting
+    markWalletForDiscovery(pending.masterKeyId);
+
+    // Refresh the wallet dropdown to show the discovery spinner
+    // (the dropdown was already populated before resumePendingDiscovery was called)
+    await populateWalletDropdown();
+
+    // Resume discovery from where we left off
+    startSubWalletDiscovery(pending.masterKeyId, mnemonic, pending.nextIndexToCheck).catch(err => {
+        console.error('[Discovery] Resume discovery error:', err);
+    });
 }
 
 /**
@@ -852,9 +987,10 @@ export async function showWalletManagementInterface(): Promise<void> {
 }
 
 /**
- * Hide wallet management interface and return to main interface
+ * Hide wallet management interface and optionally return to main interface
+ * @param showMain - If true (default), shows the main interface after hiding management
  */
-export function hideWalletManagementInterface(): void {
+export function hideWalletManagementInterface(showMain: boolean = true): void {
     console.log('[Wallet Management] Hiding management interface');
 
     const managementInterface = document.getElementById('wallet-management-interface');
@@ -862,9 +998,11 @@ export function hideWalletManagementInterface(): void {
         managementInterface.classList.add('hidden');
     }
 
-    const mainInterface = document.getElementById('main-interface');
-    if (mainInterface) {
-        mainInterface.classList.remove('hidden');
+    if (showMain) {
+        const mainInterface = document.getElementById('main-interface');
+        if (mainInterface) {
+            mainInterface.classList.remove('hidden');
+        }
     }
 }
 
@@ -1256,12 +1394,9 @@ async function handleDeleteMasterKey(masterId: string): Promise<void> {
         const response = await ExtensionMessaging.removeMasterKey(masterId, pin);
         if (response.success) {
             showSuccess(`Wallet "${masterName}" deleted successfully!`);
-            
-            // Hide management interface
-            hideWalletManagementInterface();
-            
-            // Show wallet selection screen so user can select another wallet
-            await showWalletSelectionInterface();
+
+            // Stay on the Manage Wallets page and refresh the list
+            await loadWalletManagementList();
         } else {
             showError(response.error || 'Failed to delete wallet');
         }

@@ -354,6 +354,16 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         });
         break;
 
+      case 'GET_MASTER_MNEMONIC':
+        try {
+          const masterMnemonic = await storageManager.getMasterKeyMnemonic(message.masterKeyId, message.pin);
+          sendResponse({ success: true, data: { mnemonic: masterMnemonic } });
+        } catch (error) {
+          console.error('[Background] GET_MASTER_MNEMONIC failed:', error);
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to get mnemonic' });
+        }
+        break;
+
       case 'SAVE_DOMAIN_SETTINGS':
         await storageManager.saveDomainSettings(message.domain, message.status);
         sendResponse({ success: true });

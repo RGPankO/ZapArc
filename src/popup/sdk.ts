@@ -214,17 +214,24 @@ export async function checkWalletHasTransactions(
                 hasActivity = true;
             }
 
-            // Also check for payments
+            // Also check for payments (transaction history)
+            // This is critical for wallets with zero balance but have transaction history
+            console.log('[Popup-SDK] Checking for payment history...');
             const payments = await tempSdk.listPayments({});
-            if (payments.payments && payments.payments.length > 0) {
+            const paymentCount = payments.payments?.length || 0;
+            console.log(`[Popup-SDK] Payment history check: ${paymentCount} payments found`);
+
+            if (paymentCount > 0) {
                 hasActivity = true;
-                console.log('[Popup-SDK] Found payments:', payments.payments.length);
+                console.log('[Popup-SDK] ✅ Found payments:', paymentCount);
+            } else {
+                console.log('[Popup-SDK] No payments found in history');
             }
         } catch (infoError) {
             console.warn('[Popup-SDK] Error getting wallet info:', infoError);
         }
 
-        console.log(`[Popup-SDK] Result: hasActivity=${hasActivity}, balance=${balanceSats}`);
+        console.log(`[Popup-SDK] Final result: hasActivity=${hasActivity}, balance=${balanceSats}`);
         return { hasTransactions: hasActivity, balanceSats };
     } catch (error) {
         console.error('[Popup-SDK] checkWalletHasTransactions failed:', error);
@@ -249,21 +256,23 @@ export async function checkWalletHasTransactions(
  * @param masterMnemonic - The master 12-word mnemonic
  * @param onProgress - Optional callback for progress updates
  * @param onWalletFound - Optional callback when a sub-wallet with activity is found (for partial results)
+ * @param startFromIndex - Optional index to resume from (default: 1)
  */
 export async function discoverSubWalletsInPopup(
     masterMnemonic: string,
     onProgress?: (status: string, index: number, foundCount: number) => void,
-    onWalletFound?: (wallet: { index: number; balanceSats: number }) => void
+    onWalletFound?: (wallet: { index: number; balanceSats: number }) => void,
+    startFromIndex: number = 1
 ): Promise<{ index: number; balanceSats: number }[]> {
-    console.log('[Popup-SDK] Starting sub-wallet discovery (sequential)...');
+    console.log(`[Popup-SDK] Starting sub-wallet discovery (sequential) from index ${startFromIndex}...`);
 
     const discoveredWallets: { index: number; balanceSats: number }[] = [];
     const MAX_INDEX = 5; // Check indices 1, 2, 3, 4
-    const MAX_CONSECUTIVE_EMPTY = 1; // Stop after 1 empty wallet (no gaps expected)
+    const MAX_CONSECUTIVE_EMPTY = 2; // Stop after 2 consecutive empty wallets
     let consecutiveEmpty = 0;
 
     // Check sub-wallets sequentially (WASM can't handle parallel connections)
-    for (let index = 1; index < MAX_INDEX; index++) {
+    for (let index = startFromIndex; index < MAX_INDEX; index++) {
         try {
             onProgress?.(`Checking sub-wallet ${index}...`, index, discoveredWallets.length);
 
@@ -279,8 +288,9 @@ export async function discoverSubWalletsInPopup(
                 onWalletFound?.(wallet);
                 consecutiveEmpty = 0;
             } else {
-                console.log(`[Popup-SDK] ❌ Sub-wallet ${index} is empty`);
+                console.log(`[Popup-SDK] ❌ Sub-wallet ${index} appears empty (balance: ${balanceSats}, hasTransactions: ${hasTransactions})`);
                 consecutiveEmpty++;
+                console.log(`[Popup-SDK] Consecutive empty count: ${consecutiveEmpty}/${MAX_CONSECUTIVE_EMPTY}`);
                 if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
                     console.log('[Popup-SDK] Stopping after consecutive empty wallets');
                     break;

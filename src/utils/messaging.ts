@@ -229,6 +229,17 @@ export class ExtensionMessaging {
   }
 
   /**
+   * Get master mnemonic for a specific wallet by ID
+   */
+  static async getMasterMnemonic(masterKeyId: string, pin: string): Promise<MessageResponse<{ mnemonic: string }>> {
+    return this.sendToBackground({
+      type: 'GET_MASTER_MNEMONIC',
+      masterKeyId,
+      pin
+    });
+  }
+
+  /**
    * Save domain settings
    */
   static async saveDomainSettings(domain: string, status: string): Promise<MessageResponse> {
