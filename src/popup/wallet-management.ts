@@ -33,10 +33,205 @@ import {
     toggleMasterKeyExpanded as toggleMasterKeyExpandedState
 } from './state';
 import type { MasterKeyMetadata, SubWalletEntry } from '../types';
-import { connectBreezSDK } from './sdk';
-import { showError, showSuccess, showInfo } from './notifications';
+import { connectBreezSDK, discoverSubWalletsInPopup } from './sdk';
+import { showError, showSuccess, showInfo, showNotification } from './notifications';
+
+// Track which wallets are currently being discovered
+const walletsBeingDiscovered = new Set<string>();
+
+// Track discovery progress for UI updates
+interface DiscoveryProgress {
+    masterKeyId: string;
+    currentIndex: number;
+    foundCount: number;
+    isComplete: boolean;
+}
+let currentDiscoveryProgress: DiscoveryProgress | null = null;
 import { showPINModal, promptForPIN, promptForText, showModal, hideModal } from './modals';
 import { showWalletSelectionInterface } from './wallet-selection';
+
+/**
+ * Start sub-wallet discovery for a newly imported wallet
+ * Shows progress in the wallet list UI and adds discovered sub-wallets
+ */
+// Track which wallets have active discovery running (not just marked for UI)
+const activeDiscoveryRunning = new Set<string>();
+
+export async function startSubWalletDiscovery(
+    masterKeyId: string,
+    mnemonic: string
+): Promise<void> {
+    // Check if discovery is already RUNNING (not just marked for UI)
+    if (activeDiscoveryRunning.has(masterKeyId)) {
+        console.log('[Discovery] Already discovering for wallet:', masterKeyId);
+        return;
+    }
+
+    console.log('[Discovery] Starting discovery for wallet:', masterKeyId);
+    activeDiscoveryRunning.add(masterKeyId);
+    walletsBeingDiscovered.add(masterKeyId);
+
+    // Update UI to show discovery in progress
+    updateDiscoveryUI(masterKeyId, 'Scanning for sub-wallets...', 0, false);
+
+    try {
+        const discoveredWallets = await discoverSubWalletsInPopup(
+            mnemonic,
+            (_status, index, foundCount) => {
+                // Update progress in UI (keep message simple for users)
+                currentDiscoveryProgress = {
+                    masterKeyId,
+                    currentIndex: index,
+                    foundCount,
+                    isComplete: false
+                };
+                // Don't change the message - keep it simple as "Scanning for sub-wallets..."
+                updateDiscoveryUI(masterKeyId, 'Scanning for sub-wallets...', foundCount, false);
+            },
+            async (wallet) => {
+                // When a sub-wallet is found, add it immediately
+                console.log(`[Discovery] Found sub-wallet ${wallet.index} with ${wallet.balanceSats} sats`);
+
+                const addResult = await ExtensionMessaging.addDiscoveredSubWallets(masterKeyId, [{
+                    index: wallet.index,
+                    nickname: `Sub-wallet ${wallet.index}`
+                }]);
+
+                if (addResult.success) {
+                    console.log(`[Discovery] Added sub-wallet ${wallet.index}`);
+                    // Refresh the wallet list to show new sub-wallet
+                    await loadWalletManagementList();
+                }
+            }
+        );
+
+        // Discovery complete
+        currentDiscoveryProgress = {
+            masterKeyId,
+            currentIndex: 0,
+            foundCount: discoveredWallets.length,
+            isComplete: true
+        };
+
+        if (discoveredWallets.length > 0) {
+            showNotification(
+                `Found ${discoveredWallets.length} sub-wallet${discoveredWallets.length > 1 ? 's' : ''} with history`,
+                'success'
+            );
+        }
+
+        // Remove discovery indicator and clear state BEFORE refreshing UI
+        // This ensures the UI doesn't show the spinner anymore
+        activeDiscoveryRunning.delete(masterKeyId);
+        walletsBeingDiscovered.delete(masterKeyId);
+        currentDiscoveryProgress = null;
+
+        updateDiscoveryUI(masterKeyId, '', 0, true);
+
+        // Final refresh of wallet list (now without discovery spinner)
+        await loadWalletManagementList();
+        await initializeMultiWalletUI();
+
+    } catch (error) {
+        console.error('[Discovery] Error during discovery:', error);
+        showError('Sub-wallet discovery failed');
+        // Clear state on error too
+        activeDiscoveryRunning.delete(masterKeyId);
+        walletsBeingDiscovered.delete(masterKeyId);
+        currentDiscoveryProgress = null;
+    }
+}
+
+/**
+ * Update the discovery UI indicator for a wallet
+ * Updates both the wallet management list indicator AND the main interface banner
+ */
+function updateDiscoveryUI(
+    masterKeyId: string,
+    status: string,
+    foundCount: number,
+    isComplete: boolean
+): void {
+    // Update wallet management list indicator (if visible)
+    const discoveryIndicator = document.querySelector(
+        `.discovery-indicator[data-master-id="${masterKeyId}"]`
+    );
+
+    if (discoveryIndicator) {
+        if (isComplete) {
+            discoveryIndicator.remove();
+        } else {
+            const statusEl = discoveryIndicator.querySelector('.discovery-status');
+            const countEl = discoveryIndicator.querySelector('.discovery-count');
+            if (statusEl) statusEl.textContent = status;
+            if (countEl && foundCount > 0) {
+                countEl.textContent = `Found: ${foundCount}`;
+                countEl.classList.remove('hidden');
+            }
+        }
+    }
+
+    // Update main interface discovery banner
+    const discoveryBanner = document.getElementById('discovery-banner');
+    if (discoveryBanner) {
+        if (isComplete) {
+            discoveryBanner.classList.add('hidden');
+        } else {
+            discoveryBanner.classList.remove('hidden');
+            const textEl = discoveryBanner.querySelector('.discovery-banner-text');
+            const countEl = document.getElementById('discovery-banner-count');
+            if (textEl) textEl.textContent = status;
+            if (countEl && foundCount > 0) {
+                countEl.textContent = `Found: ${foundCount}`;
+                countEl.classList.remove('hidden');
+            }
+        }
+    }
+}
+
+/**
+ * Check if a wallet is currently being discovered
+ */
+export function isWalletBeingDiscovered(masterKeyId: string): boolean {
+    return walletsBeingDiscovered.has(masterKeyId);
+}
+
+/**
+ * Mark a wallet as pending discovery (before actual discovery starts)
+ * This ensures the UI shows the loading state immediately
+ */
+export function markWalletForDiscovery(masterKeyId: string): void {
+    walletsBeingDiscovered.add(masterKeyId);
+}
+
+/**
+ * Refresh the discovery banner visibility based on current discovery state
+ * Called when UI initializes to ensure banner is visible if discovery is in progress
+ */
+function refreshDiscoveryBannerVisibility(): void {
+    const discoveryBanner = document.getElementById('discovery-banner');
+    if (!discoveryBanner) return;
+
+    // Check if any wallet is being discovered
+    if (walletsBeingDiscovered.size > 0) {
+        // Show the banner
+        discoveryBanner.classList.remove('hidden');
+        const textEl = discoveryBanner.querySelector('.discovery-banner-text');
+        if (textEl) textEl.textContent = 'Scanning for sub-wallets...';
+
+        // Update count if we have progress info
+        if (currentDiscoveryProgress) {
+            const countEl = document.getElementById('discovery-banner-count');
+            if (countEl && currentDiscoveryProgress.foundCount > 0) {
+                countEl.textContent = `Found: ${currentDiscoveryProgress.foundCount}`;
+                countEl.classList.remove('hidden');
+            }
+        }
+    } else {
+        // No discovery in progress, hide the banner
+        discoveryBanner.classList.add('hidden');
+    }
+}
 
 // Callback type for wallet operations that need main popup functions
 export type WalletManagementCallbacks = {
@@ -111,6 +306,9 @@ export async function initializeMultiWalletUI(): Promise<void> {
             updateWalletSelectorUI();
             setupWalletSelectorListeners();
         }
+
+        // Refresh discovery banner visibility in case discovery is in progress
+        refreshDiscoveryBannerVisibility();
     } catch (error) {
         console.error('[Multi-Wallet] Initialization error:', error);
     }
@@ -162,6 +360,16 @@ export async function updateWalletSelectorUI(): Promise<void> {
             walletCountBadge.textContent = totalWallets.toString();
         }
 
+        // Hide delete button for sub-wallets (only show for master wallet at index 0)
+        const deleteWalletBtn = document.getElementById('delete-wallet-btn');
+        if (deleteWalletBtn) {
+            if (activeSubWalletIndex > 0) {
+                deleteWalletBtn.classList.add('hidden');
+            } else {
+                deleteWalletBtn.classList.remove('hidden');
+            }
+        }
+
         // Populate wallet dropdown list
         await populateWalletDropdown();
     } catch (error) {
@@ -196,16 +404,25 @@ export async function populateWalletDropdown(): Promise<void> {
         // Each wallet is a master key
         for (const wallet of currentWallets) {
             const isActiveWallet = wallet.id === activeWalletId;
+            const isDiscovering = walletsBeingDiscovered.has(wallet.id);
             const allSubWallets = (data.wallets?.find((w: any) => w.metadata.id === wallet.id)?.subWallets) || [];
             // Filter out archived sub-wallets
             const subWallets = allSubWallets.filter((sw: any) => !sw.archivedAt);
             const hasSubWallets = subWallets.length > 0;
             const createdDate = new Date(wallet.createdAt).toLocaleDateString();
 
+            // Show spinner if discovering, checkmark if active, nothing otherwise
+            const statusIcon = isDiscovering
+                ? '<span class="discovery-spinner-small">⏳</span>'
+                : (isActiveWallet ? '<span class="active-check">✓</span>' : '');
+
             if (hasSubWallets) {
                 // Wallet with sub-wallets - show hierarchical structure
                 // Master wallet is clickable at top level (index 0), sub-wallets shown below (index 1+)
                 const isMasterActive = isActiveWallet && activeSubWalletIndex === 0;
+                const masterStatusIcon = isDiscovering
+                    ? '<span class="discovery-spinner-small">⏳</span>'
+                    : (isMasterActive ? '<span class="active-check">✓</span>' : '');
 
                 html += `
                     <div class="master-key-dropdown-item expanded" data-master-id="${wallet.id}">
@@ -215,9 +432,9 @@ export async function populateWalletDropdown(): Promise<void> {
                             <span class="master-key-icon">🔑</span>
                             <div class="master-key-dropdown-info">
                                 <div class="master-key-dropdown-name">${wallet.nickname}</div>
-                                <div class="master-key-dropdown-meta">Last used: ${createdDate}</div>
+                                <div class="master-key-dropdown-meta">${isDiscovering ? 'Scanning...' : `Last used: ${createdDate}`}</div>
                             </div>
-                            ${isMasterActive ? '<span class="active-check">✓</span>' : ''}
+                            ${masterStatusIcon}
                         </div>
 
                         <!-- Sub-wallets wrapper for proper indentation -->
@@ -247,8 +464,9 @@ export async function populateWalletDropdown(): Promise<void> {
                             <span class="master-key-icon">🔑</span>
                             <div class="master-key-dropdown-info">
                                 <div class="master-key-dropdown-name">${wallet.nickname}</div>
-                                <div class="master-key-dropdown-meta">Last used: ${createdDate}</div>
+                                <div class="master-key-dropdown-meta">${isDiscovering ? 'Scanning...' : `Last used: ${createdDate}`}</div>
                             </div>
+                            ${statusIcon}
                         </div>
                     </div>
                 `;
@@ -776,6 +994,9 @@ async function loadHierarchicalWalletList(): Promise<void> {
             }
         }
 
+        // Check if this wallet is currently being discovered
+        const isDiscovering = walletsBeingDiscovered.has(mk.id);
+
         html += `
             <div class="master-key-item ${isExpanded ? 'expanded' : 'collapsed'}"
                  data-master-id="${mk.id}">
@@ -785,6 +1006,13 @@ async function loadHierarchicalWalletList(): Promise<void> {
                     <span class="sub-wallet-count">(${mk.subWalletCount})</span>
                     <span class="expand-icon">${isExpanded ? '▼' : '▶'}</span>
                 </div>
+                ${isDiscovering ? `
+                    <div class="discovery-indicator" data-master-id="${mk.id}">
+                        <span class="discovery-spinner">⏳</span>
+                        <span class="discovery-status">Scanning for sub-wallets...</span>
+                        <span class="discovery-count hidden"></span>
+                    </div>
+                ` : ''}
                 <div class="master-key-meta">Created: ${createdDate}</div>
                 <div class="master-key-actions">
                     <button class="wallet-mgmt-btn rename-master-btn"

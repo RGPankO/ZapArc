@@ -36,7 +36,7 @@ import {
 } from './state';
 
 // SDK imports
-import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, discoverSubWalletsInPopup } from './sdk';
+import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks } from './sdk';
 
 // Notification imports
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
@@ -57,6 +57,8 @@ import {
     handleRenameSave,
     hideRenameInterface,
     setWalletManagementCallbacks,
+    startSubWalletDiscovery,
+    markWalletForDiscovery,
 } from './wallet-management';
 
 // Wallet Selection imports
@@ -87,38 +89,6 @@ function generateMnemonic(): string {
     return bip39.generateMnemonic();
 }
 
-// Background discovery task and partial results
-let subWalletDiscoveryTask: Promise<{ index: number; balanceSats: number }[]> | null = null;
-let discoveredSubWalletsPartial: { index: number; balanceSats: number }[] = [];
-
-function startDiscoveryInBackground(mnemonic: string) {
-    if (subWalletDiscoveryTask) return; // Already running
-
-    console.log('[Wizard] Starting background sub-wallet discovery...');
-    discoveredSubWalletsPartial = []; // Reset partial results
-
-    subWalletDiscoveryTask = discoverSubWalletsInPopup(
-        mnemonic,
-        (status, index, foundCount) => {
-            console.log(`[Background-Discovery] ${status} (found so far: ${foundCount})`);
-        },
-        (wallet) => {
-            // Track each wallet as it's discovered (for partial results on timeout)
-            discoveredSubWalletsPartial.push(wallet);
-            console.log(`[Background-Discovery] Found sub-wallet ${wallet.index} (${wallet.balanceSats} sats)`);
-        }
-    );
-
-    subWalletDiscoveryTask.then(results => {
-        console.log(`[Background-Discovery] Complete: found ${results.length} sub-wallets`);
-    }).catch(err => {
-        console.error('[Background-Discovery] Error:', err);
-    });
-}
-
-function getDiscoveredSubWallets(): { index: number; balanceSats: number }[] {
-    return [...discoveredSubWalletsPartial]; // Return a copy
-}
 
 // ========================================
 // Balance & Transaction Functions
@@ -449,10 +419,6 @@ function setupWizardListeners() {
 
     if (confirmContinueBtn) {
         confirmContinueBtn.onclick = () => {
-             // Start discovery in background now that seed is confirmed
-             if (generatedMnemonic) {
-                 startDiscoveryInBackground(generatedMnemonic);
-             }
              showWizardStep('pin-step');
         };
     }
@@ -1020,8 +986,7 @@ async function handlePinConfirm() {
         const nickname = existingWalletCount === 0 ? 'Main Wallet' : `Wallet ${existingWalletCount + 1}`;
         console.log(`[Wizard] Creating wallet with nickname: ${nickname} (existing count: ${existingWalletCount})`);
 
-        // Step 1: Create the master wallet via background (without sub-wallet discovery)
-        // Discovery is disabled in background because WASM needs DOM access
+        // Create the master wallet via background
         const response = await ExtensionMessaging.importWalletWithDiscovery(generatedMnemonic, nickname, pin);
 
         if (!response.success || !response.data) {
@@ -1031,80 +996,6 @@ async function handlePinConfirm() {
         const { masterKeyId } = response.data;
         console.log(`[Wizard] Master wallet created: ${masterKeyId}`);
 
-        // Step 2: Run sub-wallet discovery in popup context (where WASM/DOM works)
-        // Keep strictly "Creating wallet..." message for better UX
-        // if (pinContinueBtn) {
-        //     pinContinueBtn.textContent = 'Scanning for sub-wallets...';
-        // }
-
-        let discoveredCount = 0;
-        try {
-            let discoveredWallets: { index: number; balanceSats: number }[] = [];
-
-            // Use background discovery if started, with a timeout to not delay too long
-            if (subWalletDiscoveryTask) {
-                console.log('[Wizard] Waiting for background discovery (max 5s)...');
-
-                // Race between discovery completing and a 5s timeout
-                const timeoutPromise = new Promise<{ index: number; balanceSats: number }[] | null>((resolve) => {
-                    setTimeout(() => {
-                        console.log('[Wizard] Discovery timeout - using partial results');
-                        resolve(null); // null indicates timeout
-                    }, 5000);
-                });
-
-                const result = await Promise.race([subWalletDiscoveryTask, timeoutPromise]);
-
-                if (result === null) {
-                    // Timeout hit - use whatever partial results we have
-                    discoveredWallets = getDiscoveredSubWallets();
-                    console.log(`[Wizard] Using ${discoveredWallets.length} partial discovery results`);
-                } else {
-                    discoveredWallets = result;
-                }
-                subWalletDiscoveryTask = null; // Reset for next time
-            } else {
-                 console.log('[Wizard] Starting fresh discovery (background task not found)...');
-                 discoveredWallets = await discoverSubWalletsInPopup(
-                    generatedMnemonic,
-                    (status, index, found) => {
-                        console.log(`[Discovery] ${status} (found: ${found})`);
-                    }
-                );
-            }
-
-            // Step 3: Add discovered sub-wallets via messaging
-            if (discoveredWallets.length > 0) {
-                // Keep "Creating wallet..." message
-                // if (pinContinueBtn) {
-                //     pinContinueBtn.textContent = `Restoring ${discoveredWallets.length} sub-wallet(s)...`;
-                // }
-
-                const subWalletsToAdd = discoveredWallets.map(({ index }) => ({
-                    index,
-                    nickname: `Sub-wallet ${index}`
-                }));
-
-                const addResult = await ExtensionMessaging.addDiscoveredSubWallets(masterKeyId, subWalletsToAdd);
-                if (addResult.success) {
-                    discoveredCount = discoveredWallets.length;
-                    console.log(`[Wizard] Added ${discoveredCount} discovered sub-wallet(s)`);
-                } else {
-                    console.warn('[Wizard] Failed to add discovered sub-wallets:', addResult.error);
-                }
-            }
-        } catch (discoveryError) {
-            console.warn('[Wizard] Sub-wallet discovery error (continuing anyway):', discoveryError);
-            // Don't fail the whole process if discovery fails
-        }
-
-        if (discoveredCount > 0) {
-            console.log(`[Wizard] Wallet saved with ${discoveredCount} discovered sub-wallet(s)`);
-            showNotification(`Restored ${discoveredCount} sub-wallet${discoveredCount > 1 ? 's' : ''} with transaction history`, 'success');
-        } else {
-            console.log('[Wizard] Wallet saved successfully (no sub-wallets found)');
-        }
-
         // Update session PIN to the new wallet's PIN
         setSessionPin(pin);
         await chrome.storage.session.set({ walletSessionPin: pin });
@@ -1113,7 +1004,7 @@ async function handlePinConfirm() {
         console.log(`[Wizard] Setting newly created wallet ${masterKeyId} as active`);
         setActiveMasterKeyId(masterKeyId);
         setActiveSubWalletIndex(0);
-        
+
         // Update storage with active wallet
         const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
         if (multiWalletResult.multiWalletData) {
@@ -1123,10 +1014,21 @@ async function handlePinConfirm() {
             await chrome.storage.local.set({ multiWalletData: JSON.stringify(multiWalletData) });
         }
 
+        // Mark wallet for discovery BEFORE finalizing setup
+        // This ensures the UI shows the loading spinner when it renders
+        markWalletForDiscovery(masterKeyId);
+
         // Skip the completion screen and directly finalize setup
         // This avoids the "Opening..." button getting stuck
         console.log('[Wizard] Skipping completion screen, opening wallet directly');
         await finalizeWalletSetup();
+
+        // Start sub-wallet discovery in the background (non-blocking)
+        // This runs after the main UI is shown, scanning for existing sub-wallets
+        console.log('[Wizard] Starting background sub-wallet discovery...');
+        startSubWalletDiscovery(masterKeyId, generatedMnemonic).catch(err => {
+            console.warn('[Wizard] Background discovery error (non-fatal):', err);
+        });
         
     } catch (error) {
         console.error('[Wizard] Error saving wallet:', error);
@@ -1438,10 +1340,6 @@ function checkImportComplete() {
 }
 
 function handleImportContinue() {
-    // Start discovery in background now that seed is imported
-    if (generatedMnemonic) {
-        startDiscoveryInBackground(generatedMnemonic);
-    }
     showWizardStep('pin-step');
 }
 

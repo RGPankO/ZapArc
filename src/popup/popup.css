@@ -602,6 +602,7 @@ header h1 {
 
 #settings-section {
   text-align: center;
+  padding-bottom: 16px;
 }
 
 .settings-btn {
@@ -2037,6 +2038,87 @@ body.modal-open {
   color: #888;
   margin: 8px 0;
   padding-left: 24px;
+}
+
+/* Discovery Indicator */
+.discovery-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 8px 0 8px 24px;
+  background: linear-gradient(90deg, #fff7e6 0%, #fffbe6 100%);
+  border: 1px solid #ffe58f;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #d48806;
+}
+
+.discovery-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.discovery-status {
+  flex: 1;
+}
+
+.discovery-count {
+  font-weight: 600;
+  color: #389e0d;
+}
+
+.discovery-count.hidden {
+  display: none;
+}
+
+/* Discovery Banner (main interface) */
+.discovery-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 0 16px 12px;
+  background: linear-gradient(90deg, #fff7e6 0%, #fffbe6 100%);
+  border: 1px solid #ffe58f;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #d48806;
+}
+
+.discovery-banner.hidden {
+  display: none;
+}
+
+.discovery-banner-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.discovery-banner-text {
+  flex: 1;
+}
+
+.discovery-banner-count {
+  font-weight: 600;
+  color: #389e0d;
+  background: #f6ffed;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.discovery-banner-count.hidden {
+  display: none;
+}
+
+/* Small spinner for dropdown items */
+.discovery-spinner-small {
+  animation: spin 1s linear infinite;
+  font-size: 14px;
 }
 
 /* Master Key Actions */

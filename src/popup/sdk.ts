@@ -130,26 +130,18 @@ export async function checkWalletHasTransactions(
         const SYNC_TIMEOUT_MS = 8000;
         
         const syncListenerPromise = new Promise<void>((resolve) => {
+             // Define pollInterval first so it can be referenced in timeout and event listener
+             let pollInterval: ReturnType<typeof setInterval>;
+
              const timeout = setTimeout(() => {
                  console.log('[Popup-SDK] Sync timeout reached (fast check)');
+                 if (pollInterval) clearInterval(pollInterval);
                  resolve();
              }, SYNC_TIMEOUT_MS);
-             
-             // Event listener for sync
-             const cleanup = tempSdk!.addEventListener({
-                onEvent: (event: SdkEvent) => {
-                    if (event.type === 'synced') {
-                        console.log('[Popup-SDK] Temporary SDK synced!');
-                        clearTimeout(timeout);
-                        // cleanup(); 
-                        resolve();
-                    }
-                }
-            });
 
-            // FAST TRACK: Poll for balance AND payments every 500ms while waiting for sync
-            // If we see balance/payments, we don't need to wait for full sync to know it exists
-            const pollInterval = setInterval(async () => {
+             // FAST TRACK: Poll for balance AND payments every 500ms while waiting for sync
+             // If we see balance/payments, we don't need to wait for full sync to know it exists
+             pollInterval = setInterval(async () => {
                 if (!tempSdk) {
                     clearInterval(pollInterval);
                     return;
@@ -159,7 +151,7 @@ export async function checkWalletHasTransactions(
                     const info = await tempSdk.getInfo({ ensureSynced: false });
                     const currentBalance = info.balanceSats || 0;
                     const hasNodeId = !!info.id;
-                    
+
                     if (currentBalance > 0) {
                          console.log('[Popup-SDK] Fast track: Found balance before sync complete');
                          clearTimeout(timeout);
@@ -167,7 +159,7 @@ export async function checkWalletHasTransactions(
                          resolve();
                          return;
                     }
-                    
+
                     // Check payments ONLY if we have a node ID (SDK initialized)
                     if (hasNodeId) {
                         try {
@@ -185,6 +177,18 @@ export async function checkWalletHasTransactions(
                     }
                 } catch (e) { /* ignore polling errors */ }
             }, 500);
+
+             // Event listener for sync - also clears the poll interval
+             tempSdk!.addEventListener({
+                onEvent: (event: SdkEvent) => {
+                    if (event.type === 'synced') {
+                        console.log('[Popup-SDK] Temporary SDK synced!');
+                        clearTimeout(timeout);
+                        clearInterval(pollInterval);
+                        resolve();
+                    }
+                }
+            });
         });
 
         console.log('[Popup-SDK] Waiting for sync or activity...');
@@ -255,7 +259,7 @@ export async function discoverSubWalletsInPopup(
 
     const discoveredWallets: { index: number; balanceSats: number }[] = [];
     const MAX_INDEX = 5; // Check indices 1, 2, 3, 4
-    const MAX_CONSECUTIVE_EMPTY = 3; // Stop after 3 consecutive empty (allows gaps)
+    const MAX_CONSECUTIVE_EMPTY = 1; // Stop after 1 empty wallet (no gaps expected)
     let consecutiveEmpty = 0;
 
     // Check sub-wallets sequentially (WASM can't handle parallel connections)
