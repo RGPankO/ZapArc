@@ -1110,25 +1110,44 @@ async function loadHierarchicalWalletList(): Promise<void> {
         let addSubWalletDisabledReason = '';
 
         if (allSubWallets.length === 0) {
-            // No sub-wallets exist yet - allow creating the first one
-            canAddSubWallet = true;
+            // No sub-wallets exist yet - only allow creating the first one if the main wallet has transactions
+            // The main wallet (index 0) must have activity before creating sub-wallets
+            if (isActiveMasterKey && activeWalletHasTransactions) {
+                canAddSubWallet = true;
+            } else if (isActiveMasterKey) {
+                addSubWalletDisabledReason = `${mk.nickname} must have transactions before adding sub-wallets`;
+            } else {
+                // Not the active wallet - we can't check its transactions, so disable by default
+                addSubWalletDisabledReason = 'Switch to this wallet to check if sub-wallets can be added';
+            }
         } else {
             // Find the last sub-wallet by highest index
-            const lastSubWallet = allSubWallets.reduce((max, sw) => 
+            const lastSubWallet = allSubWallets.reduce((max, sw) =>
                 sw.index > max.index ? sw : max
             );
 
-            // Check if it has been used (lastUsedAt exists and is different from createdAt)
-            const hasBeenUsed = lastSubWallet.lastUsedAt && 
-                                lastSubWallet.lastUsedAt !== lastSubWallet.createdAt;
+            const lastName = lastSubWallet.index === 0
+                ? mk.nickname
+                : lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
 
-            if (hasBeenUsed) {
-                canAddSubWallet = true;
+            // Check if the LAST sub-wallet has transactions
+            // We can only check this via SDK if it's the currently active wallet
+            const isLastSubWalletActive = isActiveMasterKey && currentActiveSubWalletIndex === lastSubWallet.index;
+
+            if (isLastSubWalletActive) {
+                // Use the SDK check - most reliable
+                if (activeWalletHasTransactions) {
+                    canAddSubWallet = true;
+                } else {
+                    addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
+                }
+            } else if (isActiveMasterKey) {
+                // Active master key but not on the last sub-wallet
+                // Need to switch to the last sub-wallet to check
+                addSubWalletDisabledReason = `Switch to ${lastName} to check if you can add more sub-wallets`;
             } else {
-                const lastName = lastSubWallet.index === 0 
-                    ? mk.nickname 
-                    : lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
-                addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
+                // Not the active master key - can't check
+                addSubWalletDisabledReason = 'Switch to this wallet to check if sub-wallets can be added';
             }
         }
 

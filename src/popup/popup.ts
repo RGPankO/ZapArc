@@ -271,45 +271,75 @@ function showWizardStep(stepId: string) {
 
 /**
  * Check if current wallet has transactions and update button state accordingly
+ * Logic: The LAST sub-wallet (or main wallet if no sub-wallets) must have transactions
+ * before a new sub-wallet can be added. This ensures users don't create empty wallets.
  */
 async function updateAddSubWalletButtonState(btn: HTMLButtonElement): Promise<void> {
     try {
-        // Get sub-wallet count for the active wallet
-        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
-        if (!multiWalletResult.multiWalletData) {
-            return;
-        }
-
-        const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
-        const activeWalletId = multiWalletData.activeWalletId;
-        const activeWallet = multiWalletData.wallets?.find((w: any) => w.metadata.id === activeWalletId);
-        const existingSubWallets = activeWallet?.subWallets?.filter((sw: any) => !sw.archivedAt) || [];
-
-        // If no sub-wallets exist, allow adding (first sub-wallet is always allowed)
-        if (existingSubWallets.length === 0) {
-            btn.disabled = false;
-            btn.removeAttribute('title');
-            return;
-        }
-
-        // Check if current wallet has transactions
-        if (breezSDK) {
-            const response = await breezSDK.listPayments({});
-            const payments = response?.payments || [];
-            const hasTransactions = payments.length > 0;
-
-            btn.disabled = !hasTransactions;
-            if (!hasTransactions) {
-                btn.setAttribute('title', 'Make a transaction first before adding another sub-wallet');
-            } else {
-                btn.removeAttribute('title');
-            }
-            console.log(`[Wizard] Add Sub-Wallet button: ${hasTransactions ? 'enabled' : 'disabled'} (${payments.length} transactions)`);
-        } else {
-            // No SDK connected, disable the button
+        if (!breezSDK) {
             btn.disabled = true;
             btn.setAttribute('title', 'Wallet not connected');
+            return;
         }
+
+        // Get active wallet info to determine which sub-wallet we're on
+        const activeData = await chrome.storage.local.get(['multiWalletData']);
+        let activeMasterKeyId = '';
+        let activeSubWalletIndex = 0;
+
+        if (activeData.multiWalletData) {
+            try {
+                const data = JSON.parse(activeData.multiWalletData);
+                activeMasterKeyId = data.activeWalletId || '';
+                activeSubWalletIndex = data.activeSubWalletIndex || 0;
+            } catch (e) {
+                console.error('[Wizard] Failed to parse active wallet data');
+            }
+        }
+
+        // Get all sub-wallets to find the last one
+        let lastSubWalletIndex = 0;
+        let lastSubWalletName = 'Main Wallet';
+
+        if (activeMasterKeyId) {
+            const subWalletsResponse = await ExtensionMessaging.getSubWallets(activeMasterKeyId, true);
+            if (subWalletsResponse.success && subWalletsResponse.data && subWalletsResponse.data.length > 0) {
+                const lastSubWallet = subWalletsResponse.data.reduce((max, sw) =>
+                    sw.index > max.index ? sw : max
+                );
+                lastSubWalletIndex = lastSubWallet.index;
+                lastSubWalletName = lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
+            }
+        }
+
+        // Check if we're on the last sub-wallet
+        const isOnLastSubWallet = activeSubWalletIndex === lastSubWalletIndex;
+
+        if (!isOnLastSubWallet) {
+            // Not on the last sub-wallet - need to switch first
+            btn.disabled = true;
+            btn.setAttribute('title', `Switch to ${lastSubWalletName} to add more sub-wallets`);
+            console.log(`[Wizard] Add Sub-Wallet button: disabled (not on last sub-wallet, active: ${activeSubWalletIndex}, last: ${lastSubWalletIndex})`);
+            return;
+        }
+
+        // We're on the last sub-wallet - check if it has transactions
+        const [paymentsResponse, info] = await Promise.all([
+            breezSDK.listPayments({}).catch(() => ({ payments: [] })),
+            breezSDK.getInfo({ ensureSynced: false }).catch(() => ({ balanceSats: 0 }))
+        ]);
+
+        const payments = paymentsResponse?.payments || [];
+        const balance = info?.balanceSats || 0;
+        const hasActivity = payments.length > 0 || balance > 0;
+
+        btn.disabled = !hasActivity;
+        if (!hasActivity) {
+            btn.setAttribute('title', `${lastSubWalletName} must have transactions before adding another`);
+        } else {
+            btn.removeAttribute('title');
+        }
+        console.log(`[Wizard] Add Sub-Wallet button: ${hasActivity ? 'enabled' : 'disabled'} (${payments.length} txs, ${balance} sats, index: ${activeSubWalletIndex})`);
     } catch (error) {
         console.warn('[Wizard] Could not check transaction history for sub-wallet button:', error);
         // On error, disable to be safe
