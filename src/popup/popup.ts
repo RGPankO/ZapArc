@@ -182,11 +182,13 @@ async function loadTransactionHistory() {
         // Cache transactions for faster loading next time (wallet-specific)
         const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
         let activeWalletId = null;
+        let activeSubWalletIndex = 0;
         
         if (multiWalletResult.multiWalletData) {
             try {
                 const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
                 activeWalletId = multiWalletData.activeWalletId;
+                activeSubWalletIndex = multiWalletData.activeSubWalletIndex || 0;
             } catch (e) {
                 console.error('⚠️ [Popup] Failed to parse multiWalletData for caching:', e);
             }
@@ -195,9 +197,14 @@ async function loadTransactionHistory() {
         if (activeWalletId) {
             const cacheKey = `cachedTransactions_${activeWalletId}`;
             await chrome.storage.local.set({ [cacheKey]: displayTransactions });
-            console.log('💾 [Popup] Cached', displayTransactions.length, 'transactions for wallet:', activeWalletId);
-        } else {
-            console.warn('⚠️ [Popup] No active wallet ID - skipping transaction cache');
+            
+            // Update hasActivity flag for sub-wallets when we detect transactions
+            if (activeSubWalletIndex > 0) {
+                const hasTransactions = payments.length > 0;
+                ExtensionMessaging.updateSubWalletActivity(activeWalletId, activeSubWalletIndex, hasTransactions).catch(e =>
+                    console.warn('[Popup] Failed to update hasActivity flag:', e)
+                );
+            }
         }
 
         // Render to UI
@@ -317,19 +324,32 @@ async function updateAddSubWalletButtonState(btn: HTMLButtonElement): Promise<vo
         // Get all sub-wallets to find the last one
         let lastSubWalletIndex = 0;
         let lastSubWalletName = 'Main Wallet';
+        let subWalletCount = 0;
 
         if (activeMasterKeyId) {
             const subWalletsResponse = await ExtensionMessaging.getSubWallets(activeMasterKeyId, true);
-            if (subWalletsResponse.success && subWalletsResponse.data && subWalletsResponse.data.length > 0) {
-                const lastSubWallet = subWalletsResponse.data.reduce((max, sw) =>
-                    sw.index > max.index ? sw : max
-                );
-                lastSubWalletIndex = lastSubWallet.index;
-                lastSubWalletName = lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
+            if (subWalletsResponse.success && subWalletsResponse.data) {
+                subWalletCount = subWalletsResponse.data.length;
+                if (subWalletCount > 0) {
+                    const lastSubWallet = subWalletsResponse.data.reduce((max, sw) =>
+                        sw.index > max.index ? sw : max
+                    );
+                    lastSubWalletIndex = lastSubWallet.index;
+                    lastSubWalletName = lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
+                }
             }
         }
 
-        // Check if we're on the last sub-wallet - if so, we can use SDK directly
+        // First sub-wallet is always allowed
+        if (subWalletCount === 0) {
+            btn.disabled = false;
+            btn.removeAttribute('title');
+            updateHint(false);
+            console.log('[Wizard] No sub-wallets exist - first sub-wallet always allowed');
+            return;
+        }
+
+        // For additional sub-wallets, check if the last one has activity
         const isOnLastSubWallet = activeSubWalletIndex === lastSubWalletIndex;
         let hasActivity = false;
 
@@ -343,12 +363,19 @@ async function updateAddSubWalletButtonState(btn: HTMLButtonElement): Promise<vo
             const payments = paymentsResponse?.payments || [];
             const balance = info?.balanceSats || 0;
             hasActivity = payments.length > 0 || balance > 0;
-            console.log(`[Wizard] Checked last sub-wallet (${lastSubWalletIndex}) directly: ${payments.length} txs, ${balance} sats`);
         } else {
-            // Not on the last sub-wallet - we cannot reliably check transaction history
-            // Disable the button until user is on the last sub-wallet (but no "switch to" message)
-            hasActivity = false;
-            console.log(`[Wizard] Not on last sub-wallet (current: ${activeSubWalletIndex}, last: ${lastSubWalletIndex}) - cannot verify transactions`);
+            // Not on the last sub-wallet - check persisted hasActivity flag
+            const subWalletsResponse = await ExtensionMessaging.getSubWallets(activeMasterKeyId, true);
+            let lastSubWalletHasActivity: boolean | undefined = undefined;
+            if (subWalletsResponse.success && subWalletsResponse.data && subWalletsResponse.data.length > 0) {
+                const lastSubWallet = subWalletsResponse.data.reduce((max, sw) =>
+                    sw.index > max.index ? sw : max
+                );
+                lastSubWalletHasActivity = lastSubWallet.hasActivity;
+            }
+            
+            // Only allow if hasActivity is explicitly true
+            hasActivity = lastSubWalletHasActivity === true;
         }
 
         btn.disabled = !hasActivity;
@@ -360,7 +387,6 @@ async function updateAddSubWalletButtonState(btn: HTMLButtonElement): Promise<vo
             btn.removeAttribute('title');
             updateHint(false);
         }
-        console.log(`[Wizard] Add Sub-Wallet button: ${hasActivity ? 'enabled' : 'disabled'} (last sub-wallet: ${lastSubWalletIndex}, current: ${activeSubWalletIndex})`);
     } catch (error) {
         console.warn('[Wizard] Could not check transaction history for sub-wallet button:', error);
         // On error, disable to be safe

@@ -956,6 +956,29 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      case 'UPDATE_SUB_WALLET_ACTIVITY':
+        try {
+          const { masterKeyId, subWalletIndex, hasActivity } = message;
+          if (!masterKeyId || subWalletIndex === undefined || hasActivity === undefined) {
+            throw new Error('Master key ID, sub-wallet index, and hasActivity are required');
+          }
+          console.log('[Background] UPDATE_SUB_WALLET_ACTIVITY', {
+            masterKeyId,
+            subWalletIndex,
+            hasActivity
+          });
+
+          await storageManager.updateSubWalletActivity(masterKeyId, subWalletIndex, hasActivity);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] UPDATE_SUB_WALLET_ACTIVITY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update sub-wallet activity'
+          });
+        }
+        break;
+
       // ========================================
       // Wallet Archive/Restore Handlers
       // ========================================

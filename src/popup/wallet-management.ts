@@ -1110,16 +1110,8 @@ async function loadHierarchicalWalletList(): Promise<void> {
         let addSubWalletDisabledReason = '';
 
         if (allSubWallets.length === 0) {
-            // No sub-wallets exist yet - only allow creating the first one if the main wallet has transactions
-            // The main wallet (index 0) must have activity before creating sub-wallets
-            if (isActiveMasterKey && activeWalletHasTransactions) {
-                canAddSubWallet = true;
-            } else if (isActiveMasterKey) {
-                addSubWalletDisabledReason = `${mk.nickname} must have transactions before adding sub-wallets`;
-            } else {
-                // Not the active wallet - we can't check its transactions, so disable by default
-                addSubWalletDisabledReason = 'Switch to this wallet to check if sub-wallets can be added';
-            }
+            // No sub-wallets exist yet - first sub-wallet is always allowed
+            canAddSubWallet = true;
         } else {
             // Find the last sub-wallet by highest index
             const lastSubWallet = allSubWallets.reduce((max, sw) =>
@@ -1130,24 +1122,37 @@ async function loadHierarchicalWalletList(): Promise<void> {
                 ? mk.nickname
                 : lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
 
-            // Check if the LAST sub-wallet has activity
-            // We can only reliably check if we're connected to it
-            const isLastSubWalletActive = isActiveMasterKey && currentActiveSubWalletIndex === lastSubWallet.index;
+            // Check if we're connected to this exact last sub-wallet (can verify via SDK)
+            const isConnectedToLastSubWallet = isActiveMasterKey && currentActiveSubWalletIndex === lastSubWallet.index;
 
-            if (isActiveMasterKey) {
-                if (isLastSubWalletActive && activeWalletHasTransactions) {
-                    // Currently on the last sub-wallet and it has transactions - allow
+            if (isConnectedToLastSubWallet) {
+                // We're connected to this exact sub-wallet - use SDK to verify
+                // Also persist the result to hasActivity so it works when wallet is unselected
+                if (activeWalletHasTransactions) {
                     canAddSubWallet = true;
-                } else if (isLastSubWalletActive && !activeWalletHasTransactions) {
-                    // Currently on the last sub-wallet but no transactions
-                    addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
+                    // Persist hasActivity = true
+                    ExtensionMessaging.updateSubWalletActivity(mk.id, lastSubWallet.index, true).catch(e => 
+                        console.warn('[Wallet Management] Failed to persist hasActivity:', e)
+                    );
                 } else {
-                    // Not on the last sub-wallet - cannot verify transaction history
                     addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
+                    // Persist hasActivity = false
+                    ExtensionMessaging.updateSubWalletActivity(mk.id, lastSubWallet.index, false).catch(e => 
+                        console.warn('[Wallet Management] Failed to persist hasActivity:', e)
+                    );
                 }
             } else {
-                // Not the active master key - can't check
-                addSubWalletDisabledReason = 'Switch to this wallet to check if sub-wallets can be added';
+                // Not connected to this sub-wallet - use stored hasActivity flag
+                // Only allow if hasActivity is explicitly true, OR if on same master key (optimistic)
+                if (lastSubWallet.hasActivity === true) {
+                    canAddSubWallet = true;
+                } else if (isActiveMasterKey) {
+                    // On same master key but not connected to last sub-wallet - be optimistic
+                    canAddSubWallet = true;
+                } else {
+                    // Different master key and hasActivity is false or undefined
+                    addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
+                }
             }
         }
 

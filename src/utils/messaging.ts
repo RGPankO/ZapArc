@@ -986,6 +986,28 @@ export class ExtensionMessaging {
     });
   }
 
+  /**
+   * Update the hasActivity flag for a sub-wallet
+   * Called when we detect transactions on a sub-wallet
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet
+   * @param hasActivity - Whether the sub-wallet has transaction activity
+   * @returns Success status
+   */
+  static async updateSubWalletActivity(
+    masterKeyId: string,
+    subWalletIndex: number,
+    hasActivity: boolean
+  ): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'UPDATE_SUB_WALLET_ACTIVITY',
+      masterKeyId,
+      subWalletIndex,
+      hasActivity
+    });
+  }
+
   // ========================================
   // Wallet Archive/Restore Methods
   // ========================================

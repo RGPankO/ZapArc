@@ -1247,7 +1247,8 @@ export class ChromeStorageManager {
         index: nextIndex,
         nickname,
         createdAt: now,
-        lastUsedAt: now
+        lastUsedAt: now,
+        hasActivity: false  // New sub-wallets start with no activity
       };
 
       wallet.subWallets.push(newSubWallet);
@@ -1633,6 +1634,49 @@ export class ChromeStorageManager {
       console.log('✅ [Storage] RENAME_SUB_WALLET SUCCESS');
     } catch (error) {
       console.error('❌ [Storage] RENAME_SUB_WALLET FAILED', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update the hasActivity flag for a sub-wallet
+   * Called when we detect transactions on a sub-wallet
+   */
+  async updateSubWalletActivity(masterKeyId: string, subWalletIndex: number, hasActivity: boolean): Promise<void> {
+    console.log('🔵 [Storage] UPDATE_SUB_WALLET_ACTIVITY', { masterKeyId, subWalletIndex, hasActivity });
+
+    try {
+      const result = await chrome.storage.local.get(['multiWalletData']);
+
+      if (!result.multiWalletData) {
+        throw new Error('No wallet data found');
+      }
+
+      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+
+      if (!wallet) {
+        throw new Error(`Wallet ${masterKeyId} not found`);
+      }
+
+      if (!wallet.subWallets) {
+        throw new Error('Wallet has no sub-wallets');
+      }
+
+      const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
+      if (!subWallet) {
+        throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+      }
+
+      subWallet.hasActivity = hasActivity;
+
+      await chrome.storage.local.set({
+        multiWalletData: JSON.stringify(data)
+      });
+
+      console.log('✅ [Storage] UPDATE_SUB_WALLET_ACTIVITY SUCCESS');
+    } catch (error) {
+      console.error('❌ [Storage] UPDATE_SUB_WALLET_ACTIVITY FAILED', error);
       throw error;
     }
   }
