@@ -1130,21 +1130,21 @@ async function loadHierarchicalWalletList(): Promise<void> {
                 ? mk.nickname
                 : lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
 
-            // Check if the LAST sub-wallet has transactions
-            // We can only check this via SDK if it's the currently active wallet
+            // Check if the LAST sub-wallet has activity
+            // We can only reliably check if we're connected to it
             const isLastSubWalletActive = isActiveMasterKey && currentActiveSubWalletIndex === lastSubWallet.index;
 
-            if (isLastSubWalletActive) {
-                // Use the SDK check - most reliable
-                if (activeWalletHasTransactions) {
+            if (isActiveMasterKey) {
+                if (isLastSubWalletActive && activeWalletHasTransactions) {
+                    // Currently on the last sub-wallet and it has transactions - allow
                     canAddSubWallet = true;
+                } else if (isLastSubWalletActive && !activeWalletHasTransactions) {
+                    // Currently on the last sub-wallet but no transactions
+                    addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
                 } else {
+                    // Not on the last sub-wallet - cannot verify transaction history
                     addSubWalletDisabledReason = `${lastName} must have transactions before adding another`;
                 }
-            } else if (isActiveMasterKey) {
-                // Active master key but not on the last sub-wallet
-                // Need to switch to the last sub-wallet to check
-                addSubWalletDisabledReason = `Switch to ${lastName} to check if you can add more sub-wallets`;
             } else {
                 // Not the active master key - can't check
                 addSubWalletDisabledReason = 'Switch to this wallet to check if sub-wallets can be added';

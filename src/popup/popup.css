@@ -225,6 +225,35 @@ body {
   font-weight: normal;
 }
 
+/* Choice Hint (shown when Add Sub-Wallet is disabled) */
+.choice-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-top: 0;
+  background: #fff8e6;
+  border: 1px solid #ffe082;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #b36b00;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.choice-hint.hidden {
+  display: none;
+}
+
+.choice-hint .hint-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.choice-hint .hint-text {
+  flex: 1;
+}
+
 /* Import Words Grid */
 .import-words-grid {
   display: grid;
