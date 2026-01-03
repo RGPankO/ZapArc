@@ -19,7 +19,7 @@
             </div>
             <div class="modal-body">
                 <p id="pin-modal-message">Enter your PIN to continue</p>
-                <input type="password" id="pin-modal-input" class="modal-input" placeholder="Enter PIN" maxlength="20" autocomplete="off" />
+                <input type="password" id="pin-modal-input" class="modal-input" placeholder="Enter PIN" maxlength="6" autocomplete="off" />
                 <div id="pin-modal-error" class="error-message hidden"></div>
             </div>
             <div class="modal-footer">
@@ -192,6 +192,15 @@
                             <span class="choice-title">Import Existing Wallet</span>
                             <span class="choice-description">Enter your 12-word recovery phrase</span>
                         </button>
+                        <button id="add-sub-wallet-btn" class="choice-btn hidden">
+                            <span class="choice-icon">💼</span>
+                            <span class="choice-title">Add Sub-Wallet</span>
+                            <span class="choice-description">Create a new sub-wallet under existing key</span>
+                        </button>
+                        <div id="add-sub-wallet-hint" class="choice-hint hidden">
+                            <span class="hint-icon">⚠️</span>
+                            <span id="add-sub-wallet-hint-text" class="hint-text"></span>
+                        </div>
                     </div>
                 </div>
                 <div class="wizard-actions">
@@ -294,11 +303,29 @@
 
             <div class="wallet-mgmt-actions">
                 <button id="wallet-mgmt-add-btn" class="add-wallet-full-btn" title="Add New Wallet">+ Add Wallet</button>
+                <button id="view-archived-wallets-btn" class="view-archived-btn" title="View Archived Wallets">📦 Archived</button>
             </div>
 
             <main>
                 <div id="wallet-management-list" class="wallet-management-list">
                     <!-- Populated dynamically with wallet items -->
+                </div>
+            </main>
+        </div>
+
+        <!-- Archived Wallets Interface -->
+        <div id="archived-wallets-interface" class="hidden">
+            <header>
+                <button id="archived-wallets-back-btn" class="back-btn">← Back</button>
+                <h1>Archived Wallets</h1>
+            </header>
+
+            <main>
+                <p class="archived-wallets-description">
+                    Archived wallets are stored but not active. You can restore them at any time.
+                </p>
+                <div id="archived-wallets-list" class="archived-wallets-list">
+                    <!-- Populated dynamically with archived wallet items -->
                 </div>
             </main>
         </div>
@@ -333,6 +360,13 @@
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Discovery Banner (shown when scanning for sub-wallets) -->
+                <div id="discovery-banner" class="discovery-banner hidden">
+                    <span class="discovery-banner-spinner">⏳</span>
+                    <span class="discovery-banner-text">Scanning for existing sub-wallets...</span>
+                    <span id="discovery-banner-count" class="discovery-banner-count hidden"></span>
                 </div>
 
                 <div id="wallet-section">
@@ -376,6 +410,7 @@
         <!-- Unlock Interface -->
         <div id="unlock-interface" class="hidden">
             <div class="unlock-container">
+                <button id="show-wallet-selector-btn" class="back-btn" style="position: absolute; top: 16px; left: 16px; text-decoration: underline;">Show all wallets</button>
                 <h2>🔒 Wallet Locked</h2>
                 <p>Enter your PIN to unlock your wallet</p>
                 <div class="pin-input-container">
@@ -384,6 +419,21 @@
                 </div>
                 <div id="unlock-error" class="error-message hidden"></div>
                 <a href="#" id="forgot-pin-link" style="display: block; text-align: center; margin-top: 12px; font-size: 12px; color: #666; text-decoration: underline; cursor: pointer;">Forgot PIN?</a>
+            </div>
+        </div>
+
+        <!-- Wallet Selection Interface (for locked screen) -->
+        <div id="wallet-selection-interface" class="hidden">
+            <div class="wallet-selection-container">
+                <button id="wallet-selection-back-btn" class="back-btn">← Back</button>
+                <h2>Select Wallet</h2>
+                <p>Choose a wallet to unlock</p>
+                <div id="wallet-selection-list" class="wallet-selection-list">
+                    <!-- Populated dynamically with wallets and sub-wallets -->
+                </div>
+                <div id="wallet-selection-footer" class="wallet-selection-footer">
+                    <!-- Add wallet button goes here -->
+                </div>
             </div>
         </div>
 

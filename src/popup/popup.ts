@@ -29,6 +29,10 @@ import {
     currentWallets,
     setCurrentWallets,
     BIP39_WORDS,
+    setIsSDKInitialized,
+    getMasterKeys,
+    setActiveMasterKeyId,
+    setActiveSubWalletIndex,
 } from './state';
 
 // SDK imports
@@ -38,7 +42,7 @@ import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks } from './sdk
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
 
 // Modal imports
-import { setupModalListeners, showPINModal, promptForPIN } from './modals';
+import { setupModalListeners, showPINModal, promptForPIN, promptForText } from './modals';
 
 // Utility imports
 import { createDebounce, PIN_AUTO_CONFIRM_DELAY_MS } from '../utils/debounce';
@@ -53,13 +57,20 @@ import {
     handleRenameSave,
     hideRenameInterface,
     setWalletManagementCallbacks,
+    startSubWalletDiscovery,
+    markWalletForDiscovery,
+    resumePendingDiscovery,
 } from './wallet-management';
+
+// Wallet Selection imports
+import { showWalletSelectionInterface } from './wallet-selection';
 
 // Deposit imports
 import {
     showDepositInterface,
     hideDepositInterface,
     setDepositCallbacks,
+    handlePaymentReceivedFromSDK
 } from './deposit';
 
 // Withdrawal imports
@@ -79,7 +90,6 @@ function generateMnemonic(): string {
     return bip39.generateMnemonic();
 }
 
-// Module callbacks will be setup in setupModuleCallbacks() after functions are defined
 
 // ========================================
 // Balance & Transaction Functions
@@ -172,11 +182,13 @@ async function loadTransactionHistory() {
         // Cache transactions for faster loading next time (wallet-specific)
         const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
         let activeWalletId = null;
+        let activeSubWalletIndex = 0;
         
         if (multiWalletResult.multiWalletData) {
             try {
                 const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
                 activeWalletId = multiWalletData.activeWalletId;
+                activeSubWalletIndex = multiWalletData.activeSubWalletIndex || 0;
             } catch (e) {
                 console.error('⚠️ [Popup] Failed to parse multiWalletData for caching:', e);
             }
@@ -185,9 +197,14 @@ async function loadTransactionHistory() {
         if (activeWalletId) {
             const cacheKey = `cachedTransactions_${activeWalletId}`;
             await chrome.storage.local.set({ [cacheKey]: displayTransactions });
-            console.log('💾 [Popup] Cached', displayTransactions.length, 'transactions for wallet:', activeWalletId);
-        } else {
-            console.warn('⚠️ [Popup] No active wallet ID - skipping transaction cache');
+            
+            // Update hasActivity flag for sub-wallets when we detect transactions
+            if (activeSubWalletIndex > 0) {
+                const hasTransactions = payments.length > 0;
+                ExtensionMessaging.updateSubWalletActivity(activeWalletId, activeSubWalletIndex, hasTransactions).catch(e =>
+                    console.warn('[Popup] Failed to update hasActivity flag:', e)
+                );
+            }
         }
 
         // Render to UI
@@ -239,6 +256,145 @@ function showWizardStep(stepId: string) {
             element.classList.toggle('hidden', id !== stepId);
         }
     });
+
+    // Show/hide "Add Sub-Wallet" button
+    // Show when: 1) on setup-choice-step, 2) adding a wallet (not initial setup), 3) at least one wallet exists
+    // Disable when: current sub-wallet has no transactions (must use wallet before adding another)
+    if (stepId === 'setup-choice-step') {
+        const addSubWalletBtn = document.getElementById('add-sub-wallet-btn') as HTMLButtonElement;
+        if (addSubWalletBtn) {
+            const currentMasterKeys = getMasterKeys();
+            const shouldShow = isAddingWallet && currentMasterKeys.length > 0;
+            addSubWalletBtn.classList.toggle('hidden', !shouldShow);
+            console.log(`[Wizard] Add Sub-Wallet button: ${shouldShow ? 'visible' : 'hidden'} (${currentMasterKeys.length} wallets)`);
+
+            // Check if we should disable based on transaction history
+            if (shouldShow) {
+                updateAddSubWalletButtonState(addSubWalletBtn);
+            }
+        }
+    }
+}
+
+/**
+ * Check if the last sub-wallet has transactions and update button state accordingly
+ * Logic: The LAST sub-wallet (or main wallet if no sub-wallets) must have transactions
+ * before a new sub-wallet can be added. This ensures users don't create empty wallets.
+ * 
+ * We only check that the correct MASTER WALLET is selected - we don't require the user
+ * to switch to a specific sub-wallet. We check the last sub-wallet's status regardless
+ * of which sub-wallet is currently active.
+ */
+async function updateAddSubWalletButtonState(btn: HTMLButtonElement): Promise<void> {
+    // Get the hint elements
+    const hint = document.getElementById('add-sub-wallet-hint');
+    const hintText = document.getElementById('add-sub-wallet-hint-text');
+
+    // Helper to show/hide hint
+    const updateHint = (show: boolean, message: string = '') => {
+        if (hint && hintText) {
+            hint.classList.toggle('hidden', !show);
+            hintText.textContent = message;
+        }
+    };
+
+    try {
+        if (!breezSDK) {
+            btn.disabled = true;
+            btn.setAttribute('title', 'Wallet not connected');
+            updateHint(true, 'Wallet not connected');
+            return;
+        }
+
+        // Get active wallet info
+        const activeData = await chrome.storage.local.get(['multiWalletData']);
+        let activeMasterKeyId = '';
+        let activeSubWalletIndex = 0;
+
+        if (activeData.multiWalletData) {
+            try {
+                const data = JSON.parse(activeData.multiWalletData);
+                activeMasterKeyId = data.activeWalletId || '';
+                activeSubWalletIndex = data.activeSubWalletIndex || 0;
+            } catch (e) {
+                console.error('[Wizard] Failed to parse active wallet data');
+            }
+        }
+
+        // Get all sub-wallets to find the last one
+        let lastSubWalletIndex = 0;
+        let lastSubWalletName = 'Main Wallet';
+        let subWalletCount = 0;
+
+        if (activeMasterKeyId) {
+            const subWalletsResponse = await ExtensionMessaging.getSubWallets(activeMasterKeyId, true);
+            if (subWalletsResponse.success && subWalletsResponse.data) {
+                subWalletCount = subWalletsResponse.data.length;
+                if (subWalletCount > 0) {
+                    const lastSubWallet = subWalletsResponse.data.reduce((max, sw) =>
+                        sw.index > max.index ? sw : max
+                    );
+                    lastSubWalletIndex = lastSubWallet.index;
+                    lastSubWalletName = lastSubWallet.nickname || `Sub-wallet ${lastSubWallet.index}`;
+                }
+            }
+        }
+
+        // First sub-wallet is always allowed
+        if (subWalletCount === 0) {
+            btn.disabled = false;
+            btn.removeAttribute('title');
+            updateHint(false);
+            console.log('[Wizard] No sub-wallets exist - first sub-wallet always allowed');
+            return;
+        }
+
+        // For additional sub-wallets, check if the last one has activity
+        const isOnLastSubWallet = activeSubWalletIndex === lastSubWalletIndex;
+        let hasActivity = false;
+
+        if (isOnLastSubWallet) {
+            // We're on the last sub-wallet - check directly via SDK
+            const [paymentsResponse, info] = await Promise.all([
+                breezSDK.listPayments({}).catch(() => ({ payments: [] })),
+                breezSDK.getInfo({ ensureSynced: false }).catch(() => ({ balanceSats: 0 }))
+            ]);
+
+            const payments = paymentsResponse?.payments || [];
+            const balance = info?.balanceSats || 0;
+            hasActivity = payments.length > 0 || balance > 0;
+        } else {
+            // Not on the last sub-wallet - check persisted hasActivity flag
+            const subWalletsResponse = await ExtensionMessaging.getSubWallets(activeMasterKeyId, true);
+            let lastSubWalletHasActivity: boolean | undefined = undefined;
+            if (subWalletsResponse.success && subWalletsResponse.data && subWalletsResponse.data.length > 0) {
+                const lastSubWallet = subWalletsResponse.data.reduce((max, sw) =>
+                    sw.index > max.index ? sw : max
+                );
+                lastSubWalletHasActivity = lastSubWallet.hasActivity;
+            }
+            
+            // Only allow if hasActivity is explicitly true
+            hasActivity = lastSubWalletHasActivity === true;
+        }
+
+        btn.disabled = !hasActivity;
+        if (!hasActivity) {
+            const reason = `${lastSubWalletName} must have transactions before adding another`;
+            btn.setAttribute('title', reason);
+            updateHint(true, reason);
+        } else {
+            btn.removeAttribute('title');
+            updateHint(false);
+        }
+    } catch (error) {
+        console.warn('[Wizard] Could not check transaction history for sub-wallet button:', error);
+        // On error, disable to be safe
+        const reason = 'Could not verify transaction history';
+        btn.disabled = true;
+        btn.setAttribute('title', reason);
+        updateHint(true, reason);
+    }
 }
 
 function setupWizardListeners() {
@@ -296,6 +452,14 @@ function setupWizardListeners() {
         };
     }
 
+    // Add Sub-Wallet button (only visible in hierarchical mode when adding wallet)
+    const addSubWalletBtn = document.getElementById('add-sub-wallet-btn');
+    if (addSubWalletBtn) {
+        addSubWalletBtn.onclick = () => {
+            handleAddSubWalletFromWizard();
+        };
+    }
+
     // Mnemonic Step
     const mnemonicBackBtn = document.getElementById('mnemonic-back-btn');
     const wizardCopyMnemonicBtn = document.getElementById('wizard-copy-mnemonic-btn');
@@ -334,7 +498,9 @@ function setupWizardListeners() {
     }
 
     if (confirmContinueBtn) {
-        confirmContinueBtn.onclick = () => showWizardStep('pin-step');
+        confirmContinueBtn.onclick = () => {
+             showWizardStep('pin-step');
+        };
     }
 
     // Import Step
@@ -396,6 +562,122 @@ function setupWizardListeners() {
     }
     if (renameBackBtn) {
         renameBackBtn.onclick = () => hideRenameInterface();
+    }
+}
+
+/**
+ * Handle adding a sub-wallet from the wizard (when user clicks "Add Sub-Wallet" card)
+ * Directly creates a new sub-wallet under the currently active wallet with auto-generated name
+ */
+async function handleAddSubWalletFromWizard(): Promise<void> {
+    console.log('[Wizard] Adding sub-wallet from wizard');
+
+    try {
+        // Get the currently active wallet ID from storage
+        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+        if (!multiWalletResult.multiWalletData) {
+            showError('No wallet found. Please create a wallet first.');
+            return;
+        }
+
+        const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+        const activeWalletId = multiWalletData.activeWalletId;
+        
+        if (!activeWalletId) {
+            showError('No active wallet. Please unlock a wallet first.');
+            return;
+        }
+
+        // Find the active wallet to get sub-wallet count for auto-naming
+        const activeWallet = multiWalletData.wallets?.find((w: any) => w.metadata.id === activeWalletId);
+        const existingSubWalletCount = activeWallet?.subWallets?.length || 0;
+        
+        // Auto-generate default name: "Sub-wallet 1", "Sub-wallet 2", etc.
+        const defaultName = `Sub-wallet ${existingSubWalletCount + 1}`;
+
+        // Prompt for wallet name using modal
+        const walletName = await promptForText(
+            'Enter a name for the new sub-wallet:',
+            defaultName,
+            'e.g., Savings, Trading'
+        );
+
+        if (!walletName) {
+            return; // User cancelled
+        }
+
+
+
+        // Add the sub-wallet to the currently active wallet
+        const response = await ExtensionMessaging.addSubWallet(activeWalletId, walletName.trim());
+
+        if (response.success && response.data !== undefined) {
+            const newSubWalletIndex = Number(response.data);
+            
+            // Switch to the newly created sub-wallet
+            if (sessionPin) {
+                // Clear UI first
+                const transactionList = document.getElementById('transaction-list');
+                if (transactionList) {
+                    transactionList.innerHTML = '<div class="no-transactions">Loading history...</div>';
+                }
+                const balanceDisplay = document.getElementById('balance');
+                if (balanceDisplay) {
+                    balanceDisplay.textContent = '-- sats';
+                }
+
+                const switchResponse = await ExtensionMessaging.switchHierarchicalWallet(
+                    activeWalletId,
+                    newSubWalletIndex,
+                    sessionPin
+                );
+
+                const wizard = document.getElementById('onboarding-wizard');
+                const mainInterface = document.getElementById('main-interface');
+
+                if (switchResponse.success && switchResponse.data) {
+                    // Update Active State
+                    setActiveMasterKeyId(activeWalletId);
+                    setActiveSubWalletIndex(newSubWalletIndex);
+
+                    // Reconnect SDK
+                    const sdk = await connectBreezSDK(switchResponse.data.mnemonic);
+                    setBreezSDK(sdk);
+
+                    showSuccess(`${walletName} created and activated!`);
+
+                    if (wizard) wizard.classList.add('hidden');
+                    if (mainInterface) mainInterface.classList.remove('hidden');
+
+                    setIsAddingWallet(false);
+
+                    // Refresh wallet UI fully
+                    await initializeMultiWalletUI();
+                    await updateBalanceDisplay();
+                } else {
+                    showSuccess(`${walletName} created!`);
+                    console.warn('[Wizard] Could not switch to new sub-wallet:', switchResponse.error);
+                    
+                    if (wizard) wizard.classList.add('hidden');
+                    if (mainInterface) mainInterface.classList.remove('hidden');
+                    setIsAddingWallet(false);
+                }
+            } else {
+                showSuccess(`${walletName} created! Please unlock to use it.`);
+                
+                const wizard = document.getElementById('onboarding-wizard');
+                const mainInterface = document.getElementById('main-interface');
+                
+                if (wizard) wizard.classList.add('hidden');
+                if (mainInterface) mainInterface.classList.remove('hidden');
+                setIsAddingWallet(false);
+            }
+        } else {
+            showError(response.error || 'Failed to create sub-wallet');
+        }
+    } catch (error) {
+        console.error('[Wizard] Error adding sub-wallet:', error);
+        showError('Failed to create sub-wallet');
     }
 }
 
@@ -775,22 +1057,59 @@ async function handlePinConfirm() {
         }
 
         // Determine if we're adding a wallet or creating initial one
-        const nickname = isAddingWallet ? `Wallet ${currentWallets.length + 1}` : 'Main Wallet';
+        // Fetch the actual wallet count from storage (currentWallets state may not be populated yet)
+        const walletsResponse = await ExtensionMessaging.getAllWallets();
+        const existingWalletCount = walletsResponse.success && walletsResponse.data 
+            ? walletsResponse.data.length 
+            : 0;
+        
+        const nickname = existingWalletCount === 0 ? 'Main Wallet' : `Wallet ${existingWalletCount + 1}`;
+        console.log(`[Wizard] Creating wallet with nickname: ${nickname} (existing count: ${existingWalletCount})`);
 
-        // Each wallet uses its own PIN
-        const response = await ExtensionMessaging.importWallet(generatedMnemonic, nickname, pin);
+        // Create the master wallet via background
+        const response = await ExtensionMessaging.importWalletWithDiscovery(generatedMnemonic, nickname, pin);
 
-        if (!response.success) {
+        if (!response.success || !response.data) {
             throw new Error(response.error || 'Failed to save wallet');
         }
 
-        console.log('[Wizard] Wallet saved successfully');
+        const { masterKeyId } = response.data;
+        console.log(`[Wizard] Master wallet created: ${masterKeyId}`);
 
         // Update session PIN to the new wallet's PIN
         setSessionPin(pin);
         await chrome.storage.session.set({ walletSessionPin: pin });
 
-        showWizardStep('setup-complete-step');
+        // Set the newly created wallet as the active wallet
+        console.log(`[Wizard] Setting newly created wallet ${masterKeyId} as active`);
+        setActiveMasterKeyId(masterKeyId);
+        setActiveSubWalletIndex(0);
+
+        // Update storage with active wallet
+        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+        if (multiWalletResult.multiWalletData) {
+            const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+            multiWalletData.activeWalletId = masterKeyId;
+            multiWalletData.activeSubWalletIndex = 0;
+            await chrome.storage.local.set({ multiWalletData: JSON.stringify(multiWalletData) });
+        }
+
+        // Mark wallet for discovery BEFORE finalizing setup
+        // This ensures the UI shows the loading spinner when it renders
+        markWalletForDiscovery(masterKeyId);
+
+        // Skip the completion screen and directly finalize setup
+        // This avoids the "Opening..." button getting stuck
+        console.log('[Wizard] Skipping completion screen, opening wallet directly');
+        await finalizeWalletSetup();
+
+        // Start sub-wallet discovery in the background (non-blocking)
+        // This runs after the main UI is shown, scanning for existing sub-wallets
+        console.log('[Wizard] Starting background sub-wallet discovery...');
+        startSubWalletDiscovery(masterKeyId, generatedMnemonic).catch(err => {
+            console.warn('[Wizard] Background discovery error (non-fatal):', err);
+        });
+        
     } catch (error) {
         console.error('[Wizard] Error saving wallet:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to create wallet';
@@ -1180,8 +1499,9 @@ function showUnlockPrompt() {
             const walletResponse = await ExtensionMessaging.loadWallet(pin);
 
             if (!walletResponse.success || !walletResponse.data) {
-                // Only show error for manual attempts or if PIN looks complete
-                if (!isAutoAttempt) {
+                // Show error for manual attempts OR auto-attempts with complete PIN (6+ digits)
+                const shouldShowError = !isAutoAttempt || pin.length >= 6;
+                if (shouldShowError) {
                     const errorMsg = walletResponse.error || 'Invalid PIN';
                     showError(errorMsg);
                     if (unlockError) {
@@ -1235,6 +1555,19 @@ function showUnlockPrompt() {
             enableWalletControls();
             await initializeMultiWalletUI();
 
+            // Check for any pending sub-wallet discovery to resume
+            resumePendingDiscovery(async (masterKeyId: string) => {
+                // Get master mnemonic for the wallet that has pending discovery
+                try {
+                    const result = await ExtensionMessaging.getMasterMnemonic(masterKeyId, pin);
+                    return result.success && result.data ? result.data.mnemonic : null;
+                } catch {
+                    return null;
+                }
+            }).catch(err => {
+                console.warn('[Popup] Resume discovery error (non-fatal):', err);
+            });
+
             // Start auto-lock
             await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
             await chrome.storage.local.set({ lastActivity: Date.now() });
@@ -1245,13 +1578,17 @@ function showUnlockPrompt() {
         } catch (error) {
             console.error('❌ [Unlock] Failed:', error);
             const errorMsg = error instanceof Error ? error.message : 'Failed to unlock';
-            if (!isAutoAttempt) {
+
+            // Show error for manual attempts OR auto-attempts with complete PIN (6+ digits)
+            const shouldShowError = !isAutoAttempt || pin.length >= 6;
+            if (shouldShowError) {
                 showError(errorMsg);
                 if (unlockError) {
                     unlockError.textContent = errorMsg;
                     unlockError.classList.remove('hidden');
                 }
             }
+
             newUnlockBtn.disabled = false;
             newUnlockBtn.textContent = 'Unlock';
             if (!isAutoAttempt) {
@@ -1295,6 +1632,14 @@ function showUnlockPrompt() {
         forgotPinLink.onclick = (e) => {
             e.preventDefault();
             showForgotPinModal();
+        };
+    }
+
+    // Show wallet selector button handler
+    const showWalletSelectorBtn = document.getElementById('show-wallet-selector-btn');
+    if (showWalletSelectorBtn) {
+        showWalletSelectorBtn.onclick = () => {
+            showWalletSelectionInterface();
         };
     }
 }
@@ -1463,14 +1808,24 @@ async function handleWalletReset(modal: HTMLElement) {
                 setCurrentBalance(0);
                 setBreezSDK(null);
 
-                showNotification('Wallet deleted. Please unlock to continue.', 'info', 5000);
+                showNotification('Wallet deleted successfully', 'success', 3000);
 
-                // Show unlock prompt for remaining wallets
-                const unlockInterface = document.getElementById('unlock-interface');
+                // Hide all other interfaces first
                 const mainInterface = document.getElementById('main-interface');
-                
                 if (mainInterface) mainInterface.classList.add('hidden');
-                if (unlockInterface) unlockInterface.classList.remove('hidden');
+                
+                const unlockInterface = document.getElementById('unlock-interface');
+                if (unlockInterface) unlockInterface.classList.add('hidden');
+                
+                const wizard = document.getElementById('onboarding-wizard');
+                if (wizard) wizard.classList.add('hidden');
+
+                console.log('[Wallet] Showing wallet selection interface...');
+                
+                // Show wallet selection for remaining wallets
+                await showWalletSelectionInterface();
+                
+                console.log('[Wallet] Wallet selection interface should now be visible');
             }
         } else {
             // Last wallet: Clear all storage and show setup
@@ -1657,10 +2012,27 @@ function setupEventListeners() {
     }
 
     // Delete wallet button - shows reset/delete confirmation modal
+    // Delete wallet button
     const deleteWalletBtn = document.getElementById('delete-wallet-btn');
     if (deleteWalletBtn) {
         deleteWalletBtn.onclick = showForgotPinModal;
     }
+    
+    // Show all wallets button
+    const showWalletSelectorBtn = document.getElementById('show-wallet-selector-btn');
+    if (showWalletSelectorBtn) {
+        showWalletSelectorBtn.onclick = (e) => {
+            e.preventDefault();
+            console.log('[Popup] Show all wallets clicked');
+            showWalletSelectionInterface();
+        };
+    }
+    
+    // Listen for wallet selection changes
+    window.addEventListener('wallet-selected', () => {
+        console.log('[Popup] Wallet selected event received, updating unlock screen');
+        showUnlockPrompt();
+    });
 
     // Modal listeners
     setupModalListeners();
@@ -1684,6 +2056,8 @@ function setupModuleCallbacks(): void {
         onPaymentReceived: async () => {
             await updateBalanceDisplay();
             await loadTransactionHistory();
+            // Also notify deposit interface for immediate UI update
+            await handlePaymentReceivedFromSDK();
         }
     });
 
@@ -1841,6 +2215,23 @@ async function initializePopup() {
                     enableWalletControls();
                     await initializeMultiWalletUI();
 
+                    // Check for any pending sub-wallet discovery to resume
+                    const pin = sessionData.walletSessionPin;
+                    console.log('🔍 [Popup] Auto-unlock: Checking for pending discovery to resume...');
+                    resumePendingDiscovery(async (masterKeyId: string) => {
+                        console.log(`🔍 [Popup] Resume getMnemonic callback called for: ${masterKeyId}`);
+                        try {
+                            const result = await ExtensionMessaging.getMasterMnemonic(masterKeyId, pin);
+                            console.log(`🔍 [Popup] getMasterMnemonic result:`, result.success, !!result.data);
+                            return result.success && result.data ? result.data.mnemonic : null;
+                        } catch (err) {
+                            console.error('[Popup] getMasterMnemonic failed:', err);
+                            return null;
+                        }
+                    }).catch(err => {
+                        console.warn('[Popup] Resume discovery error (non-fatal):', err);
+                    });
+
                     // Start auto-lock
                     await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
 
@@ -1863,3 +2254,73 @@ async function initializePopup() {
 
 // Start initialization when DOM is ready
 document.addEventListener('DOMContentLoaded', initializePopup);
+
+// ========================================
+// Hierarchical Wallet Switching Event Handler
+// ========================================
+
+// De-duplication tracking to prevent multiple notifications for the same switch
+let lastWalletSwitchKey = '';
+let lastWalletSwitchTime = 0;
+
+/**
+ * Handle wallet switch events from wallet-management.ts
+ * This reconnects the SDK with the new derived mnemonic
+ */
+window.addEventListener('hierarchical-wallet-switched', async (event: Event) => {
+    const customEvent = event as CustomEvent<{
+        mnemonic: string;
+        masterKeyId: string;
+        subWalletIndex: number;
+        masterKeyNickname: string;
+        subWalletNickname: string;
+    }>;
+
+    console.log('🔄 [Popup] Hierarchical wallet switch event received', {
+        masterKeyId: customEvent.detail.masterKeyId,
+        subWalletIndex: customEvent.detail.subWalletIndex
+    });
+
+    try {
+        // Disconnect existing SDK
+        if (breezSDK) {
+            console.log('🔄 [Popup] Disconnecting previous SDK...');
+            await disconnectBreezSDK();
+            setBreezSDK(null);
+            setIsSDKInitialized(false);
+        }
+        
+        // Connect with new derived mnemonic
+        console.log('🔄 [Popup] Connecting SDK with derived mnemonic...');
+        const sdk = await connectBreezSDK(customEvent.detail.mnemonic);
+        setBreezSDK(sdk);
+        setIsSDKInitialized(true);
+
+        // Clear old data first
+        const transactionList = document.getElementById('transaction-list');
+        if (transactionList) {
+            transactionList.innerHTML = '<div class="transaction-item">Loading transactions...</div>';
+        }
+
+        // Update balance and reload transactions
+        console.log('🔄 [Popup] Fetching balance and transactions...');
+        await updateBalanceDisplay();
+        
+        // Small delay to allow SDK to sync before loading transactions
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadTransactionHistory();
+
+        console.log('✅ [Popup] SDK reconnected for new wallet', {
+            masterKeyNickname: customEvent.detail.masterKeyNickname,
+            subWalletNickname: customEvent.detail.subWalletNickname,
+            subWalletIndex: customEvent.detail.subWalletIndex
+        });
+        
+        // Don't show notification here - let the caller decide
+        // This prevents duplicate notifications when the event fires multiple times
+        console.log('[Popup] Wallet switched successfully, balance and transactions refreshed');
+    } catch (error) {
+        console.error('❌ [Popup] Failed to reconnect SDK after wallet switch:', error);
+        showError('Failed to connect to new wallet');
+    }
+});

@@ -325,9 +325,9 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'LOAD_WALLET':
         console.log('🔵 [Background] LOAD_WALLET - PIN received, length:', message.pin?.length);
 
-        // Try to unlock any wallet with the given PIN
-        // This iterates through all wallets and returns the first one that decrypts successfully
-        const unlockedWallet = await storageManager.tryUnlockAnyWallet(message.pin);
+        // Try to unlock any wallet (v1 flat or v2 hierarchical) with the given PIN
+        // For v2, this returns the derived sub-wallet mnemonic based on activeSubWalletIndex
+        const unlockedWallet = await storageManager.tryUnlockAnyWalletUnified(message.pin);
 
         if (!unlockedWallet) {
           console.error('❌ [Background] LOAD_WALLET - No wallet matched the PIN');
@@ -336,15 +336,32 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
 
         console.log('✅ [Background] LOAD_WALLET - Wallet unlocked successfully');
-        console.log('🔍 [Background] LOAD_WALLET - Wallet ID:', unlockedWallet.metadata.id);
         console.log('🔍 [Background] LOAD_WALLET - Response data:', {
           hasWallet: !!unlockedWallet.wallet,
           hasMnemonic: !!unlockedWallet.wallet?.mnemonic,
           walletId: unlockedWallet.metadata.id,
-          nickname: unlockedWallet.metadata.nickname
+          nickname: unlockedWallet.metadata.nickname,
+          isHierarchical: unlockedWallet.isHierarchical,
+          hierarchicalInfo: unlockedWallet.hierarchicalInfo
         });
 
-        sendResponse({ success: true, data: unlockedWallet.wallet, metadata: unlockedWallet.metadata });
+        sendResponse({
+          success: true,
+          data: unlockedWallet.wallet,
+          metadata: unlockedWallet.metadata,
+          isHierarchical: unlockedWallet.isHierarchical,
+          hierarchicalInfo: unlockedWallet.hierarchicalInfo
+        });
+        break;
+
+      case 'GET_MASTER_MNEMONIC':
+        try {
+          const masterMnemonic = await storageManager.getMasterKeyMnemonic(message.masterKeyId, message.pin);
+          sendResponse({ success: true, data: { mnemonic: masterMnemonic } });
+        } catch (error) {
+          console.error('[Background] GET_MASTER_MNEMONIC failed:', error);
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to get mnemonic' });
+        }
         break;
 
       case 'SAVE_DOMAIN_SETTINGS':
@@ -478,7 +495,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'IMPORT_WALLET':
         try {
-          console.log('[Background] IMPORT_WALLET - Importing wallet');
+          console.log('[Background] IMPORT_WALLET - Importing wallet as master key');
           let { mnemonic, nickname, pin } = message;
 
           // Validate parameters
@@ -491,15 +508,29 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
           // Auto-generate nickname if not provided
           if (!nickname || typeof nickname !== 'string' || !nickname.trim()) {
-            const wallets = await walletManager.getAllWallets();
-            const walletCount = wallets.length;
-            nickname = `Wallet ${walletCount + 1}`;
+            const masterKeys = await storageManager.getMasterKeyMetadata();
+            const masterKeyCount = masterKeys.length;
+            nickname = masterKeyCount === 0 ? 'Main Wallet' : `Wallet ${masterKeyCount + 1}`;
             console.log(`[Background] IMPORT_WALLET - Auto-generated nickname: "${nickname}"`);
           }
 
-          const importedWallet = await walletManager.importWallet(mnemonic, nickname, pin);
-          console.log('[Background] IMPORT_WALLET - Wallet imported successfully');
-          sendResponse({ success: true, data: importedWallet });
+          // Always create as master key with default sub-wallet (index 0)
+          // This ensures all wallets are in hierarchical format from the start
+          const masterKeyId = await storageManager.addMasterKey(mnemonic.trim().toLowerCase(), nickname, pin, true);
+          console.log('[Background] IMPORT_WALLET - Created as master key:', masterKeyId);
+
+          // Set as active wallet
+          await storageManager.setActiveHierarchicalWallet(masterKeyId, 0);
+
+          // Return wallet data for compatibility
+          const walletData = {
+            mnemonic: mnemonic.trim().toLowerCase(),
+            balance: 0,
+            transactions: []
+          };
+
+          console.log('[Background] IMPORT_WALLET - Wallet imported successfully (hierarchical)');
+          sendResponse({ success: true, data: walletData });
         } catch (error) {
           console.error('[Background] IMPORT_WALLET - Failed:', error);
           sendResponse({
@@ -636,6 +667,496 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         }
         break;
 
+      // ========================================
+      // Hierarchical Multi-Wallet Messages (v2)
+      // ========================================
+
+      case 'GET_WALLET_VERSION':
+        try {
+          const version = await walletManager.getWalletVersion();
+          sendResponse({ success: true, data: version });
+        } catch (error) {
+          console.error('[Background] GET_WALLET_VERSION - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get wallet version' });
+        }
+        break;
+
+      case 'GET_MASTER_KEY_METADATA':
+        try {
+          const metadata = await walletManager.getMasterKeyMetadata();
+          sendResponse({ success: true, data: metadata });
+        } catch (error) {
+          console.error('[Background] GET_MASTER_KEY_METADATA - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get master key metadata' });
+        }
+        break;
+
+      case 'GET_SUB_WALLETS':
+        try {
+          const { masterKeyId, includeArchived } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          const subWallets = await walletManager.getSubWallets(masterKeyId, includeArchived);
+          sendResponse({ success: true, data: subWallets });
+        } catch (error) {
+          console.error('[Background] GET_SUB_WALLETS - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get sub-wallets' });
+        }
+        break;
+
+      case 'ADD_MASTER_KEY':
+        try {
+          const { mnemonic, nickname, pin, createDefaultSubWallet } = message;
+          if (!mnemonic || !nickname || !pin) {
+            throw new Error('Mnemonic, nickname, and PIN are required');
+          }
+          const masterKeyId = await walletManager.addMasterKey(
+            mnemonic,
+            nickname,
+            pin,
+            createDefaultSubWallet !== false
+          );
+          sendResponse({ success: true, data: masterKeyId });
+        } catch (error) {
+          console.error('[Background] ADD_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to add master key'
+          });
+        }
+        break;
+
+      case 'ADD_SUB_WALLET':
+        try {
+          const { masterKeyId, nickname } = message;
+          if (!masterKeyId || !nickname) {
+            throw new Error('Master key ID and nickname are required');
+          }
+          const subWalletIndex = await walletManager.addSubWallet(masterKeyId, nickname);
+          sendResponse({ success: true, data: subWalletIndex });
+        } catch (error) {
+          console.error('[Background] ADD_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to add sub-wallet'
+          });
+        }
+        break;
+
+      case 'IMPORT_WALLET_WITH_DISCOVERY':
+        try {
+          const { mnemonic, nickname, pin } = message;
+          if (!mnemonic || !nickname || !pin) {
+            throw new Error('Mnemonic, nickname, and PIN are required');
+          }
+          console.log('[Background] IMPORT_WALLET_WITH_DISCOVERY - Starting import with sub-wallet discovery');
+          const result = await walletManager.importWalletWithDiscovery(
+            mnemonic,
+            nickname,
+            pin
+          );
+          console.log(`[Background] IMPORT_WALLET_WITH_DISCOVERY - Complete: ${result.discoveredCount} sub-wallets found`);
+          sendResponse({ success: true, data: result });
+        } catch (error) {
+          console.error('[Background] IMPORT_WALLET_WITH_DISCOVERY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to import wallet'
+          });
+        }
+        break;
+
+      case 'REMOVE_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          await walletManager.removeMasterKey(masterKeyId);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] REMOVE_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to remove master key'
+          });
+        }
+        break;
+
+      case 'REMOVE_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          await walletManager.removeSubWallet(masterKeyId, subWalletIndex);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] REMOVE_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to remove sub-wallet'
+          });
+        }
+        break;
+
+      case 'SET_ACTIVE_HIERARCHICAL_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          await walletManager.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] SET_ACTIVE_HIERARCHICAL_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to set active wallet'
+          });
+        }
+        break;
+
+      case 'RENAME_MASTER_KEY':
+        try {
+          const { masterKeyId, newNickname } = message;
+          if (!masterKeyId || !newNickname) {
+            throw new Error('Master key ID and new nickname are required');
+          }
+          await walletManager.renameMasterKey(masterKeyId, newNickname);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RENAME_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to rename master key'
+          });
+        }
+        break;
+
+      case 'RENAME_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex, newNickname } = message;
+          if (!masterKeyId || subWalletIndex === undefined || !newNickname) {
+            throw new Error('Master key ID, sub-wallet index, and new nickname are required');
+          }
+          await walletManager.renameSubWallet(masterKeyId, subWalletIndex, newNickname);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RENAME_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to rename sub-wallet'
+          });
+        }
+        break;
+
+      case 'TOGGLE_MASTER_KEY_EXPANDED':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          await walletManager.toggleMasterKeyExpanded(masterKeyId);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] TOGGLE_MASTER_KEY_EXPANDED - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to toggle expansion' });
+        }
+        break;
+
+
+      case 'SWITCH_HIERARCHICAL_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex, pin } = message;
+          if (!masterKeyId || subWalletIndex === undefined || !pin) {
+            throw new Error('Master key ID, sub-wallet index, and PIN are required');
+          }
+          console.log('[Background] SWITCH_HIERARCHICAL_WALLET', { masterKeyId, subWalletIndex });
+
+          const switchResult = await walletManager.switchHierarchicalWallet(
+            masterKeyId,
+            subWalletIndex,
+            pin
+          );
+
+          sendResponse({
+            success: true,
+            data: {
+              mnemonic: switchResult.mnemonic,
+              masterKeyNickname: switchResult.masterKeyNickname,
+              subWalletNickname: switchResult.subWalletNickname,
+              masterKeyId,
+              subWalletIndex
+            }
+          });
+        } catch (error) {
+          console.error('[Background] SWITCH_HIERARCHICAL_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to switch wallet'
+          });
+        }
+        break;
+
+      case 'GET_HIERARCHICAL_WALLET_MNEMONIC':
+        try {
+          const { masterKeyId, subWalletIndex, pin } = message;
+          if (!masterKeyId || subWalletIndex === undefined || !pin) {
+            throw new Error('Master key ID, sub-wallet index, and PIN are required');
+          }
+          console.log('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC', { masterKeyId, subWalletIndex });
+
+          const mnemonic = await walletManager.getHierarchicalWalletMnemonic(
+            masterKeyId,
+            subWalletIndex,
+            pin
+          );
+
+          sendResponse({ success: true, data: mnemonic });
+        } catch (error) {
+          console.error('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get wallet mnemonic'
+          });
+        }
+        break;
+
+      case 'GET_ACTIVE_HIERARCHICAL_WALLET_INFO':
+        try {
+          const info = await walletManager.getActiveHierarchicalWalletInfo();
+          sendResponse({ success: true, data: info });
+        } catch (error) {
+          console.error('[Background] GET_ACTIVE_HIERARCHICAL_WALLET_INFO - Failed:', error);
+          sendResponse({ success: false, error: 'Failed to get active wallet info' });
+        }
+        break;
+
+      case 'ADD_DISCOVERED_SUB_WALLETS':
+        try {
+          const { masterKeyId, subWallets } = message;
+          if (!masterKeyId || !subWallets || !Array.isArray(subWallets)) {
+            throw new Error('Master key ID and sub-wallets array are required');
+          }
+          console.log('[Background] ADD_DISCOVERED_SUB_WALLETS', {
+            masterKeyId,
+            count: subWallets.length
+          });
+
+          await walletManager.addDiscoveredSubWallets(masterKeyId, subWallets);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] ADD_DISCOVERED_SUB_WALLETS - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to add discovered sub-wallets'
+          });
+        }
+        break;
+
+      case 'UPDATE_SUB_WALLET_ACTIVITY':
+        try {
+          const { masterKeyId, subWalletIndex, hasActivity } = message;
+          if (!masterKeyId || subWalletIndex === undefined || hasActivity === undefined) {
+            throw new Error('Master key ID, sub-wallet index, and hasActivity are required');
+          }
+          console.log('[Background] UPDATE_SUB_WALLET_ACTIVITY', {
+            masterKeyId,
+            subWalletIndex,
+            hasActivity
+          });
+
+          await storageManager.updateSubWalletActivity(masterKeyId, subWalletIndex, hasActivity);
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] UPDATE_SUB_WALLET_ACTIVITY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update sub-wallet activity'
+          });
+        }
+        break;
+
+      // ========================================
+      // Wallet Archive/Restore Handlers
+      // ========================================
+
+      case 'ARCHIVE_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          console.log('[Background] ARCHIVE_MASTER_KEY', { masterKeyId });
+
+          await storageManager.archiveMasterKey(masterKeyId);
+          console.log('[Background] ARCHIVE_MASTER_KEY - Wallet archived successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] ARCHIVE_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to archive wallet'
+          });
+        }
+        break;
+
+      case 'RESTORE_ARCHIVED_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          console.log('[Background] RESTORE_ARCHIVED_MASTER_KEY', { masterKeyId });
+
+          await storageManager.restoreArchivedMasterKey(masterKeyId);
+          console.log('[Background] RESTORE_ARCHIVED_MASTER_KEY - Wallet restored successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RESTORE_ARCHIVED_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to restore wallet'
+          });
+        }
+        break;
+
+      case 'GET_ARCHIVED_WALLETS':
+        try {
+          console.log('[Background] GET_ARCHIVED_WALLETS');
+          const archivedWallets = await storageManager.getArchivedWallets();
+          console.log('[Background] GET_ARCHIVED_WALLETS - Retrieved:', { count: archivedWallets.length });
+          sendResponse({ success: true, data: archivedWallets });
+        } catch (error) {
+          console.error('[Background] GET_ARCHIVED_WALLETS - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get archived wallets'
+          });
+        }
+        break;
+
+      case 'DELETE_ARCHIVED_MASTER_KEY':
+        try {
+          const { masterKeyId } = message;
+          if (!masterKeyId) {
+            throw new Error('Master key ID is required');
+          }
+          console.log('[Background] DELETE_ARCHIVED_MASTER_KEY', { masterKeyId });
+
+          await storageManager.deleteArchivedMasterKey(masterKeyId);
+          console.log('[Background] DELETE_ARCHIVED_MASTER_KEY - Wallet permanently deleted');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] DELETE_ARCHIVED_MASTER_KEY - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete archived wallet'
+          });
+        }
+        break;
+
+      case 'VERIFY_ARCHIVED_WALLET_PIN':
+        try {
+          const { masterKeyId, pin } = message;
+          if (!masterKeyId || !pin) {
+            throw new Error('Master key ID and PIN are required');
+          }
+          console.log('[Background] VERIFY_ARCHIVED_WALLET_PIN', { masterKeyId });
+
+          const isValid = await storageManager.verifyArchivedWalletPin(masterKeyId, pin);
+          console.log('[Background] VERIFY_ARCHIVED_WALLET_PIN - Result:', isValid);
+          sendResponse({ success: true, data: isValid });
+        } catch (error) {
+          console.error('[Background] VERIFY_ARCHIVED_WALLET_PIN - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to verify PIN'
+          });
+        }
+        break;
+
+      // ========================================
+      // Sub-Wallet Archive/Restore Handlers
+      // ========================================
+
+      case 'ARCHIVE_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          console.log('[Background] ARCHIVE_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+          await storageManager.archiveSubWallet(masterKeyId, subWalletIndex);
+          console.log('[Background] ARCHIVE_SUB_WALLET - Sub-wallet archived successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] ARCHIVE_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to archive sub-wallet'
+          });
+        }
+        break;
+
+      case 'RESTORE_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          console.log('[Background] RESTORE_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+          await storageManager.restoreSubWallet(masterKeyId, subWalletIndex);
+          console.log('[Background] RESTORE_SUB_WALLET - Sub-wallet restored successfully');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] RESTORE_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to restore sub-wallet'
+          });
+        }
+        break;
+
+      case 'DELETE_ARCHIVED_SUB_WALLET':
+        try {
+          const { masterKeyId, subWalletIndex } = message;
+          if (!masterKeyId || subWalletIndex === undefined) {
+            throw new Error('Master key ID and sub-wallet index are required');
+          }
+          console.log('[Background] DELETE_ARCHIVED_SUB_WALLET', { masterKeyId, subWalletIndex });
+
+          await storageManager.deleteArchivedSubWallet(masterKeyId, subWalletIndex);
+          console.log('[Background] DELETE_ARCHIVED_SUB_WALLET - Sub-wallet permanently deleted');
+          sendResponse({ success: true });
+        } catch (error) {
+          console.error('[Background] DELETE_ARCHIVED_SUB_WALLET - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete archived sub-wallet'
+          });
+        }
+        break;
+
+      case 'GET_ARCHIVED_SUB_WALLETS':
+        try {
+          console.log('[Background] GET_ARCHIVED_SUB_WALLETS');
+          const archivedSubWallets = await storageManager.getArchivedSubWallets();
+          console.log('[Background] GET_ARCHIVED_SUB_WALLETS - Retrieved:', { count: archivedSubWallets.length });
+          sendResponse({ success: true, data: archivedSubWallets });
+        } catch (error) {
+          console.error('[Background] GET_ARCHIVED_SUB_WALLETS - Failed:', error);
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get archived sub-wallets'
+          });
+        }
+        break;
+
       default:
         sendResponse({ success: false, error: 'Unknown message type' });
     }
@@ -733,6 +1254,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 // Listen for wallet unlock to start alarm
+// NOTE: This needs to return false for unhandled messages so main handler can process them
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'START_AUTO_LOCK_ALARM') {
     startAutoLockAlarm();
@@ -745,4 +1267,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+  
+  // Return false to indicate we're not handling this message
+  // This allows the main message handler to process it
+  return false;
 });

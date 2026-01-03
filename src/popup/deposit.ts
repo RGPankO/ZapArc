@@ -15,6 +15,7 @@ import { showError, showSuccess } from './notifications';
 export type DepositCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
     loadTransactionHistory: () => Promise<void>;
+    onPaymentReceived?: () => Promise<void>; // Optional callback for when payment is received
 };
 
 let callbacks: DepositCallbacks | null = null;
@@ -23,6 +24,21 @@ export function setDepositCallbacks(cb: DepositCallbacks): void {
     callbacks = cb;
 }
 
+// Track current invoice being monitored
+let currentMonitoredInvoice: string | null = null;
+
+export function setCurrentMonitoredInvoice(invoice: string | null): void {
+    currentMonitoredInvoice = invoice;
+}
+
+// Export function to handle payment received event from SDK
+export async function handlePaymentReceivedFromSDK(): Promise<void> {
+    console.log('[Deposit] Payment received event from SDK - checking immediately');
+    // If we're monitoring an invoice, check it immediately instead of waiting for next poll
+    if (currentMonitoredInvoice) {
+        await checkPaymentStatus(currentMonitoredInvoice);
+    }
+}
 // ========================================
 // Deposit Interface
 // ========================================
@@ -63,6 +79,9 @@ export function hideDepositInterface(): void {
         clearInterval(paymentMonitoringInterval);
         setPaymentMonitoringInterval(null);
     }
+    
+    // Clear monitored invoice
+    setCurrentMonitoredInvoice(null);
 
     // Hide deposit interface
     const depositInterface = document.getElementById('deposit-interface');
@@ -255,6 +274,9 @@ export function showDepositStep(stepId: string): void {
 // ========================================
 
 export function startPaymentMonitoring(invoice: string): void {
+    // Track the invoice we're monitoring
+    setCurrentMonitoredInvoice(invoice);
+    
     // Set expiry time (15 minutes from now)
     setInvoiceExpiryTime(Date.now() + (15 * 60 * 1000));
     

@@ -229,6 +229,17 @@ export class ExtensionMessaging {
   }
 
   /**
+   * Get master mnemonic for a specific wallet by ID
+   */
+  static async getMasterMnemonic(masterKeyId: string, pin: string): Promise<MessageResponse<{ mnemonic: string }>> {
+    return this.sendToBackground({
+      type: 'GET_MASTER_MNEMONIC',
+      masterKeyId,
+      pin
+    });
+  }
+
+  /**
    * Save domain settings
    */
   static async saveDomainSettings(domain: string, status: string): Promise<MessageResponse> {
@@ -705,6 +716,433 @@ export class ExtensionMessaging {
       type: 'CHECK_DUPLICATE_MNEMONIC',
       mnemonic,
       pin
+    });
+  }
+
+  // ========================================
+  // Hierarchical Multi-Wallet Support (v2)
+  // ========================================
+
+  /**
+   * Get the current wallet storage version
+   * @returns 0 = legacy single, 1 = flat multi-wallet, 2 = hierarchical
+   */
+  static async getWalletVersion(): Promise<MessageResponse<number>> {
+    return this.sendToBackground({
+      type: 'GET_WALLET_VERSION'
+    });
+  }
+
+  /**
+   * Get all master key metadata (without decryption)
+   * @returns Array of master key metadata for UI display
+   */
+  static async getMasterKeyMetadata(): Promise<MessageResponse<import('../types').MasterKeyMetadata[]>> {
+    return this.sendToBackground({
+      type: 'GET_MASTER_KEY_METADATA'
+    });
+  }
+
+  /**
+   * Get sub-wallets for a specific master key
+   * @param masterKeyId - UUID of the master key
+   * @returns Array of sub-wallet entries
+   */
+  static async getSubWallets(masterKeyId: string, includeArchived: boolean = false): Promise<MessageResponse<import('../types').SubWalletEntry[]>> {
+    return this.sendToBackground({
+      type: 'GET_SUB_WALLETS',
+      masterKeyId,
+      includeArchived
+    });
+  }
+
+  /**
+   * Add a new master key with mnemonic
+   * @param mnemonic - 12-word BIP39 mnemonic
+   * @param nickname - User-friendly name
+   * @param pin - User's PIN for encryption
+   * @param createDefaultSubWallet - Whether to create a default sub-wallet (index 0)
+   * @returns The new master key ID
+   */
+  static async addMasterKey(
+    mnemonic: string,
+    nickname: string,
+    pin: string,
+    createDefaultSubWallet: boolean = true
+  ): Promise<MessageResponse<string>> {
+    return this.sendToBackground({
+      type: 'ADD_MASTER_KEY',
+      mnemonic,
+      nickname,
+      pin,
+      createDefaultSubWallet
+    });
+  }
+
+  /**
+   * Add a sub-wallet to an existing master key
+   * @param masterKeyId - UUID of the master key
+   * @param nickname - User-friendly name for the sub-wallet
+   * @returns The new sub-wallet index
+   */
+  static async addSubWallet(masterKeyId: string, nickname: string): Promise<MessageResponse<number>> {
+    return this.sendToBackground({
+      type: 'ADD_SUB_WALLET',
+      masterKeyId,
+      nickname
+    });
+  }
+
+  /**
+   * Import a wallet with automatic sub-wallet discovery
+   * Scans for sub-wallets with transaction history and restores them
+   * @param mnemonic - 12-word mnemonic phrase
+   * @param nickname - User-friendly name for the wallet
+   * @param pin - User's PIN for encryption
+   * @returns Object with master key ID and count of discovered sub-wallets
+   */
+  static async importWalletWithDiscovery(
+    mnemonic: string,
+    nickname: string,
+    pin: string
+  ): Promise<MessageResponse<{ masterKeyId: string; discoveredCount: number }>> {
+    return this.sendToBackground({
+      type: 'IMPORT_WALLET_WITH_DISCOVERY',
+      mnemonic,
+      nickname,
+      pin
+    });
+  }
+
+  /**
+   * Remove a master key and all its sub-wallets
+   * @param masterKeyId - UUID of the master key to remove
+   * @param pin - User's PIN for verification
+   */
+  static async removeMasterKey(masterKeyId: string, pin: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'REMOVE_MASTER_KEY',
+      masterKeyId,
+      pin
+    });
+  }
+
+  /**
+   * Remove a sub-wallet from a master key
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet to remove
+   * @param pin - User's PIN for verification
+   */
+  static async removeSubWallet(masterKeyId: string, subWalletIndex: number, pin: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'REMOVE_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex,
+      pin
+    });
+  }
+
+  /**
+   * Set the active wallet (master key + sub-wallet)
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet
+   */
+  static async setActiveHierarchicalWallet(masterKeyId: string, subWalletIndex: number): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'SET_ACTIVE_HIERARCHICAL_WALLET',
+      masterKeyId,
+      subWalletIndex
+    });
+  }
+
+  /**
+   * Rename a master key
+   * @param masterKeyId - UUID of the master key
+   * @param newNickname - New name for the master key
+   */
+  static async renameMasterKey(masterKeyId: string, newNickname: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'RENAME_MASTER_KEY',
+      masterKeyId,
+      newNickname
+    });
+  }
+
+  /**
+   * Rename a sub-wallet
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet
+   * @param newNickname - New name for the sub-wallet
+   */
+  static async renameSubWallet(masterKeyId: string, subWalletIndex: number, newNickname: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'RENAME_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex,
+      newNickname
+    });
+  }
+
+  /**
+   * Toggle master key expansion state in UI
+   * @param masterKeyId - UUID of the master key
+   */
+  static async toggleMasterKeyExpanded(masterKeyId: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'TOGGLE_MASTER_KEY_EXPANDED',
+      masterKeyId
+    });
+  }
+
+  /**
+   * Check if migration to hierarchical (v2) is needed
+   * @returns True if v1 exists and v2 doesn't
+   */
+  static async needsHierarchicalMigration(): Promise<MessageResponse<boolean>> {
+    return this.sendToBackground({
+      type: 'NEEDS_HIERARCHICAL_MIGRATION'
+    });
+  }
+
+  /**
+   * Switch to a specific hierarchical wallet (master key + sub-wallet)
+   * Returns the derived mnemonic for SDK connection
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns Object with derived mnemonic and wallet info
+   */
+  static async switchHierarchicalWallet(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<MessageResponse<{
+    mnemonic: string;
+    masterKeyNickname: string;
+    subWalletNickname: string;
+    masterKeyId: string;
+    subWalletIndex: number;
+  }>> {
+    return this.sendToBackground({
+      type: 'SWITCH_HIERARCHICAL_WALLET',
+      masterKeyId,
+      subWalletIndex,
+      pin
+    });
+  }
+
+  /**
+   * Get the derived mnemonic for a specific hierarchical wallet
+   * Useful when needing to reconnect SDK for a specific wallet
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns The derived mnemonic for the sub-wallet
+   */
+  static async getHierarchicalWalletMnemonic(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<MessageResponse<string>> {
+    return this.sendToBackground({
+      type: 'GET_HIERARCHICAL_WALLET_MNEMONIC',
+      masterKeyId,
+      subWalletIndex,
+      pin
+    });
+  }
+
+  /**
+   * Get the active hierarchical wallet info
+   * @returns Object with masterKeyId and subWalletIndex, or null if not hierarchical
+   */
+  static async getActiveHierarchicalWalletInfo(): Promise<MessageResponse<{
+    masterKeyId: string;
+    subWalletIndex: number;
+  } | null>> {
+    return this.sendToBackground({
+      type: 'GET_ACTIVE_HIERARCHICAL_WALLET_INFO'
+    });
+  }
+
+  /**
+   * Add discovered sub-wallets to a master key
+   * Used after sub-wallet discovery to add multiple sub-wallets at once
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWallets - Array of { index, nickname } for discovered wallets
+   * @returns Success status
+   */
+  static async addDiscoveredSubWallets(
+    masterKeyId: string,
+    subWallets: { index: number; nickname: string }[]
+  ): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'ADD_DISCOVERED_SUB_WALLETS',
+      masterKeyId,
+      subWallets
+    });
+  }
+
+  /**
+   * Update the hasActivity flag for a sub-wallet
+   * Called when we detect transactions on a sub-wallet
+   *
+   * @param masterKeyId - UUID of the master key
+   * @param subWalletIndex - Index of the sub-wallet
+   * @param hasActivity - Whether the sub-wallet has transaction activity
+   * @returns Success status
+   */
+  static async updateSubWalletActivity(
+    masterKeyId: string,
+    subWalletIndex: number,
+    hasActivity: boolean
+  ): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'UPDATE_SUB_WALLET_ACTIVITY',
+      masterKeyId,
+      subWalletIndex,
+      hasActivity
+    });
+  }
+
+  // ========================================
+  // Wallet Archive/Restore Methods
+  // ========================================
+
+  /**
+   * Archive a master key (move to archived list)
+   * Does NOT require PIN - used when user forgot PIN
+   *
+   * @param masterKeyId - UUID of the master key to archive
+   * @returns Success status
+   */
+  static async archiveMasterKey(masterKeyId: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'ARCHIVE_MASTER_KEY',
+      masterKeyId
+    });
+  }
+
+  /**
+   * Restore an archived master key back to active list
+   *
+   * @param masterKeyId - UUID of the archived master key
+   * @returns Success status
+   */
+  static async restoreArchivedMasterKey(masterKeyId: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'RESTORE_ARCHIVED_MASTER_KEY',
+      masterKeyId
+    });
+  }
+
+  /**
+   * Get all archived wallets (metadata only)
+   *
+   * @returns Array of archived wallet metadata
+   */
+  static async getArchivedWallets(): Promise<MessageResponse<(import('../types').WalletMetadata & { archivedAt?: number })[]>> {
+    return this.sendToBackground({
+      type: 'GET_ARCHIVED_WALLETS'
+    });
+  }
+
+  /**
+   * Permanently delete an archived master key
+   * This is irreversible - the wallet data will be lost
+   *
+   * @param masterKeyId - UUID of the archived master key
+   * @returns Success status
+   */
+  static async deleteArchivedMasterKey(masterKeyId: string): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'DELETE_ARCHIVED_MASTER_KEY',
+      masterKeyId
+    });
+  }
+
+  /**
+   * Verify PIN against an archived wallet
+   * Used to confirm PIN before permanent deletion
+   *
+   * @param masterKeyId - UUID of the archived master key
+   * @param pin - PIN to verify
+   * @returns True if PIN is correct
+   */
+  static async verifyArchivedWalletPin(masterKeyId: string, pin: string): Promise<MessageResponse<boolean>> {
+    return this.sendToBackground({
+      type: 'VERIFY_ARCHIVED_WALLET_PIN',
+      masterKeyId,
+      pin
+    });
+  }
+
+  // ========================================
+  // Sub-Wallet Archive/Restore Methods
+  // ========================================
+
+  /**
+   * Archive a sub-wallet
+   *
+   * @param masterKeyId - UUID of the parent master key
+   * @param subWalletIndex - Index of the sub-wallet to archive
+   * @returns Success status
+   */
+  static async archiveSubWallet(masterKeyId: string, subWalletIndex: number): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'ARCHIVE_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex
+    });
+  }
+
+  /**
+   * Restore an archived sub-wallet
+   *
+   * @param masterKeyId - UUID of the parent master key
+   * @param subWalletIndex - Index of the sub-wallet to restore
+   * @returns Success status
+   */
+  static async restoreSubWallet(masterKeyId: string, subWalletIndex: number): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'RESTORE_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex
+    });
+  }
+
+  /**
+   * Permanently delete an archived sub-wallet
+   *
+   * @param masterKeyId - UUID of the parent master key
+   * @param subWalletIndex - Index of the sub-wallet to delete
+   * @returns Success status
+   */
+  static async deleteArchivedSubWallet(masterKeyId: string, subWalletIndex: number): Promise<MessageResponse<void>> {
+    return this.sendToBackground({
+      type: 'DELETE_ARCHIVED_SUB_WALLET',
+      masterKeyId,
+      subWalletIndex
+    });
+  }
+
+  /**
+   * Get all archived sub-wallets across all master keys
+   *
+   * @returns Array of archived sub-wallet info with parent master key details
+   */
+  static async getArchivedSubWallets(): Promise<MessageResponse<{
+    masterKeyId: string;
+    masterKeyNickname: string;
+    subWalletIndex: number;
+    subWalletNickname: string;
+    archivedAt: number;
+  }[]>> {
+    return this.sendToBackground({
+      type: 'GET_ARCHIVED_SUB_WALLETS'
     });
   }
 }

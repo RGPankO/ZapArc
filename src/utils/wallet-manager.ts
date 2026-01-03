@@ -4,7 +4,8 @@
 import * as bip39 from 'bip39';
 import { BreezSDKWrapper, BreezConfig, LnurlPayResult } from './breez-sdk';
 import { ChromeStorageManager } from './storage';
-import { WalletData, Transaction, UserSettings } from '../types';
+import { WalletData, Transaction, UserSettings, HIERARCHICAL_WALLET_CONSTANTS } from '../types';
+import { deriveSubWalletMnemonic } from './mnemonic-derivation';
 
 export interface WalletStatus {
   isConnected: boolean;
@@ -769,5 +770,308 @@ export class WalletManager {
       // Return false to allow operation to proceed (better than blocking on error)
       return false;
     }
+  }
+
+  // ========================================
+  // Hierarchical Multi-Wallet Methods (v2)
+  // ========================================
+
+  /**
+   * Get the current wallet storage version
+   * @returns 0 = legacy single, 1 = flat multi-wallet, 2 = hierarchical
+   */
+  async getWalletVersion(): Promise<number> {
+    return this.storage.getWalletVersion();
+  }
+
+  /**
+   * Get all master key metadata (without decryption)
+   */
+  async getMasterKeyMetadata(): Promise<import('../types').MasterKeyMetadata[]> {
+    return this.storage.getMasterKeyMetadata();
+  }
+
+  /**
+   * Get sub-wallets for a specific master key
+   * @param masterKeyId - The master key ID to get sub-wallets for
+   * @param includeArchived - Whether to include archived sub-wallets (default: false)
+   */
+  async getSubWallets(masterKeyId: string, includeArchived: boolean = false): Promise<import('../types').SubWalletEntry[]> {
+    return this.storage.getSubWallets(masterKeyId, includeArchived);
+  }
+
+  /**
+   * Add a new master key with mnemonic
+   */
+  async addMasterKey(
+    mnemonic: string,
+    nickname: string,
+    pin: string,
+    createDefaultSubWallet: boolean = true
+  ): Promise<string> {
+    return this.storage.addMasterKey(mnemonic, nickname, pin, createDefaultSubWallet);
+  }
+
+  /**
+   * Add a sub-wallet to an existing master key
+   */
+  async addSubWallet(masterKeyId: string, nickname: string): Promise<number> {
+    return this.storage.addSubWallet(masterKeyId, nickname);
+  }
+
+  /**
+   * Remove a master key and all its sub-wallets
+   */
+  async removeMasterKey(masterKeyId: string): Promise<void> {
+    return this.storage.removeMasterKey(masterKeyId);
+  }
+
+  /**
+   * Remove a sub-wallet from a master key
+   */
+  async removeSubWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    return this.storage.removeSubWallet(masterKeyId, subWalletIndex);
+  }
+
+  /**
+   * Set the active wallet (master key + sub-wallet)
+   */
+  async setActiveHierarchicalWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+    return this.storage.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
+  }
+
+  /**
+   * Rename a master key
+   */
+  async renameMasterKey(masterKeyId: string, newNickname: string): Promise<void> {
+    return this.storage.renameMasterKey(masterKeyId, newNickname);
+  }
+
+  /**
+   * Rename a sub-wallet
+   */
+  async renameSubWallet(masterKeyId: string, subWalletIndex: number, newNickname: string): Promise<void> {
+    return this.storage.renameSubWallet(masterKeyId, subWalletIndex, newNickname);
+  }
+
+  /**
+   * Toggle master key expansion state in UI
+   */
+  async toggleMasterKeyExpanded(masterKeyId: string): Promise<void> {
+    return this.storage.toggleMasterKeyExpanded(masterKeyId);
+  }
+
+  /**
+   * Check if migration to hierarchical (v2) is needed
+   */
+  async needsHierarchicalMigration(): Promise<boolean> {
+    return this.storage.needsHierarchicalMigration();
+  }
+
+  /**
+   * Get the derived mnemonic for a specific hierarchical wallet
+   * This is used when switching wallets to get the correct mnemonic for SDK connection
+   *
+   * @param masterKeyId - The master key ID
+   * @param subWalletIndex - The sub-wallet index (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns Derived mnemonic for the sub-wallet
+   */
+  async getHierarchicalWalletMnemonic(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<string> {
+    // Get the master key mnemonic
+    const masterMnemonic = await this.storage.getMasterKeyMnemonic(masterKeyId, pin);
+
+    // Derive the sub-wallet mnemonic
+    return deriveSubWalletMnemonic(masterMnemonic, subWalletIndex);
+  }
+
+  /**
+   * Switch to a specific hierarchical wallet (master key + sub-wallet)
+   * Returns the derived mnemonic for SDK connection
+   *
+   * @param masterKeyId - The master key ID
+   * @param subWalletIndex - The sub-wallet index (0-19)
+   * @param pin - User's PIN to decrypt the master key
+   * @returns Object with derived mnemonic and wallet info
+   */
+  async switchHierarchicalWallet(
+    masterKeyId: string,
+    subWalletIndex: number,
+    pin: string
+  ): Promise<{
+    mnemonic: string;
+    masterKeyNickname: string;
+    subWalletNickname: string;
+  }> {
+    console.log('WalletManager: Switching to hierarchical wallet', { masterKeyId, subWalletIndex });
+
+    try {
+      // Step 1: Disconnect current SDK if connected
+      if (this.breezSDK.isWalletConnected()) {
+        console.log('WalletManager: Disconnecting current SDK');
+        await this.breezSDK.disconnect();
+      }
+
+      // Step 2: Get derived mnemonic (this validates the PIN)
+      const derivedMnemonic = await this.getHierarchicalWalletMnemonic(
+        masterKeyId,
+        subWalletIndex,
+        pin
+      );
+
+      // Step 3: Get wallet info for display
+      const subWallets = await this.storage.getSubWallets(masterKeyId);
+      const masterKeys = await this.storage.getMasterKeyMetadata();
+      const masterKey = masterKeys.find(mk => mk.id === masterKeyId);
+      const subWallet = subWallets.find(sw => sw.index === subWalletIndex);
+
+      // Step 4: ONLY NOW set as active in storage (after successful PIN validation)
+      await this.storage.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
+
+      console.log('WalletManager: Hierarchical wallet switch prepared', {
+        masterKeyId,
+        subWalletIndex,
+        masterKeyNickname: masterKey?.nickname,
+        subWalletNickname: subWallet?.nickname
+      });
+
+      return {
+        mnemonic: derivedMnemonic,
+        masterKeyNickname: masterKey?.nickname || 'Unknown',
+        subWalletNickname: subWallet?.nickname || 'Unknown'
+      };
+    } catch (error) {
+      console.error('WalletManager: Hierarchical wallet switch failed:', error);
+      throw new Error(
+        `Wallet switch failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Get the active hierarchical wallet info
+   */
+  async getActiveHierarchicalWalletInfo(): Promise<{
+    masterKeyId: string;
+    subWalletIndex: number;
+  } | null> {
+    return this.storage.getActiveHierarchicalWalletInfo();
+  }
+
+  /**
+   * Add discovered sub-wallets to a master key
+   */
+  async addDiscoveredSubWallets(
+    masterKeyId: string,
+    subWallets: { index: number; nickname: string }[]
+  ): Promise<void> {
+    return this.storage.addDiscoveredSubWallets(masterKeyId, subWallets);
+  }
+
+  /**
+   * Discover sub-wallets with transaction history for a master mnemonic
+   * Scans sub-wallet indices (1, 2, 3...) until finding one with no transactions
+   *
+   * @param masterMnemonic - The 12-word master mnemonic
+   * @param onProgress - Optional callback for progress updates
+   * @returns Array of discovered sub-wallet indices that have transactions
+   */
+  async discoverSubWallets(
+    masterMnemonic: string,
+    onProgress?: (index: number, found: number) => void
+  ): Promise<{ index: number; transactionCount: number; balanceSats: number }[]> {
+    console.log('WalletManager: Starting sub-wallet discovery...');
+
+    const discoveredWallets: { index: number; transactionCount: number; balanceSats: number }[] = [];
+    const maxIndex = HIERARCHICAL_WALLET_CONSTANTS.MAX_SUB_WALLETS;
+    let consecutiveEmpty = 0;
+    const MAX_CONSECUTIVE_EMPTY = 3; // Stop after 3 consecutive empty wallets
+
+    // Start from index 1 (index 0 is the master wallet itself)
+    for (let index = 1; index < maxIndex; index++) {
+      try {
+        // Derive the mnemonic for this sub-wallet index
+        const derivedMnemonic = deriveSubWalletMnemonic(masterMnemonic, index);
+
+        console.log(`WalletManager: Checking sub-wallet index ${index}...`);
+        onProgress?.(index, discoveredWallets.length);
+
+        // Check if this wallet has any activity (balance or transactions)
+        const { hasTransactions, transactionCount, balanceSats } =
+          await this.breezSDK.checkWalletHasTransactions(derivedMnemonic);
+
+        console.log(`WalletManager: Sub-wallet ${index} result:`, {
+          hasActivity: hasTransactions,
+          transactions: transactionCount,
+          balance: balanceSats
+        });
+
+        if (hasTransactions) {
+          console.log(`WalletManager: Found sub-wallet ${index} with activity (balance: ${balanceSats} sats, ${transactionCount} payments)`);
+          discoveredWallets.push({ index, transactionCount, balanceSats });
+          consecutiveEmpty = 0; // Reset counter
+        } else {
+          consecutiveEmpty++;
+          console.log(`WalletManager: Sub-wallet ${index} has no activity (${consecutiveEmpty}/${MAX_CONSECUTIVE_EMPTY} consecutive empty)`);
+
+          // Stop after N consecutive empty wallets
+          if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+            console.log(`WalletManager: Stopping discovery after ${MAX_CONSECUTIVE_EMPTY} consecutive empty wallets`);
+            break;
+          }
+        }
+      } catch (error) {
+        console.error(`WalletManager: Error checking sub-wallet ${index}:`, error);
+        consecutiveEmpty++;
+        // Continue to next index instead of stopping immediately
+        if (consecutiveEmpty >= MAX_CONSECUTIVE_EMPTY) {
+          console.log('WalletManager: Too many errors, stopping discovery');
+          break;
+        }
+      }
+    }
+
+    console.log(`WalletManager: Discovery complete. Found ${discoveredWallets.length} sub-wallets with activity`);
+    return discoveredWallets;
+  }
+
+  /**
+   * Import a master wallet and automatically discover/restore any sub-wallets
+   * that have transaction history
+   *
+   * NOTE: Sub-wallet discovery is currently disabled because Breez SDK WASM
+   * requires DOM access which is not available in the background service worker.
+   * The wallet will be imported without scanning for sub-wallets.
+   *
+   * @param mnemonic - The 12-word mnemonic to import
+   * @param nickname - Nickname for the master wallet
+   * @param pin - PIN for encryption
+   * @param onProgress - Optional callback for discovery progress
+   * @returns Object with master key ID and discovered sub-wallets count
+   */
+  async importWalletWithDiscovery(
+    mnemonic: string,
+    nickname: string,
+    pin: string,
+    onProgress?: (status: string, index?: number, found?: number) => void
+  ): Promise<{ masterKeyId: string; discoveredCount: number }> {
+    console.log('WalletManager: Importing wallet...');
+
+    // Step 1: Add the master key
+    onProgress?.('Creating master wallet...');
+    const masterKeyId = await this.addMasterKey(mnemonic, nickname, pin, false);
+    console.log(`WalletManager: Master key created: ${masterKeyId}`);
+
+    // NOTE: Sub-wallet discovery is disabled because Breez SDK WASM requires DOM access
+    // which is not available in the background service worker context.
+    // Users can manually add sub-wallets after import if needed.
+    console.log('WalletManager: Sub-wallet discovery skipped (requires DOM - not available in background)');
+
+    onProgress?.('Import complete!');
+    return { masterKeyId, discoveredCount: 0 };
   }
 }
