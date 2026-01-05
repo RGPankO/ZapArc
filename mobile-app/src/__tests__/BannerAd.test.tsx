@@ -15,21 +15,21 @@ jest.mock('../lib/apiClient', () => ({
 
 const mockApiClient = apiClient as jest.Mocked<typeof apiClient>;
 
-// Create a wrapper with QueryClientProvider
-const createWrapper = () => {
+// Helper to render with a fresh QueryClient for each test
+const renderWithClient = (ui: React.ReactElement) => {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
+        gcTime: 0,
       },
     },
   });
-  return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
   );
 };
-
-const Wrapper = createWrapper();
 
 describe('BannerAd', () => {
   beforeEach(() => {
@@ -39,14 +39,10 @@ describe('BannerAd', () => {
   it('should render loading state initially', async () => {
     // Make the API call hang to show loading state
     mockApiClient.get.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve({ user: { premiumStatus: 'FREE' } }), 1000))
+      () => new Promise((resolve) => global.setTimeout(() => resolve({ user: { premiumStatus: 'FREE' } }), 1000))
     );
 
-    const { getByText } = render(
-      <Wrapper>
-        <BannerAd />
-      </Wrapper>
-    );
+    const { getByText } = renderWithClient(<BannerAd />);
 
     expect(getByText('Loading ad...')).toBeTruthy();
   });
@@ -68,11 +64,7 @@ describe('BannerAd', () => {
     // Analytics tracking
     mockApiClient.post.mockResolvedValue({ success: true });
 
-    const { getByText } = render(
-      <Wrapper>
-        <BannerAd />
-      </Wrapper>
-    );
+    const { getByText } = renderWithClient(<BannerAd />);
 
     await waitFor(() => {
       expect(getByText('Advertisement')).toBeTruthy();
@@ -85,14 +77,11 @@ describe('BannerAd', () => {
       user: { premiumStatus: 'PREMIUM_LIFETIME' },
     });
 
-    const { queryByText } = render(
-      <Wrapper>
-        <BannerAd />
-      </Wrapper>
-    );
+    const { queryByText } = renderWithClient(<BannerAd />);
 
     await waitFor(() => {
       expect(queryByText('Advertisement')).toBeNull();
+      expect(queryByText('Loading ad...')).toBeNull();
     });
   });
 
@@ -111,11 +100,7 @@ describe('BannerAd', () => {
     mockApiClient.get.mockResolvedValueOnce(mockAdConfig);
     mockApiClient.post.mockResolvedValue({ success: true });
 
-    render(
-      <Wrapper>
-        <BannerAd onAdLoaded={onAdLoaded} />
-      </Wrapper>
-    );
+    renderWithClient(<BannerAd onAdLoaded={onAdLoaded} />);
 
     await waitFor(() => {
       expect(onAdLoaded).toHaveBeenCalled();
@@ -136,11 +121,7 @@ describe('BannerAd', () => {
     mockApiClient.get.mockResolvedValueOnce(mockAdConfig);
     mockApiClient.post.mockResolvedValue({ success: true });
 
-    render(
-      <Wrapper>
-        <BannerAd />
-      </Wrapper>
-    );
+    renderWithClient(<BannerAd />);
 
     await waitFor(() => {
       expect(mockApiClient.post).toHaveBeenCalledWith(
@@ -169,11 +150,7 @@ describe('BannerAd', () => {
     mockApiClient.get.mockResolvedValueOnce(mockAdConfig);
     mockApiClient.post.mockResolvedValue({ success: true });
 
-    const { getByText } = render(
-      <Wrapper>
-        <BannerAd />
-      </Wrapper>
-    );
+    const { getByText } = renderWithClient(<BannerAd />);
 
     await waitFor(() => {
       expect(getByText('Tap to learn more')).toBeTruthy();
@@ -204,11 +181,7 @@ describe('BannerAd', () => {
     mockApiClient.get.mockRejectedValueOnce(new Error('Network error'));
     mockApiClient.post.mockResolvedValue({ success: true });
 
-    const { getByText } = render(
-      <Wrapper>
-        <BannerAd />
-      </Wrapper>
-    );
+    const { getByText } = renderWithClient(<BannerAd />);
 
     await waitFor(() => {
       expect(getByText('Sample Banner Ad - Network: sample-network-banner')).toBeTruthy();

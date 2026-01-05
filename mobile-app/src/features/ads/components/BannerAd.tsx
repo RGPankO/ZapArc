@@ -33,11 +33,7 @@ export const BannerAd: React.FC<BannerAdProps> = ({
     }
   };
 
-  // Don't render anything if user shouldn't see ads or there's no ad
-  if (!shouldShow || !adConfig) {
-    return null;
-  }
-
+  // Show loading state while fetching
   if (isLoading) {
     return (
       <View style={[styles.container, styles.loadingContainer, style]}>
@@ -47,8 +43,9 @@ export const BannerAd: React.FC<BannerAdProps> = ({
     );
   }
 
-  if (error) {
-    return null; // Silently fail for better user experience
+  // Don't render anything if user shouldn't see ads, there's no ad, or there's an error
+  if (!shouldShow || !adConfig || error) {
+    return null;
   }
 
   return (

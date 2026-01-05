@@ -30,9 +30,10 @@ export function useAd(adType: AdType, options?: { enabled?: boolean }) {
     queryKey: ['ads', 'serve', adType],
     queryFn: async () => {
       try {
-        const adConfig = (await apiClient.get<AdConfig | null>(`/ads/serve/${adType}`, {
+        // apiClient response interceptor already extracts .data, so we cast the result
+        const adConfig = (await apiClient.get(`/ads/serve/${adType}`, {
           timeout: AD_TIMEOUT,
-        })).data;
+        })) as AdConfig | null;
         return adConfig || SAMPLE_ADS[adType];
       } catch {
         // Return sample ad when backend is unavailable
