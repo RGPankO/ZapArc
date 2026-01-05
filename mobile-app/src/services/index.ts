@@ -47,5 +47,31 @@ export {
   type TranslationParams,
 } from './i18nService';
 
+// Offline cache service
+export {
+  offlineCacheService,
+  type CachedBalance,
+  type CachedTransactions,
+  type SyncStatus,
+  type PendingAction,
+} from './offlineCacheService';
+
+// Security service
+export {
+  securityService,
+  type SecurityConfig,
+  type BiometricInfo,
+  type AutoLockState,
+} from './securityService';
+
+// Error handling service
+export {
+  errorHandlingService,
+  classifyError,
+  ErrorType,
+  type AppError,
+  type RetryConfig,
+} from './errorHandlingService';
+
 // Token service (existing)
 export * from './tokenService';
