@@ -1,0 +1,407 @@
+// PIN Entry Screen
+// Unlock wallet with PIN or biometric authentication
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Vibration,
+  Animated,
+} from 'react-native';
+import { Text, IconButton, useTheme } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useWalletAuth } from '../../../hooks/useWalletAuth';
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const PIN_LENGTH = 6;
+const KEYPAD = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['', '0', 'delete'],
+];
+
+// =============================================================================
+// Component
+// =============================================================================
+
+export function PinEntryScreen(): React.JSX.Element {
+  const theme = useTheme();
+  const {
+    unlock,
+    unlockWithBiometric,
+    biometricAvailable,
+    biometricType,
+    activeWalletInfo,
+    isLoading,
+    error: authError,
+  } = useWalletAuth();
+
+  // State
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+
+  // Animation ref for shake effect
+  const shakeAnimation = useRef(new Animated.Value(0)).current;
+
+  // ========================================
+  // Effects
+  // ========================================
+
+  useEffect(() => {
+    // Try biometric on mount if available
+    if (biometricAvailable) {
+      handleBiometricUnlock();
+    }
+  }, [biometricAvailable]);
+
+  // Auto-submit when PIN is complete
+  useEffect(() => {
+    if (pin.length === PIN_LENGTH) {
+      handleUnlock();
+    }
+  }, [pin]);
+
+  // ========================================
+  // PIN Input
+  // ========================================
+
+  const handleKeyPress = useCallback(
+    (key: string) => {
+      if (key === 'delete') {
+        setPin((prev) => prev.slice(0, -1));
+        setError(null);
+        return;
+      }
+
+      if (key === '' || pin.length >= PIN_LENGTH) {
+        return;
+      }
+
+      setPin((prev) => prev + key);
+      setError(null);
+    },
+    [pin]
+  );
+
+  // ========================================
+  // Unlock
+  // ========================================
+
+  const shake = useCallback(() => {
+    Vibration.vibrate(200);
+    
+    Animated.sequence([
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  }, [shakeAnimation]);
+
+  const handleUnlock = useCallback(async () => {
+    if (pin.length !== PIN_LENGTH) return;
+
+    try {
+      const success = await unlock(pin);
+
+      if (success) {
+        router.replace('/wallet/home');
+      } else {
+        setError('Incorrect PIN');
+        setAttempts((prev) => prev + 1);
+        shake();
+        setPin('');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unlock failed');
+      shake();
+      setPin('');
+    }
+  }, [pin, unlock, shake]);
+
+  const handleBiometricUnlock = useCallback(async () => {
+    try {
+      const success = await unlockWithBiometric();
+
+      if (success) {
+        router.replace('/wallet/home');
+      }
+    } catch (err) {
+      // User cancelled or biometric failed - they can use PIN
+      console.log('Biometric unlock failed:', err);
+    }
+  }, [unlockWithBiometric]);
+
+  // ========================================
+  // Get biometric icon
+  // ========================================
+
+  const getBiometricIcon = () => {
+    switch (biometricType) {
+      case 'facial':
+        return 'face-recognition';
+      case 'fingerprint':
+        return 'fingerprint';
+      case 'iris':
+        return 'eye';
+      default:
+        return 'fingerprint';
+    }
+  };
+
+  const getBiometricLabel = () => {
+    switch (biometricType) {
+      case 'facial':
+        return 'Use Face ID';
+      case 'fingerprint':
+        return 'Use Fingerprint';
+      case 'iris':
+        return 'Use Iris Scan';
+      default:
+        return 'Use Biometric';
+    }
+  };
+
+  // ========================================
+  // Render
+  // ========================================
+
+  return (
+    <LinearGradient
+      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      style={styles.gradient}
+    >
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Unlock Wallet</Text>
+          {activeWalletInfo && (
+            <Text style={styles.walletInfo}>
+              {activeWalletInfo.masterKeyNickname} • {activeWalletInfo.subWalletNickname}
+            </Text>
+          )}
+        </View>
+
+        {/* PIN Display */}
+        <View style={styles.pinDisplayContainer}>
+          <Animated.View
+            style={[
+              styles.pinDisplay,
+              { transform: [{ translateX: shakeAnimation }] },
+            ]}
+          >
+            {Array(PIN_LENGTH)
+              .fill(0)
+              .map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.pinDot,
+                    index < pin.length && styles.pinDotFilled,
+                    error && styles.pinDotError,
+                  ]}
+                />
+              ))}
+          </Animated.View>
+
+          {/* Error Message */}
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
+          {/* Attempts Warning */}
+          {attempts >= 3 && (
+            <Text style={styles.warningText}>
+              {5 - attempts} attempts remaining
+            </Text>
+          )}
+        </View>
+
+        {/* Keypad */}
+        <View style={styles.keypadContainer}>
+          {KEYPAD.map((row, rowIndex) => (
+            <View key={rowIndex} style={styles.keypadRow}>
+              {row.map((key, keyIndex) => {
+                if (key === '') {
+                  // Biometric button or empty space
+                  return biometricAvailable ? (
+                    <TouchableOpacity
+                      key={keyIndex}
+                      style={styles.keypadKey}
+                      onPress={handleBiometricUnlock}
+                    >
+                      <IconButton
+                        icon={getBiometricIcon()}
+                        size={28}
+                        iconColor="#FFC107"
+                      />
+                    </TouchableOpacity>
+                  ) : (
+                    <View key={keyIndex} style={styles.keypadKey} />
+                  );
+                }
+
+                if (key === 'delete') {
+                  return (
+                    <TouchableOpacity
+                      key={keyIndex}
+                      style={styles.keypadKey}
+                      onPress={() => handleKeyPress('delete')}
+                      disabled={pin.length === 0}
+                    >
+                      <IconButton
+                        icon="backspace-outline"
+                        size={28}
+                        iconColor={
+                          pin.length > 0 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)'
+                        }
+                      />
+                    </TouchableOpacity>
+                  );
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={keyIndex}
+                    style={styles.keypadKey}
+                    onPress={() => handleKeyPress(key)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.keypadKeyText}>{key}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+
+        {/* Biometric Button Label */}
+        {biometricAvailable && (
+          <TouchableOpacity
+            style={styles.biometricLabel}
+            onPress={handleBiometricUnlock}
+          >
+            <Text style={styles.biometricLabelText}>{getBiometricLabel()}</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Switch Wallet Button */}
+        <TouchableOpacity
+          style={styles.switchWalletButton}
+          onPress={() => router.push('/wallet/select')}
+        >
+          <Text style={styles.switchWalletText}>Switch Wallet</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+// =============================================================================
+// Styles
+// =============================================================================
+
+const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+    paddingVertical: 40,
+  },
+  header: {
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  walletInfo: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  pinDisplayContainer: {
+    alignItems: 'center',
+  },
+  pinDisplay: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  pinDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'transparent',
+  },
+  pinDotFilled: {
+    backgroundColor: '#FFC107',
+    borderColor: '#FFC107',
+  },
+  pinDotError: {
+    borderColor: '#F44336',
+    backgroundColor: pin => pin ? '#F44336' : 'transparent',
+  },
+  errorText: {
+    color: '#F44336',
+    fontSize: 14,
+    marginTop: 8,
+  },
+  warningText: {
+    color: '#FF9800',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  keypadContainer: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  keypadRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  keypadKey: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  keypadKeyText: {
+    fontSize: 28,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  biometricLabel: {
+    alignSelf: 'center',
+    padding: 12,
+  },
+  biometricLabelText: {
+    color: '#FFC107',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  switchWalletButton: {
+    alignSelf: 'center',
+    padding: 12,
+  },
+  switchWalletText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+  },
+});

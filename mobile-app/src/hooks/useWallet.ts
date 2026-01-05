@@ -1,0 +1,535 @@
+// useWallet Hook
+// Manages wallet state, operations, and multi-wallet switching
+
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import {
+  storageService,
+  breezSDKService,
+} from '../services';
+import {
+  deriveSubWalletMnemonic,
+  generateMnemonic,
+  validateMnemonic,
+  generateMasterKeyNickname,
+  generateSubWalletNickname,
+} from '../utils/mnemonic';
+import type {
+  MultiWalletStorage,
+  MasterKeyEntry,
+  SubWalletEntry,
+  ActiveWalletInfo,
+  Transaction,
+  WalletData,
+} from '../features/wallet/types';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface WalletState {
+  // Status
+  isLoading: boolean;
+  isConnected: boolean;
+  error: string | null;
+
+  // Active wallet info
+  activeWalletInfo: ActiveWalletInfo | null;
+  balance: number;
+  transactions: Transaction[];
+
+  // Multi-wallet data
+  masterKeys: MasterKeyEntry[];
+  activeMasterKey: MasterKeyEntry | null;
+  activeSubWallet: SubWalletEntry | null;
+}
+
+export interface WalletActions {
+  // Wallet creation/import
+  createMasterKey: (pin: string, nickname?: string) => Promise<string>;
+  importMasterKey: (mnemonic: string, pin: string, nickname?: string) => Promise<string>;
+
+  // Sub-wallet operations
+  addSubWallet: (masterKeyId: string, nickname?: string) => Promise<number>;
+  archiveSubWallet: (masterKeyId: string, index: number) => Promise<void>;
+  restoreSubWallet: (masterKeyId: string, index: number) => Promise<void>;
+
+  // Wallet switching
+  switchWallet: (masterKeyId: string, subWalletIndex: number) => Promise<void>;
+
+  // Master key operations
+  deleteMasterKey: (masterKeyId: string, pin: string) => Promise<void>;
+  renameMasterKey: (masterKeyId: string, nickname: string) => Promise<void>;
+  renameSubWallet: (masterKeyId: string, index: number, nickname: string) => Promise<void>;
+
+  // Balance and transactions
+  refreshBalance: () => Promise<void>;
+  refreshTransactions: () => Promise<void>;
+
+  // Payment operations
+  sendPayment: (bolt11: string) => Promise<boolean>;
+  receivePayment: (amountSats: number, description?: string) => Promise<string>;
+
+  // Utility
+  getMnemonic: (masterKeyId: string, pin: string) => Promise<string>;
+  canAddSubWallet: (masterKeyId: string) => boolean;
+}
+
+// =============================================================================
+// Hook Implementation
+// =============================================================================
+
+export function useWallet(): WalletState & WalletActions {
+  // State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [storage, setStorage] = useState<MultiWalletStorage | null>(null);
+
+  // Derived state
+  const masterKeys = useMemo(() => storage?.masterKeys ?? [], [storage]);
+
+  const activeMasterKey = useMemo(() => {
+    if (!storage) return null;
+    return masterKeys.find((mk) => mk.id === storage.activeMasterKeyId) ?? null;
+  }, [storage, masterKeys]);
+
+  const activeSubWallet = useMemo(() => {
+    if (!activeMasterKey || storage === null) return null;
+    return (
+      activeMasterKey.subWallets.find(
+        (sw) => sw.index === storage.activeSubWalletIndex
+      ) ?? null
+    );
+  }, [activeMasterKey, storage]);
+
+  const activeWalletInfo = useMemo((): ActiveWalletInfo | null => {
+    if (!activeMasterKey || !activeSubWallet) return null;
+    return {
+      masterKeyId: activeMasterKey.id,
+      masterKeyNickname: activeMasterKey.nickname,
+      subWalletIndex: activeSubWallet.index,
+      subWalletNickname: activeSubWallet.nickname,
+    };
+  }, [activeMasterKey, activeSubWallet]);
+
+  // ========================================
+  // Load wallet data
+  // ========================================
+
+  const loadWalletData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const data = await storageService.loadMultiWalletStorage();
+      setStorage(data);
+
+      if (data && breezSDKService.isWalletConnected()) {
+        setIsConnected(true);
+        await refreshBalance();
+        await refreshTransactions();
+      }
+    } catch (err) {
+      console.error('❌ [useWallet] Failed to load wallet data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load wallet');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadWalletData();
+  }, [loadWalletData]);
+
+  // ========================================
+  // Wallet Creation/Import
+  // ========================================
+
+  const createMasterKey = useCallback(
+    async (pin: string, nickname?: string): Promise<string> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const mnemonic = generateMnemonic();
+        const keyNumber = masterKeys.length + 1;
+        const name = nickname ?? generateMasterKeyNickname(keyNumber);
+
+        const masterKeyId = await storageService.createMasterKey(
+          mnemonic,
+          name,
+          pin
+        );
+
+        await loadWalletData();
+        console.log('✅ [useWallet] Master key created:', masterKeyId);
+
+        return masterKeyId;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to create wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [masterKeys.length, loadWalletData]
+  );
+
+  const importMasterKey = useCallback(
+    async (
+      mnemonic: string,
+      pin: string,
+      nickname?: string
+    ): Promise<string> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        if (!validateMnemonic(mnemonic)) {
+          throw new Error('Invalid mnemonic phrase');
+        }
+
+        const keyNumber = masterKeys.length + 1;
+        const name = nickname ?? generateMasterKeyNickname(keyNumber);
+
+        const masterKeyId = await storageService.createMasterKey(
+          mnemonic.trim().toLowerCase(),
+          name,
+          pin
+        );
+
+        await loadWalletData();
+        console.log('✅ [useWallet] Master key imported:', masterKeyId);
+
+        return masterKeyId;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to import wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [masterKeys.length, loadWalletData]
+  );
+
+  // ========================================
+  // Sub-Wallet Operations
+  // ========================================
+
+  const addSubWallet = useCallback(
+    async (masterKeyId: string, nickname?: string): Promise<number> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const nextIndex = await storageService.getNextSubWalletIndex(masterKeyId);
+        if (nextIndex === -1) {
+          throw new Error('Maximum sub-wallets reached');
+        }
+
+        const name = nickname ?? generateSubWalletNickname(nextIndex);
+        const index = await storageService.addSubWallet(masterKeyId, name);
+
+        await loadWalletData();
+        console.log('✅ [useWallet] Sub-wallet added:', index);
+
+        return index;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to add sub-wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadWalletData]
+  );
+
+  const archiveSubWallet = useCallback(
+    async (masterKeyId: string, index: number): Promise<void> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        await storageService.archiveSubWallet(masterKeyId, index);
+        await loadWalletData();
+
+        console.log('✅ [useWallet] Sub-wallet archived:', index);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to archive sub-wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadWalletData]
+  );
+
+  const restoreSubWallet = useCallback(
+    async (masterKeyId: string, index: number): Promise<void> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        await storageService.restoreSubWallet(masterKeyId, index);
+        await loadWalletData();
+
+        console.log('✅ [useWallet] Sub-wallet restored:', index);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to restore sub-wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadWalletData]
+  );
+
+  // ========================================
+  // Wallet Switching
+  // ========================================
+
+  const switchWallet = useCallback(
+    async (masterKeyId: string, subWalletIndex: number): Promise<void> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        await storageService.setActiveWallet(masterKeyId, subWalletIndex);
+        await loadWalletData();
+
+        // TODO: Reconnect Breez SDK with new mnemonic
+        // const mnemonic = await getMnemonic(masterKeyId, pin);
+        // const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
+        // await breezSDKService.disconnect();
+        // await breezSDKService.connectWallet(derivedMnemonic);
+
+        console.log('✅ [useWallet] Switched to wallet:', {
+          masterKeyId,
+          subWalletIndex,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to switch wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadWalletData]
+  );
+
+  // ========================================
+  // Master Key Operations
+  // ========================================
+
+  const deleteMasterKey = useCallback(
+    async (masterKeyId: string, pin: string): Promise<void> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Verify PIN first
+        const isValidPin = await storageService.verifyMasterKeyPin(
+          masterKeyId,
+          pin
+        );
+        if (!isValidPin) {
+          throw new Error('Invalid PIN');
+        }
+
+        await storageService.deleteMasterKey(masterKeyId);
+        await loadWalletData();
+
+        console.log('✅ [useWallet] Master key deleted:', masterKeyId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to delete wallet';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadWalletData]
+  );
+
+  const renameMasterKey = useCallback(
+    async (masterKeyId: string, nickname: string): Promise<void> => {
+      // TODO: Implement in storageService
+      console.log('🔵 [useWallet] Rename master key:', { masterKeyId, nickname });
+    },
+    []
+  );
+
+  const renameSubWallet = useCallback(
+    async (
+      masterKeyId: string,
+      index: number,
+      nickname: string
+    ): Promise<void> => {
+      // TODO: Implement in storageService
+      console.log('🔵 [useWallet] Rename sub-wallet:', {
+        masterKeyId,
+        index,
+        nickname,
+      });
+    },
+    []
+  );
+
+  // ========================================
+  // Balance and Transactions
+  // ========================================
+
+  const refreshBalance = useCallback(async (): Promise<void> => {
+    try {
+      if (!breezSDKService.isWalletConnected()) {
+        setBalance(0);
+        return;
+      }
+
+      const newBalance = await breezSDKService.getBalance();
+      setBalance(newBalance);
+      console.log('✅ [useWallet] Balance refreshed:', newBalance);
+    } catch (err) {
+      console.error('❌ [useWallet] Failed to refresh balance:', err);
+    }
+  }, []);
+
+  const refreshTransactions = useCallback(async (): Promise<void> => {
+    try {
+      if (!breezSDKService.isWalletConnected()) {
+        setTransactions([]);
+        return;
+      }
+
+      const payments = await breezSDKService.listPayments();
+      setTransactions(payments);
+      console.log('✅ [useWallet] Transactions refreshed:', payments.length);
+    } catch (err) {
+      console.error('❌ [useWallet] Failed to refresh transactions:', err);
+    }
+  }, []);
+
+  // ========================================
+  // Payment Operations
+  // ========================================
+
+  const sendPayment = useCallback(
+    async (bolt11: string): Promise<boolean> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const success = await breezSDKService.sendPayment({ bolt11 });
+        await refreshBalance();
+        await refreshTransactions();
+
+        return success;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Payment failed';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [refreshBalance, refreshTransactions]
+  );
+
+  const receivePayment = useCallback(
+    async (amountSats: number, description?: string): Promise<string> => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const invoice = await breezSDKService.receivePayment({
+          amountSats,
+          description: description ?? '',
+        });
+
+        return invoice;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to generate invoice';
+        setError(message);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  // ========================================
+  // Utility Functions
+  // ========================================
+
+  const getMnemonic = useCallback(
+    async (masterKeyId: string, pin: string): Promise<string> => {
+      return storageService.getMasterKeyMnemonic(masterKeyId, pin);
+    },
+    []
+  );
+
+  const canAddSubWallet = useCallback(
+    (masterKeyId: string): boolean => {
+      const masterKey = masterKeys.find((mk) => mk.id === masterKeyId);
+      if (!masterKey) return false;
+
+      // Check if last sub-wallet has activity
+      const lastSubWallet =
+        masterKey.subWallets[masterKey.subWallets.length - 1];
+      if (lastSubWallet && lastSubWallet.hasActivity === false) {
+        return false; // Can't add if last sub-wallet has no activity
+      }
+
+      // Check if we've reached max sub-wallets
+      const totalIndices = [
+        ...masterKey.subWallets.map((sw) => sw.index),
+        ...masterKey.archivedSubWallets.map((sw) => sw.index),
+      ];
+      return totalIndices.length < 20;
+    },
+    [masterKeys]
+  );
+
+  // ========================================
+  // Return Hook Value
+  // ========================================
+
+  return {
+    // State
+    isLoading,
+    isConnected,
+    error,
+    activeWalletInfo,
+    balance,
+    transactions,
+    masterKeys,
+    activeMasterKey,
+    activeSubWallet,
+
+    // Actions
+    createMasterKey,
+    importMasterKey,
+    addSubWallet,
+    archiveSubWallet,
+    restoreSubWallet,
+    switchWallet,
+    deleteMasterKey,
+    renameMasterKey,
+    renameSubWallet,
+    refreshBalance,
+    refreshTransactions,
+    sendPayment,
+    receivePayment,
+    getMnemonic,
+    canAddSubWallet,
+  };
+}

@@ -10,7 +10,7 @@
  */
 export interface UserSettings {
   // Language and Localization
-  language: 'en' | 'bg';
+  language: 'en' | 'bg' | 'auto'; // 'auto' = detect from location
   isLocationBased: boolean;
   currency: CurrencyCode;
 
