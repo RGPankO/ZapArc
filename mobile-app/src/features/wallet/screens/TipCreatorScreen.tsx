@@ -10,7 +10,7 @@ import {
   Share,
   Alert,
 } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
+import * as Clipboard from 'expo-clipboard';
 import {
   Text,
   IconButton,
@@ -170,10 +170,10 @@ export function TipCreatorScreen(): React.JSX.Element {
   }, [tipRequest]);
 
   // Handle copy
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (!tipRequest) return;
 
-    Clipboard.setString(tipRequest.encoded);
+    await Clipboard.setStringAsync(tipRequest.encoded);
     Alert.alert('Copied!', 'Tip request copied to clipboard');
   }, [tipRequest]);
 

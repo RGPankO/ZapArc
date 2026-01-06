@@ -1,3 +1,3 @@
-import { HomeScreen } from '../src/features/home';
+import { WalletWelcomeScreen } from '../src/features/wallet/screens';
 
-export default HomeScreen;
+export default WalletWelcomeScreen;

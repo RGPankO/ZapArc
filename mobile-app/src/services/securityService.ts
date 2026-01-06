@@ -1,9 +1,11 @@
 // Security Service
 // Handles app security features: auto-lock, biometric auth, and security protections
 
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { storageService, settingsService } from './index';
+// Import directly to avoid circular dependency with index.ts
+import { storageService } from './storageService';
+import { settingsService } from './settingsService';
 
 // =============================================================================
 // Types
@@ -98,9 +100,13 @@ class SecurityService {
   async updateSecurityConfig(updates: Partial<SecurityConfig>): Promise<void> {
     this.config = { ...this.config, ...updates };
     
-    // Persist relevant settings
-    await settingsService.updateSettings({
-      autoLockTimeout: this.config.autoLockTimeout,
+    // Persist relevant settings (only update if timeout is a valid option)
+    const validTimeouts = [0, 300, 900, 1800, 3600, 7200];
+    const timeout = validTimeouts.includes(this.config.autoLockTimeout) 
+      ? this.config.autoLockTimeout as 0 | 300 | 900 | 1800 | 3600 | 7200
+      : 900;
+    await settingsService.updateUserSettings({
+      autoLockTimeout: timeout,
       biometricEnabled: this.config.biometricEnabled,
     });
 

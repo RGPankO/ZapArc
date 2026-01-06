@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
+import * as Clipboard from 'expo-clipboard';
 import { Text, IconButton, Button } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -45,10 +45,10 @@ export function TipQRCodeScreen(): React.JSX.Element {
   }, [params.encoded]);
 
   // Handle copy
-  const handleCopy = useCallback(() => {
+  const handleCopy = useCallback(async () => {
     if (!params.encoded) return;
 
-    Clipboard.setString(params.encoded);
+    await Clipboard.setStringAsync(params.encoded);
     Alert.alert('Copied!', 'Tip request copied to clipboard');
   }, [params.encoded]);
 

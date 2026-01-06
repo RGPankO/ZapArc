@@ -9,7 +9,7 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import Clipboard from '@react-native-clipboard/clipboard';
+import * as Clipboard from 'expo-clipboard';
 import { Text, Button, IconButton, Switch } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -93,12 +93,9 @@ export function BackupScreen(): React.JSX.Element {
         {
           text: 'Copy',
           style: 'destructive',
-          onPress: () => {
-            Clipboard.setString(mnemonic);
-            Alert.alert(
-              'Copied',
-              'Recovery phrase copied to clipboard. Clear your clipboard after use.'
-            );
+          onPress: async () => {
+            await Clipboard.setStringAsync(mnemonic);
+            // Android shows a native clipboard notification
           },
         },
       ]

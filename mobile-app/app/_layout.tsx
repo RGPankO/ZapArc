@@ -14,24 +14,33 @@ export default function RootLayout(): React.JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
       <PaperProvider>
-        <Stack>
-        <Stack.Screen
-          name="index"
-          options={{
+        <Stack
+          screenOptions={{
             headerShown: false,
-            animation: 'none',
-            gestureEnabled: false
+            animation: 'slide_from_right',
           }}
-        />
-        <Stack.Screen
-          name="auth"
-          options={{
-            headerShown: false,
-            animation: 'none',
-            gestureEnabled: false
-          }}
-        />
-        <Stack.Screen name="(main)" options={{ headerShown: false }} />
+        >
+          <Stack.Screen
+            name="index"
+            options={{
+              animation: 'none',
+              gestureEnabled: false
+            }}
+          />
+          <Stack.Screen
+            name="wallet"
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="auth"
+            options={{
+              animation: 'none',
+              gestureEnabled: false
+            }}
+          />
+          <Stack.Screen name="(main)" options={{ headerShown: false }} />
         </Stack>
       </PaperProvider>
     </QueryClientProvider>
