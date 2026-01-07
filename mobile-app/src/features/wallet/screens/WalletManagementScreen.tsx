@@ -1,7 +1,7 @@
 // Wallet Management Screen
 // Manage master keys and sub-wallets with add, rename, archive, and delete actions
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
-  Modal,
 } from 'react-native';
 import {
   Text,
@@ -54,9 +53,10 @@ export function WalletManagementScreen(): React.JSX.Element {
     restoreSubWallet,
     deleteMasterKey,
     canAddSubWallet,
+    switchWallet,
     isLoading,
   } = useWallet();
-  const { activeWalletInfo, selectWallet, verifyPin } = useWalletAuth();
+  const { activeWalletInfo, verifyPin } = useWalletAuth();
 
   // State
   const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(
@@ -71,11 +71,28 @@ export function WalletManagementScreen(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
 
+  // Keep active master key always expanded
+  useEffect(() => {
+    if (activeMasterKey?.id) {
+      setExpandedMasterKeys((prev) => {
+        if (prev.has(activeMasterKey.id)) return prev;
+        const next = new Set(prev);
+        next.add(activeMasterKey.id);
+        return next;
+      });
+    }
+  }, [activeMasterKey?.id]);
+
   // ========================================
   // Toggle Expansion
   // ========================================
 
   const toggleExpansion = useCallback((masterKeyId: string) => {
+    // Don't allow collapsing the active master key
+    if (masterKeyId === activeMasterKey?.id) {
+      return;
+    }
+    
     setExpandedMasterKeys((prev) => {
       const next = new Set(prev);
       if (next.has(masterKeyId)) {
@@ -85,7 +102,7 @@ export function WalletManagementScreen(): React.JSX.Element {
       }
       return next;
     });
-  }, []);
+  }, [activeMasterKey?.id]);
 
   // ========================================
   // Add Sub-Wallet
@@ -188,9 +205,9 @@ export function WalletManagementScreen(): React.JSX.Element {
     async (masterKeyId: string, subWalletIndex: number) => {
       try {
         setProcessing(true);
-        // For same master key, no PIN needed
+        // For same master key, no PIN needed - use switchWallet from useWallet
         if (masterKeyId === activeMasterKey?.id) {
-          await selectWallet(masterKeyId, subWalletIndex, '');
+          await switchWallet(masterKeyId, subWalletIndex);
         } else {
           // Navigate to unlock with this wallet pre-selected
           router.push({
@@ -205,7 +222,7 @@ export function WalletManagementScreen(): React.JSX.Element {
         setProcessing(false);
       }
     },
-    [activeMasterKey?.id, selectWallet]
+    [activeMasterKey?.id, switchWallet]
   );
 
   // ========================================

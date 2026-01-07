@@ -8,6 +8,8 @@ export default function WalletLayout(): React.JSX.Element {
         animation: 'slide_from_right',
       }}
     >
+      <Stack.Screen name="welcome" />
+      <Stack.Screen name="unlock" />
       <Stack.Screen name="create" />
       <Stack.Screen name="import" />
       <Stack.Screen name="pin" />

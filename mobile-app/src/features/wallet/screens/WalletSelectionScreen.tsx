@@ -156,7 +156,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
           <View style={styles.subWalletsContainer}>
             {masterKey.subWallets.map((subWallet) => (
               <TouchableOpacity
-                key={subWallet.index}
+                key={`${masterKey.id}-${subWallet.index}`}
                 style={[
                   styles.subWalletRow,
                   isActive &&
@@ -256,7 +256,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '←'].map(
                 (key, i) => (
                   <TouchableOpacity
-                    key={i}
+                    key={`keypad-${i}-${key}`}
                     style={[styles.miniKeypadKey, key === '' && styles.miniKeypadKeyEmpty]}
                     onPress={() => {
                       if (key === '←') {

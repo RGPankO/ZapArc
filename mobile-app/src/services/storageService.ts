@@ -4,11 +4,9 @@
 import * as SecureStore from 'expo-secure-store';
 
 import type {
-  EncryptedData,
   MasterKeyEntry,
   MultiWalletStorage,
   SubWalletEntry,
-  WalletData,
   ActiveWalletInfo,
 } from '../features/wallet/types';
 import { WALLET_CONSTANTS } from '../features/wallet/types';
@@ -208,6 +206,65 @@ class StorageService {
         throw new Error(`Unsupported wallet schema version: ${storage.version}`);
       }
 
+      // Data migration: Fix corrupted sub-wallets that are strings instead of objects
+      // or have incorrect nicknames
+      let needsMigration = false;
+      for (const masterKey of storage.masterKeys) {
+        // Fix active sub-wallets
+        masterKey.subWallets = masterKey.subWallets.map((sw, idx) => {
+          if (typeof sw === 'string') {
+            needsMigration = true;
+            console.warn('⚠️ [StorageService] Migrating corrupted sub-wallet:', sw);
+            // Use proper nickname based on index
+            const properNickname = idx === 0 ? 'Main Wallet' : `Sub-Wallet ${idx}`;
+            return {
+              index: idx,
+              nickname: properNickname,
+              createdAt: Date.now(),
+              lastUsedAt: Date.now(),
+              hasActivity: undefined,
+              hasTransactionHistory: undefined,
+            } as SubWalletEntry;
+          }
+          // Ensure index is set
+          if (sw.index === undefined) {
+            needsMigration = true;
+            sw.index = idx;
+          }
+          // Fix incorrect nicknames (e.g., "Sub-Wallet 1" for index 0)
+          const expectedNickname = sw.index === 0 ? 'Main Wallet' : `Sub-Wallet ${sw.index}`;
+          if (sw.nickname !== expectedNickname && sw.nickname.startsWith('Sub-Wallet')) {
+            console.warn('⚠️ [StorageService] Fixing incorrect nickname:', sw.nickname, '->', expectedNickname);
+            needsMigration = true;
+            sw.nickname = expectedNickname;
+          }
+          return sw;
+        });
+
+        // Fix archived sub-wallets
+        masterKey.archivedSubWallets = masterKey.archivedSubWallets.map((sw, idx) => {
+          if (typeof sw === 'string') {
+            needsMigration = true;
+            return {
+              index: idx + 100, // Archived wallets get high indices
+              nickname: `Archived Wallet ${idx + 1}`,
+              createdAt: Date.now(),
+              lastUsedAt: Date.now(),
+              archivedAt: Date.now(),
+              hasActivity: undefined,
+              hasTransactionHistory: undefined,
+            } as SubWalletEntry;
+          }
+          return sw;
+        });
+      }
+
+      // Save migrated data
+      if (needsMigration) {
+        console.log('🔧 [StorageService] Saving migrated data...');
+        await this.saveMultiWalletStorage(storage);
+      }
+
       console.log('✅ [StorageService] LOAD_MULTI_WALLET_STORAGE SUCCESS', {
         masterKeyCount: storage.masterKeys.length,
         activeMasterKeyId: storage.activeMasterKeyId,
@@ -268,6 +325,9 @@ class StorageService {
 
       if (storage) {
         storage.masterKeys.push(masterKey);
+        // Set the new wallet as active
+        storage.activeMasterKeyId = masterKeyId;
+        storage.activeSubWalletIndex = 0;
       } else {
         storage = {
           masterKeys: [masterKey],
@@ -393,11 +453,14 @@ class StorageService {
    */
   async addSubWallet(
     masterKeyId: string,
-    subWallet: SubWalletEntry
-  ): Promise<void> {
+    nickname: string
+  ): Promise<number> {
+    const nextIndex = await this.getNextSubWalletIndex(masterKeyId);
+    
     console.log('🔵 [StorageService] ADD_SUB_WALLET', {
       masterKeyId,
-      subWalletIndex: subWallet.index,
+      nickname,
+      index: nextIndex,
     });
 
     try {
@@ -418,12 +481,25 @@ class StorageService {
         );
       }
 
+      // Create sub-wallet entry
+      const now = Date.now();
+      const subWallet: SubWalletEntry = {
+        index: nextIndex,
+        nickname,
+        createdAt: now,
+        lastUsedAt: now,
+        hasActivity: undefined,
+        hasTransactionHistory: undefined,
+      };
+
       // Add sub-wallet
       masterKey.subWallets.push(subWallet);
-      masterKey.lastUsedAt = Date.now();
+      masterKey.lastUsedAt = now;
 
       await this.saveMultiWalletStorage(storage);
-      console.log('✅ [StorageService] ADD_SUB_WALLET SUCCESS');
+      console.log('✅ [StorageService] ADD_SUB_WALLET SUCCESS', { index: nextIndex });
+      
+      return nextIndex;
     } catch (error) {
       console.error('❌ [StorageService] ADD_SUB_WALLET FAILED', error);
       throw error;
@@ -521,10 +597,13 @@ class StorageService {
   /**
    * Set the active wallet (master key + sub-wallet)
    */
-  async setActiveWallet(masterKeyId: string, subWalletIndex: number): Promise<void> {
+  async setActiveWallet(masterKeyId: string, subWalletIndex?: number): Promise<void> {
+    // Default to index 0 if not specified
+    const safeSubWalletIndex = subWalletIndex ?? 0;
+    
     console.log('🔵 [StorageService] SET_ACTIVE_WALLET', {
       masterKeyId,
-      subWalletIndex,
+      subWalletIndex: safeSubWalletIndex,
     });
 
     try {
@@ -540,14 +619,14 @@ class StorageService {
       }
 
       // Validate sub-wallet exists
-      const subWallet = masterKey.subWallets.find((sw) => sw.index === subWalletIndex);
+      const subWallet = masterKey.subWallets.find((sw) => sw.index === safeSubWalletIndex);
       if (!subWallet) {
         throw new Error('Sub-wallet not found');
       }
 
       // Update active wallet
       storage.activeMasterKeyId = masterKeyId;
-      storage.activeSubWalletIndex = subWalletIndex;
+      storage.activeSubWalletIndex = safeSubWalletIndex;
 
       // Update timestamps
       masterKey.lastUsedAt = Date.now();

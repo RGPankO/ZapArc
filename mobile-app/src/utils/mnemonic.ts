@@ -25,7 +25,7 @@ export function generateMnemonic(): string {
 }
 
 /**
- * Validate a BIP39 mnemonic phrase
+ * Validate a mnemonic phrase using BIP39
  * @param mnemonic - The mnemonic phrase to validate
  * @returns true if the mnemonic is valid
  */
@@ -33,16 +33,26 @@ export function validateMnemonic(mnemonic: string): boolean {
   if (!mnemonic || typeof mnemonic !== 'string') {
     return false;
   }
-  return bip39.validateMnemonic(mnemonic.trim().toLowerCase());
+  // Normalize the mnemonic before validating (handles newlines, tabs, extra spaces)
+  const normalized = normalizeMnemonic(mnemonic);
+  return bip39.validateMnemonic(normalized);
 }
 
 /**
- * Normalize a mnemonic (lowercase, single spaces)
+ * Normalize a mnemonic (lowercase, single spaces, handles newlines/tabs)
  * @param mnemonic - The mnemonic to normalize
  * @returns Normalized mnemonic
  */
 export function normalizeMnemonic(mnemonic: string): string {
-  return mnemonic.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!mnemonic || typeof mnemonic !== 'string') {
+    return '';
+  }
+  // Replace any whitespace (spaces, tabs, newlines) with single space
+  // Also handles Windows \r\n line endings
+  return mnemonic
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\r\n]+/g, ' ');
 }
 
 /**

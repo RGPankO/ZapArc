@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Text, IconButton, useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWalletAuth } from '../../../hooks/useWalletAuth';
 
@@ -33,12 +33,18 @@ const KEYPAD = [
 
 export function PinEntryScreen(): React.JSX.Element {
   const theme = useTheme();
+  // Get route params for wallet switching
+  const params = useLocalSearchParams<{ masterKeyId?: string; subWalletIndex?: string }>();
+  const targetMasterKeyId = params.masterKeyId;
+  const targetSubWalletIndex = params.subWalletIndex ? parseInt(params.subWalletIndex, 10) : 0;
+  
   const {
     unlock,
     unlockWithBiometric,
     biometricAvailable,
     biometricType,
     activeWalletInfo,
+    selectWallet,
     isLoading,
     error: authError,
   } = useWalletAuth();
@@ -111,25 +117,45 @@ export function PinEntryScreen(): React.JSX.Element {
     if (pin.length !== PIN_LENGTH) return;
 
     try {
-      const success = await unlock(pin);
-
-      if (success) {
-        router.replace('/wallet/home');
+      // If we have target wallet params, use selectWallet to switch to it
+      if (targetMasterKeyId) {
+        const success = await selectWallet(targetMasterKeyId, targetSubWalletIndex, pin);
+        if (success) {
+          router.replace('/wallet/home');
+        } else {
+          setError('Incorrect PIN');
+          setAttempts((prev) => prev + 1);
+          shake();
+          setPin('');
+        }
       } else {
-        setError('Incorrect PIN');
-        setAttempts((prev) => prev + 1);
-        shake();
-        setPin('');
+        // Normal unlock for the current wallet
+        const success = await unlock(pin);
+        if (success) {
+          router.replace('/wallet/home');
+        } else {
+          setError('Incorrect PIN');
+          setAttempts((prev) => prev + 1);
+          shake();
+          setPin('');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unlock failed');
       shake();
       setPin('');
     }
-  }, [pin, unlock, shake]);
+  }, [pin, unlock, selectWallet, targetMasterKeyId, targetSubWalletIndex, shake]);
 
   const handleBiometricUnlock = useCallback(async () => {
     try {
+      // Biometric can only unlock current wallet, not switch to different one
+      if (targetMasterKeyId) {
+        // Cannot use biometric for switching wallets - need PIN
+        setError('Please enter PIN to switch wallets');
+        return;
+      }
+      
       const success = await unlockWithBiometric();
 
       if (success) {
@@ -139,7 +165,7 @@ export function PinEntryScreen(): React.JSX.Element {
       // User cancelled or biometric failed - they can use PIN
       console.log('Biometric unlock failed:', err);
     }
-  }, [unlockWithBiometric]);
+  }, [unlockWithBiometric, targetMasterKeyId]);
 
   // ========================================
   // Get biometric icon
