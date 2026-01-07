@@ -45,10 +45,10 @@ export function TipQRCodeScreen(): React.JSX.Element {
   }, [params.encoded]);
 
   // Handle copy
-  const handleCopy = useCallback(async () => {
+  const handleCopy = useCallback(() => {
     if (!params.encoded) return;
 
-    await Clipboard.setStringAsync(params.encoded);
+    Clipboard.setString(params.encoded);
     Alert.alert('Copied!', 'Tip request copied to clipboard');
   }, [params.encoded]);
 

@@ -298,6 +298,16 @@ export function WalletCreationScreen(): React.JSX.Element {
       >
         Generate Recovery Phrase
       </Button>
+
+      <Button
+        mode="text"
+        onPress={() => router.replace('/wallet/import')}
+        style={styles.secondaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.secondaryButtonLabel}
+      >
+        Import existing wallet instead
+      </Button>
     </View>
   );
 
@@ -733,6 +743,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1a1a2e',
+  },
+  secondaryButton: {
+    marginTop: 12,
+    borderRadius: 12,
+  },
+  secondaryButtonLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   actionRow: {
     flexDirection: 'row',

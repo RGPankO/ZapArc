@@ -17,18 +17,28 @@ export { storageService, StorageService } from './storageService';
 // Settings service (AsyncStorage for app settings)
 export { settingsService, SettingsService } from './settingsService';
 
-// Breez SDK service (Lightning Network operations)
+// Breez SDK Spark service (Lightning Network operations)
 export {
-  breezSDKService,
-  BreezSDKService,
-  type BreezConfig,
-  type InvoiceRequest,
-  type PaymentRequest,
-  type LnurlPayRequest,
-  type LnurlPayResult,
-  type NodeInfo,
-  type WalletActivityCheck,
-} from './breezSDKService';
+  BreezSparkService,
+  initializeSDK,
+  disconnectSDK,
+  isSDKInitialized,
+  getBalance,
+  prepareSendPayment,
+  sendPayment,
+  payInvoice,
+  receivePayment,
+  getSparkAddress,
+  listPayments,
+  getPayment,
+  payLightningAddress,
+  parsePaymentRequest,
+  addPaymentListener,
+  type WalletBalance,
+  type PaymentResult,
+  type ReceivePaymentResult,
+  type TransactionInfo,
+} from './breezSparkService';
 
 // Location service (country detection)
 export {

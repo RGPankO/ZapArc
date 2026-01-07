@@ -93,9 +93,12 @@ export function BackupScreen(): React.JSX.Element {
         {
           text: 'Copy',
           style: 'destructive',
-          onPress: async () => {
-            await Clipboard.setStringAsync(mnemonic);
-            // Android shows a native clipboard notification
+          onPress: () => {
+            Clipboard.setString(mnemonic);
+            Alert.alert(
+              'Copied',
+              'Recovery phrase copied to clipboard. Clear your clipboard after use.'
+            );
           },
         },
       ]

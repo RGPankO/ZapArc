@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -15,6 +15,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@breeztech/breez-sdk-spark-react-native": "^0.6.6",
     "@expo/vector-icons": "^15.0.3",
     "@hookform/resolvers": "^5.2.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -27,7 +28,7 @@
     "expo-auth-session": "~7.0.10",
     "expo-barcode-scanner": "^13.0.1",
     "expo-camera": "^17.0.10",
-    "expo-clipboard": "8.0.8",
+    "expo-clipboard": "^8.0.8",
     "expo-crypto": "~15.0.8",
     "expo-linear-gradient": "^15.0.8",
     "expo-local-authentication": "^17.0.8",
@@ -42,6 +43,7 @@
     "react-dom": "19.1.0",
     "react-hook-form": "^7.62.0",
     "react-native": "0.81.5",
+    "react-native-fs": "^2.20.0",
     "react-native-get-random-values": "~1.11.0",
     "react-native-navigation-bar-color": "^2.0.2",
     "react-native-paper": "^5.14.5",

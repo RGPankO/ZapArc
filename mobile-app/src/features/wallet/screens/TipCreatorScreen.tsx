@@ -170,10 +170,10 @@ export function TipCreatorScreen(): React.JSX.Element {
   }, [tipRequest]);
 
   // Handle copy
-  const handleCopy = useCallback(async () => {
+  const handleCopy = useCallback(() => {
     if (!tipRequest) return;
 
-    await Clipboard.setStringAsync(tipRequest.encoded);
+    Clipboard.setString(tipRequest.encoded);
     Alert.alert('Copied!', 'Tip request copied to clipboard');
   }, [tipRequest]);
 

@@ -233,7 +233,7 @@ class StorageService {
           }
           // Fix incorrect nicknames (e.g., "Sub-Wallet 1" for index 0)
           const expectedNickname = sw.index === 0 ? 'Main Wallet' : `Sub-Wallet ${sw.index}`;
-          if (sw.nickname !== expectedNickname && sw.nickname.startsWith('Sub-Wallet')) {
+          if (sw.nickname && sw.nickname !== expectedNickname && sw.nickname.startsWith('Sub-Wallet')) {
             console.warn('⚠️ [StorageService] Fixing incorrect nickname:', sw.nickname, '->', expectedNickname);
             needsMigration = true;
             sw.nickname = expectedNickname;
