@@ -17,7 +17,6 @@ import type {
   SubWalletEntry,
   ActiveWalletInfo,
   Transaction,
-  WalletData,
 } from '../features/wallet/types';
 
 // =============================================================================
@@ -52,7 +51,7 @@ export interface WalletActions {
   restoreSubWallet: (masterKeyId: string, index: number) => Promise<void>;
 
   // Wallet switching
-  switchWallet: (masterKeyId: string, subWalletIndex: number) => Promise<void>;
+  switchWallet: (masterKeyId: string, subWalletIndex: number, pin?: string) => Promise<void>;
 
   // Master key operations
   deleteMasterKey: (masterKeyId: string, pin: string) => Promise<void>;
@@ -126,8 +125,6 @@ export function useWallet(): WalletState & WalletActions {
 
       if (data && BreezSparkService.isSDKInitialized()) {
         setIsConnected(true);
-        await refreshBalance();
-        await refreshTransactions();
       }
     } catch (err) {
       console.error('❌ [useWallet] Failed to load wallet data:', err);
@@ -161,6 +158,16 @@ export function useWallet(): WalletState & WalletActions {
           pin
         );
 
+        // Initialize Breez SDK with the new wallet's mnemonic (sub-wallet index 0)
+        try {
+          const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, 0);
+          await BreezSparkService.initializeSDK(derivedMnemonic);
+          console.log('✅ [useWallet] Breez SDK initialized for new wallet');
+        } catch (sdkError) {
+          // Log SDK error but don't fail creation - SDK may not be available in Expo Go
+          console.warn('⚠️ [useWallet] SDK initialization failed:', sdkError);
+        }
+
         await loadWalletData();
         console.log('✅ [useWallet] Master key created:', masterKeyId);
 
@@ -190,14 +197,25 @@ export function useWallet(): WalletState & WalletActions {
           throw new Error('Invalid mnemonic phrase');
         }
 
+        const normalizedMnemonic = mnemonic.trim().toLowerCase();
         const keyNumber = masterKeys.length + 1;
         const name = nickname ?? generateMasterKeyNickname(keyNumber);
 
         const masterKeyId = await storageService.createMasterKey(
-          mnemonic.trim().toLowerCase(),
+          normalizedMnemonic,
           name,
           pin
         );
+
+        // Initialize Breez SDK with the imported wallet's mnemonic (sub-wallet index 0)
+        try {
+          const derivedMnemonic = deriveSubWalletMnemonic(normalizedMnemonic, 0);
+          await BreezSparkService.initializeSDK(derivedMnemonic);
+          console.log('✅ [useWallet] Breez SDK initialized for imported wallet');
+        } catch (sdkError) {
+          // Log SDK error but don't fail import - SDK may not be available in Expo Go
+          console.warn('⚠️ [useWallet] SDK initialization failed:', sdkError);
+        }
 
         await loadWalletData();
         console.log('✅ [useWallet] Master key imported:', masterKeyId);
@@ -294,19 +312,30 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
 
   const switchWallet = useCallback(
-    async (masterKeyId: string, subWalletIndex: number): Promise<void> => {
+    async (masterKeyId: string, subWalletIndex: number, pin?: string): Promise<void> => {
       try {
         setIsLoading(true);
         setError(null);
 
         await storageService.setActiveWallet(masterKeyId, subWalletIndex);
-        await loadWalletData();
 
-        // TODO: Reconnect Breez SDK with new mnemonic
-        // const mnemonic = await getMnemonic(masterKeyId, pin);
-        // const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
-        // await breezSDKService.disconnect();
-        // await breezSDKService.connectWallet(derivedMnemonic);
+        // Reconnect Breez SDK with the new wallet's mnemonic
+        if (pin) {
+          try {
+            const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
+            if (mnemonic) {
+              await BreezSparkService.disconnectSDK();
+              const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
+              await BreezSparkService.initializeSDK(derivedMnemonic);
+              console.log('✅ [useWallet] Breez SDK reconnected for switched wallet');
+            }
+          } catch (sdkError) {
+            // Log SDK error but don't fail switch - SDK may not be available in Expo Go
+            console.warn('⚠️ [useWallet] SDK reconnection failed:', sdkError);
+          }
+        }
+
+        await loadWalletData();
 
         console.log('✅ [useWallet] Switched to wallet:', {
           masterKeyId,
@@ -386,13 +415,20 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
 
   const refreshBalance = useCallback(async (): Promise<void> => {
+    console.log('🔍 [useWallet] refreshBalance called');
+    console.log('🔍 [useWallet] isSDKInitialized:', BreezSparkService.isSDKInitialized());
+    console.log('🔍 [useWallet] isNativeAvailable:', BreezSparkService.isNativeAvailable());
+
     try {
       if (!BreezSparkService.isSDKInitialized()) {
+        console.warn('⚠️ [useWallet] SDK not initialized, setting balance to 0');
         setBalance(0);
         return;
       }
 
+      console.log('🔍 [useWallet] Calling BreezSparkService.getBalance()...');
       const walletBalance = await BreezSparkService.getBalance();
+      console.log('🔍 [useWallet] Raw balance response:', JSON.stringify(walletBalance));
       setBalance(walletBalance.balanceSat);
       console.log('✅ [useWallet] Balance refreshed:', walletBalance.balanceSat);
     } catch (err) {
@@ -424,6 +460,46 @@ export function useWallet(): WalletState & WalletActions {
       console.error('❌ [useWallet] Failed to refresh transactions:', err);
     }
   }, []);
+
+  // ========================================
+  // SDK Connection Status Sync
+  // ========================================
+
+  // Poll for SDK status changes (handles async initialization from useWalletAuth)
+  // This ensures balance loads after SDK becomes available
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkAndSync = async (): Promise<void> => {
+      const sdkInitialized = BreezSparkService.isSDKInitialized();
+
+      if (sdkInitialized && !isConnected && isMounted) {
+        console.log('✅ [useWallet] SDK now initialized, syncing state...');
+        setIsConnected(true);
+        // Refresh balance and transactions when SDK becomes available
+        await refreshBalance();
+        await refreshTransactions();
+      } else if (!sdkInitialized && isConnected && isMounted) {
+        console.log('⚠️ [useWallet] SDK disconnected');
+        setIsConnected(false);
+      }
+    };
+
+    // Initial check
+    checkAndSync();
+
+    // Poll every 500ms until SDK is initialized
+    const interval = global.setInterval(() => {
+      if (!isConnected && isMounted) {
+        checkAndSync();
+      }
+    }, 500);
+
+    return (): void => {
+      isMounted = false;
+      global.clearInterval(interval);
+    };
+  }, [isConnected, refreshBalance, refreshTransactions]);
 
   // ========================================
   // Payment Operations
@@ -480,7 +556,11 @@ export function useWallet(): WalletState & WalletActions {
 
   const getMnemonic = useCallback(
     async (masterKeyId: string, pin: string): Promise<string> => {
-      return storageService.getMasterKeyMnemonic(masterKeyId, pin);
+      const mnemonic = await storageService.getMasterKeyMnemonic(masterKeyId, pin);
+      if (!mnemonic) {
+        throw new Error('Failed to get mnemonic');
+      }
+      return mnemonic;
     },
     []
   );

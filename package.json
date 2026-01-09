@@ -40,5 +40,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/xAleksandar/mobile-skeleton-app.git"
+  },
+  "dependencies": {
+    "expo": "^54.0.31"
   }
 }

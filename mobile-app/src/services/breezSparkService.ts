@@ -88,46 +88,127 @@ export function isSDKInitialized(): boolean {
 }
 
 /**
+ * Generate a wallet-specific storage directory from mnemonic
+ * Uses a simple hash of first 3 words to create unique storage per wallet
+ */
+function generateWalletStorageId(mnemonic: string): string {
+  const words = mnemonic.trim().split(/\s+/);
+  // Use first 3 words to create a deterministic but unique identifier
+  const identifier = words.slice(0, 3).join('-');
+  // Create a simple hash for privacy (don't expose actual words in storage name)
+  let hash = 0;
+  for (let i = 0; i < identifier.length; i++) {
+    const char = identifier.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return `wallet-${Math.abs(hash).toString(16)}`;
+}
+
+/**
  * Initialize the Breez SDK with a mnemonic
  */
 export async function initializeSDK(
   mnemonic: string,
   apiKey?: string
 ): Promise<boolean> {
+  const walletId = generateWalletStorageId(mnemonic);
+  const mnemonicWords = mnemonic.trim().split(/\s+/);
+
+  console.log('🔵 [BreezSparkService] initializeSDK called');
+  console.log('🔵 [BreezSparkService] Mnemonic word count:', mnemonicWords.length);
+  console.log('🔵 [BreezSparkService] First 2 words:', mnemonicWords.slice(0, 2).join(' '));
+  console.log('🔵 [BreezSparkService] Wallet storage ID:', walletId);
+  console.log('🔵 [BreezSparkService] _isNativeAvailable:', _isNativeAvailable);
+
   if (!_isNativeAvailable) {
-    console.warn('[BreezSparkService] Cannot initialize - native SDK not available');
+    console.warn('⚠️ [BreezSparkService] Cannot initialize - native SDK not available');
     return false;
   }
 
   try {
-    if (sdkInstance) {
-      console.log('SDK already initialized');
-      return true;
+    // If already initialized with same wallet, return true
+    if (sdkInstance && _isInitialized) {
+      console.log('⚠️ [BreezSparkService] SDK already initialized, disconnecting first...');
+      await disconnectSDK();
     }
 
-    const config = BreezSDK.defaultConfig(BreezSDK.Network.Mainnet);
-    config.apiKey = apiKey || BREEZ_API_KEY;
+    // Construct the seed using mnemonic words (per official Breez SDK Spark docs)
+    const seed = new BreezSDK.Seed.Mnemonic({
+      mnemonic,
+      passphrase: undefined,
+    });
 
-    const storageDir = `${RNFS.DocumentDirectoryPath}/${BREEZ_STORAGE_DIR}`;
+    // Create the default config
+    const config = BreezSDK.defaultConfig(BreezSDK.Network.Mainnet);
+    
+    // Only set API key if provided (empty string = no key)
+    const effectiveApiKey = apiKey || BREEZ_API_KEY;
+    if (effectiveApiKey && effectiveApiKey.length > 0) {
+      config.apiKey = effectiveApiKey;
+      console.log('🔵 [BreezSparkService] API key configured: YES (length: ' + effectiveApiKey.length + ')');
+    } else {
+      console.log('🔵 [BreezSparkService] API key configured: NO (running without API key)');
+    }
+
+    // Use wallet-specific storage directory
+    const storageDir = `${RNFS.DocumentDirectoryPath}/${BREEZ_STORAGE_DIR}/${walletId}`;
+    console.log('🔵 [BreezSparkService] Storage directory:', storageDir);
 
     // Ensure storage directory exists
     const dirExists = await RNFS.exists(storageDir);
     if (!dirExists) {
+      console.log('🔵 [BreezSparkService] Creating storage directory...');
       await RNFS.mkdir(storageDir);
     }
 
+    console.log('🔵 [BreezSparkService] Calling BreezSDK.connect()...');
+    console.log('🔵 [BreezSparkService] Connect params:', {
+      hasConfig: !!config,
+      configApiKey: config?.apiKey ? '***SET***' : '***MISSING***',
+      hasSeed: !!seed,
+      seedType: seed?.constructor?.name,
+      storageDir,
+    });
+
+    // Log available SDK exports for debugging
+    console.log('🔵 [BreezSparkService] SDK exports:', Object.keys(BreezSDK || {}).slice(0, 20));
+
     sdkInstance = await BreezSDK.connect({
       config,
-      mnemonic,
+      seed,
       storageDir,
     });
 
     _isInitialized = true;
-    console.log('Breez SDK Spark initialized successfully');
+    console.log('✅ [BreezSparkService] Breez SDK initialized successfully');
+    console.log('✅ [BreezSparkService] sdkInstance:', !!sdkInstance);
     return true;
   } catch (error) {
-    console.error('Failed to initialize Breez SDK:', error);
+    // Try multiple ways to extract error info from native errors
+    const errorStr = String(error);
+    const errorName = (error as { name?: string })?.name || 'Unknown';
+    const errorMessage = (error as { message?: string })?.message || errorStr;
+    const errorCode = (error as { code?: string })?.code;
+    const errorVariant = (error as { variant?: string })?.variant;
+
+    console.error('❌ [BreezSparkService] Failed to initialize Breez SDK');
+    console.error('❌ [BreezSparkService] Error toString:', errorStr);
+    console.error('❌ [BreezSparkService] Error name:', errorName);
+    console.error('❌ [BreezSparkService] Error message:', errorMessage);
+    console.error('❌ [BreezSparkService] Error code:', errorCode);
+    console.error('❌ [BreezSparkService] Error variant:', errorVariant);
+
+    // Log all own properties
+    if (error && typeof error === 'object') {
+      console.error('❌ [BreezSparkService] Error properties:', Object.keys(error));
+      for (const key of Object.keys(error)) {
+        console.error(`❌ [BreezSparkService] Error.${key}:`, (error as Record<string, unknown>)[key]);
+      }
+    }
+
     _isInitialized = false;
+    sdkInstance = null;
     return false;
   }
 }
@@ -154,13 +235,47 @@ export async function disconnectSDK(): Promise<void> {
  * Get current wallet balance
  */
 export async function getBalance(): Promise<WalletBalance> {
+  console.log('🔍 [BreezSparkService] getBalance called');
+  console.log('🔍 [BreezSparkService] _isNativeAvailable:', _isNativeAvailable);
+  console.log('🔍 [BreezSparkService] sdkInstance:', !!sdkInstance);
+  console.log('🔍 [BreezSparkService] _isInitialized:', _isInitialized);
+
   if (!_isNativeAvailable || !sdkInstance) {
+    console.warn('⚠️ [BreezSparkService] SDK not available, returning 0 balance');
     return { balanceSat: 0, pendingSendSat: 0, pendingReceiveSat: 0 };
   }
 
   try {
+    // First try to get balance from getInfo() - this is the proper way
+    console.log('🔍 [BreezSparkService] Attempting to get wallet info...');
+    try {
+      // Spark SDK requires { ensureSynced: false } parameter
+      // Right after startup, cache may not reflect latest state
+      const info = await sdkInstance.getInfo({ ensureSynced: false });
+      // Note: Can't JSON.stringify BigInt, so just log existence
+      console.log('✅ [BreezSparkService] getInfo() response received, balanceSats:', String(info?.balanceSats));
+
+      // Spark SDK uses "balanceSats" not "balanceSat"
+      if (info && typeof info.balanceSats !== 'undefined') {
+        console.log('✅ [BreezSparkService] Balance from getInfo:', info.balanceSats);
+        return {
+          balanceSat: Number(info.balanceSats) || 0,
+          pendingSendSat: Number(info.pendingSendSats) || 0,
+          pendingReceiveSat: Number(info.pendingReceiveSats) || 0,
+        };
+      }
+    } catch (infoError) {
+      console.warn('⚠️ [BreezSparkService] getInfo() failed, falling back to listPayments:', infoError);
+    }
+
+    // Fallback: Calculate from payments
+    console.log('🔍 [BreezSparkService] Calculating balance from payments...');
     const response = await sdkInstance.listPayments({});
-    const payments = response.payments;
+    // Note: Can't JSON.stringify BigInt values
+    console.log('🔍 [BreezSparkService] listPayments returned, count:', response?.payments?.length || 0);
+
+    const payments = response.payments || response || [];
+    console.log('🔍 [BreezSparkService] Number of payments:', payments.length);
 
     let balanceSat = 0;
     let pendingSendSat = 0;
@@ -171,6 +286,13 @@ export async function getBalance(): Promise<WalletBalance> {
       const paymentType = payment.paymentType;
       const amount = Number(payment.amountSat);
       const fees = Number(payment.feesSat || 0);
+
+      console.log('🔍 [BreezSparkService] Payment:', {
+        status,
+        paymentType,
+        amount,
+        fees,
+      });
 
       if (status === 'completed' || status === 'Completed') {
         if (paymentType === 'receive' || paymentType === 'Receive') {
@@ -187,13 +309,19 @@ export async function getBalance(): Promise<WalletBalance> {
       }
     }
 
+    console.log('✅ [BreezSparkService] Calculated balance:', {
+      balanceSat: Math.max(0, balanceSat),
+      pendingSendSat,
+      pendingReceiveSat,
+    });
+
     return {
       balanceSat: Math.max(0, balanceSat),
       pendingSendSat,
       pendingReceiveSat,
     };
   } catch (error) {
-    console.error('Failed to get balance:', error);
+    console.error('❌ [BreezSparkService] Failed to get balance:', error);
     return { balanceSat: 0, pendingSendSat: 0, pendingReceiveSat: 0 };
   }
 }
@@ -459,8 +587,16 @@ export function addPaymentListener(
 // Helper Functions
 // =============================================================================
 
-function mapPaymentStatus(status: string): 'pending' | 'completed' | 'failed' {
-  const s = status?.toLowerCase();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapPaymentStatus(status: any): 'pending' | 'completed' | 'failed' {
+  // Spark SDK may return status as an object like { type: 'completed' } or as a string
+  let s: string;
+  if (typeof status === 'object' && status !== null) {
+    s = (status.type || status.variant || '').toLowerCase();
+  } else {
+    s = String(status || '').toLowerCase();
+  }
+  
   if (s === 'completed' || s === 'complete' || s === 'succeeded') {
     return 'completed';
   }

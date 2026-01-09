@@ -44,13 +44,29 @@
     ],
     "plugins": [
       "expo-router",
-      "expo-web-browser",
-      "@breeztech/breez-sdk-spark-react-native"
+      "@breeztech/breez-sdk-spark-react-native",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "kotlinVersion": "1.9.25",
+            "packagingOptions": {
+              "pickFirst": [
+                "lib/x86/libc++_shared.so",
+                "lib/x86_64/libc++_shared.so",
+                "lib/armeabi-v7a/libc++_shared.so",
+                "lib/arm64-v8a/libc++_shared.so"
+              ]
+            }
+          }
+        }
+      ]
     ],
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d4d44a38-7d8f-4fcf-8e6e-fd902816ba47"
+        "projectId": "78dfec1d-b667-4098-9889-e26967227324"
       }
     }
   }

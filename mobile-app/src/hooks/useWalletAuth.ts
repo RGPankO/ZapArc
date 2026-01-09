@@ -5,6 +5,8 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { storageService, settingsService } from '../services';
+import * as BreezSparkService from '../services/breezSparkService';
+import { deriveSubWalletMnemonic } from '../utils/mnemonic';
 import type { ActiveWalletInfo } from '../features/wallet/types';
 
 // =============================================================================
@@ -172,6 +174,9 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
     }
   };
 
+  // Session PIN for SDK initialization (stored in memory only, not persisted)
+  const sessionPinRef = useRef<string | null>(null);
+
   const unlockWithBiometric = useCallback(async (): Promise<boolean> => {
     try {
       setIsLoading(true);
@@ -191,6 +196,29 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
         await storageService.unlockWallet();
         setIsUnlocked(true);
         updateActivity();
+
+        // Initialize Breez SDK if we have a cached session PIN
+        if (sessionPinRef.current && currentMasterKeyId) {
+          try {
+            const mnemonic = await storageService.getMasterKeyMnemonic(
+              currentMasterKeyId,
+              sessionPinRef.current
+            );
+            if (mnemonic) {
+              const walletInfo = await storageService.getActiveWalletInfo();
+              const subWalletIndex = walletInfo?.subWalletIndex ?? 0;
+              const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
+
+              await BreezSparkService.initializeSDK(derivedMnemonic);
+              console.log('✅ [useWalletAuth] Breez SDK initialized (biometric with cached PIN)');
+            }
+          } catch (sdkError) {
+            console.warn('⚠️ [useWalletAuth] SDK initialization failed (biometric):', sdkError);
+          }
+        } else {
+          console.warn('⚠️ [useWalletAuth] No cached PIN for biometric SDK init - user needs to unlock with PIN first');
+        }
+
         console.log('✅ [useWalletAuth] Unlocked with biometric');
         return true;
       }
@@ -207,7 +235,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
     } finally {
       setIsLoading(false);
     }
-  }, [biometricAvailable]);
+  }, [biometricAvailable, currentMasterKeyId]);
 
   // ========================================
   // PIN Operations
@@ -230,6 +258,25 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
           return false;
         }
 
+        // Cache PIN for biometric unlock SDK initialization
+        sessionPinRef.current = pin;
+
+        // Initialize Breez SDK with the wallet's mnemonic
+        try {
+          const mnemonic = await storageService.getMasterKeyMnemonic(currentMasterKeyId, pin);
+          if (mnemonic) {
+            const walletInfo = await storageService.getActiveWalletInfo();
+            const subWalletIndex = walletInfo?.subWalletIndex ?? 0;
+            const derivedMnemonic = deriveSubWalletMnemonic(mnemonic, subWalletIndex);
+
+            await BreezSparkService.initializeSDK(derivedMnemonic);
+            console.log('✅ [useWalletAuth] Breez SDK initialized');
+          }
+        } catch (sdkError) {
+          // Log SDK error but don't fail unlock - SDK may not be available in Expo Go
+          console.warn('⚠️ [useWalletAuth] SDK initialization failed:', sdkError);
+        }
+
         await storageService.unlockWallet();
         setIsUnlocked(true);
         updateActivity();
@@ -250,6 +297,7 @@ export function useWalletAuth(): WalletAuthState & WalletAuthActions {
   const lock = useCallback(async (): Promise<void> => {
     try {
       await storageService.lockWallet();
+      sessionPinRef.current = null; // Clear cached PIN for security
       setIsUnlocked(false);
       console.log('✅ [useWalletAuth] Wallet locked');
     } catch (err) {

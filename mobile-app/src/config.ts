@@ -2,9 +2,8 @@
 // Environment variables and constants
 
 // Breez SDK Configuration
-// Note: Get your API key from https://breez.technology
-export const BREEZ_API_KEY = process.env.EXPO_PUBLIC_BREEZ_API_KEY || '';
-export const BREEZ_STORAGE_DIR = 'breez_spark';
+// Re-export from dedicated breez config file
+export { BREEZ_API_KEY, BREEZ_STORAGE_DIR } from './config/breezConfig';
 
 // Network Configuration
 export const DEFAULT_NETWORK = 'mainnet';

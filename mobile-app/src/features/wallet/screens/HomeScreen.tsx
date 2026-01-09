@@ -79,12 +79,14 @@ export function HomeScreen(): React.JSX.Element {
     }
   }, [refreshBalance, refreshTransactions]);
 
-  // Initial load
+  // Initial load - refresh when connected
+  // Note: The useWallet hook now handles SDK initialization detection
+  // and will automatically refresh balance when SDK becomes available
   useEffect(() => {
     if (isConnected) {
       handleRefresh();
     }
-  }, [isConnected]);
+  }, [isConnected, handleRefresh]);
 
   // Navigation handlers
   const handleSend = (): void => {
@@ -118,8 +120,8 @@ export function HomeScreen(): React.JSX.Element {
 
   // Render transaction item
   const renderTransaction = (tx: Transaction, index: number): React.JSX.Element => {
-    const isReceived = tx.type === 'received';
-    const amount = tx.amountSats;
+    const isReceived = tx.type === 'receive';
+    const amount = tx.amount ?? 0; // Transaction type uses 'amount', not 'amountSats'
     const date = new Date(tx.timestamp).toLocaleDateString();
 
     return (
