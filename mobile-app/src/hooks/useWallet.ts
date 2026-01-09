@@ -415,22 +415,14 @@ export function useWallet(): WalletState & WalletActions {
   // ========================================
 
   const refreshBalance = useCallback(async (): Promise<void> => {
-    console.log('🔍 [useWallet] refreshBalance called');
-    console.log('🔍 [useWallet] isSDKInitialized:', BreezSparkService.isSDKInitialized());
-    console.log('🔍 [useWallet] isNativeAvailable:', BreezSparkService.isNativeAvailable());
-
     try {
       if (!BreezSparkService.isSDKInitialized()) {
-        console.warn('⚠️ [useWallet] SDK not initialized, setting balance to 0');
         setBalance(0);
         return;
       }
 
-      console.log('🔍 [useWallet] Calling BreezSparkService.getBalance()...');
       const walletBalance = await BreezSparkService.getBalance();
-      console.log('🔍 [useWallet] Raw balance response:', JSON.stringify(walletBalance));
       setBalance(walletBalance.balanceSat);
-      console.log('✅ [useWallet] Balance refreshed:', walletBalance.balanceSat);
     } catch (err) {
       console.error('❌ [useWallet] Failed to refresh balance:', err);
     }
@@ -448,8 +440,8 @@ export function useWallet(): WalletState & WalletActions {
       const txs: Transaction[] = payments.map((p) => ({
         id: p.id,
         type: p.type,
-        amount: p.amountSat,
-        feeSats: p.feeSat,
+        amount: p.amount, // Fixed: breezSparkService returns 'amount', not 'amountSat'
+        feeSats: p.feeSats, // Fixed: breezSparkService returns 'feeSats', not 'feeSat'
         status: p.status,
         timestamp: p.timestamp,
         description: p.description,

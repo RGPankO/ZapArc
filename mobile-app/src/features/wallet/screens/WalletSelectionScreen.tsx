@@ -24,7 +24,7 @@ import type { MasterKeyEntry, SubWalletEntry } from '../types';
 export function WalletSelectionScreen(): React.JSX.Element {
   const theme = useTheme();
   const { masterKeys, activeWalletInfo } = useWallet();
-  const { selectWallet, currentMasterKeyId } = useWalletAuth();
+  const { selectWallet, selectSubWallet, currentMasterKeyId } = useWalletAuth();
 
   // State
   const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(
@@ -67,11 +67,11 @@ export function WalletSelectionScreen(): React.JSX.Element {
         return;
       }
 
-      // Same master key - no PIN required
+      // Same master key - use selectSubWallet which will reinitialize SDK
       try {
         setIsLoading(true);
-        const success = await selectWallet(masterKeyId, subWalletIndex, '');
-        
+        const success = await selectSubWallet(subWalletIndex);
+
         if (success) {
           router.replace('/wallet/home');
         }
@@ -81,7 +81,7 @@ export function WalletSelectionScreen(): React.JSX.Element {
         setIsLoading(false);
       }
     },
-    [currentMasterKeyId, selectWallet]
+    [currentMasterKeyId, selectSubWallet]
   );
 
   const handlePinSubmit = useCallback(async () => {

@@ -29,6 +29,7 @@ const STORAGE_KEYS = {
   LAST_ACTIVITY: 'zap_arc_last_activity',
   ACTIVE_MASTER_KEY_ID: 'zap_arc_active_master_key',
   ACTIVE_SUB_WALLET_INDEX: 'zap_arc_active_sub_wallet',
+  BIOMETRIC_PIN_PREFIX: 'zap_arc_biometric_pin_', // Prefix for biometric-protected PINs
 } as const;
 
 // =============================================================================
@@ -734,6 +735,80 @@ class StorageService {
     } catch (error) {
       console.error('❌ [StorageService] GET_NEXT_SUB_WALLET_INDEX FAILED', error);
       throw error;
+    }
+  }
+
+  // ========================================
+  // Biometric PIN Storage
+  // ========================================
+
+  /**
+   * Store PIN for biometric unlock
+   * This PIN is stored in secure storage (encrypted at rest)
+   * Access control is enforced by checking biometric BEFORE retrieving the PIN
+   */
+  async storeBiometricPin(masterKeyId: string, pin: string): Promise<void> {
+    try {
+      const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
+      // Store in SecureStore (encrypted at rest)
+      // Authentication is checked via LocalAuthentication before retrieving
+      await SecureStore.setItemAsync(key, pin);
+      console.log('✅ [StorageService] Biometric PIN stored for master key:', masterKeyId);
+    } catch (error) {
+      console.error('❌ [StorageService] Failed to store biometric PIN:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Retrieve PIN for biometric unlock
+   * Note: Authentication happens before calling this method via LocalAuthentication.authenticateAsync
+   * The PIN is stored in secure storage but retrieved without additional auth prompt
+   */
+  async getBiometricPin(masterKeyId: string): Promise<string | null> {
+    try {
+      const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
+      // Don't require authentication here - user already authenticated via LocalAuthentication
+      const pin = await SecureStore.getItemAsync(key);
+
+      if (pin) {
+        console.log('✅ [StorageService] Biometric PIN retrieved for master key:', masterKeyId);
+      } else {
+        console.log('⚠️ [StorageService] No biometric PIN found for master key:', masterKeyId);
+      }
+
+      return pin;
+    } catch (error) {
+      console.error('❌ [StorageService] Failed to retrieve biometric PIN:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete biometric PIN for a master key
+   */
+  async deleteBiometricPin(masterKeyId: string): Promise<void> {
+    try {
+      const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
+      await SecureStore.deleteItemAsync(key);
+      console.log('✅ [StorageService] Biometric PIN deleted for master key:', masterKeyId);
+    } catch (error) {
+      console.error('❌ [StorageService] Failed to delete biometric PIN:', error);
+      // Don't throw - deletion failure shouldn't block other operations
+    }
+  }
+
+  /**
+   * Check if biometric PIN is stored for a master key
+   */
+  async hasBiometricPin(masterKeyId: string): Promise<boolean> {
+    try {
+      const key = `${STORAGE_KEYS.BIOMETRIC_PIN_PREFIX}${masterKeyId}`;
+      const pin = await SecureStore.getItemAsync(key);
+      return pin !== null;
+    } catch (error) {
+      console.error('❌ [StorageService] Failed to check biometric PIN:', error);
+      return false;
     }
   }
 }

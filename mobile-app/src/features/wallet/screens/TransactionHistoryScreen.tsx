@@ -38,7 +38,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
   // Filtered transactions
   const filteredTransactions = useMemo(() => {
     if (filter === 'all') return transactions;
-    return transactions.filter((tx) => tx.type === filter);
+    return transactions.filter((tx) => tx.type === filter.replace('ed', '') as 'send' | 'receive');
   }, [transactions, filter]);
 
   // Group transactions by date
@@ -85,7 +85,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
 
   // Render transaction item
   const renderTransaction = (tx: Transaction): React.JSX.Element => {
-    const isReceived = tx.type === 'received';
+    const isReceived = tx.type === 'receive';
 
     return (
       <TouchableOpacity
@@ -117,7 +117,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               isReceived ? styles.amountReceived : styles.amountSent,
             ]}
           >
-            {isReceived ? '+' : '-'}{tx.amountSats.toLocaleString()}
+            {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()}
           </Text>
           <Text style={styles.transactionAmountUnit}>sats</Text>
         </View>
@@ -137,7 +137,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
     if (!selectedTransaction) return null;
 
     const tx = selectedTransaction;
-    const isReceived = tx.type === 'received';
+    const isReceived = tx.type === 'receive';
     const date = new Date(tx.timestamp);
 
     return (
@@ -178,7 +178,7 @@ export function TransactionHistoryScreen(): React.JSX.Element {
                   isReceived ? styles.amountReceived : styles.amountSent,
                 ]}
               >
-                {isReceived ? '+' : '-'}{tx.amountSats.toLocaleString()} sats
+                {isReceived ? '+' : '-'}{(tx.amount ?? 0).toLocaleString()} sats
               </Text>
               <Text style={styles.modalStatus}>
                 {tx.status === 'completed' ? '✓ Completed' : tx.status}
@@ -202,8 +202,8 @@ export function TransactionHistoryScreen(): React.JSX.Element {
               {tx.description && (
                 <DetailRow label="Description" value={tx.description} />
               )}
-              {tx.fee !== undefined && tx.fee > 0 && (
-                <DetailRow label="Fee" value={`${tx.fee.toLocaleString()} sats`} />
+              {tx.feeSats !== undefined && tx.feeSats > 0 && (
+                <DetailRow label="Fee" value={`${tx.feeSats.toLocaleString()} sats`} />
               )}
               {tx.paymentHash && (
                 <DetailRow

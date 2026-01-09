@@ -221,13 +221,14 @@ export async function disconnectSDK(): Promise<void> {
 
   try {
     if (sdkInstance) {
-      await BreezSDK.disconnect();
+      // Spark SDK uses sdkInstance.disconnect(), not BreezSDK.disconnect()
+      await sdkInstance.disconnect();
       sdkInstance = null;
       _isInitialized = false;
-      console.log('Breez SDK disconnected');
+      console.log('✅ [BreezSparkService] Breez SDK disconnected');
     }
   } catch (error) {
-    console.error('Failed to disconnect SDK:', error);
+    console.error('❌ [BreezSparkService] Failed to disconnect SDK:', error);
   }
 }
 
@@ -235,85 +236,60 @@ export async function disconnectSDK(): Promise<void> {
  * Get current wallet balance
  */
 export async function getBalance(): Promise<WalletBalance> {
-  console.log('🔍 [BreezSparkService] getBalance called');
-  console.log('🔍 [BreezSparkService] _isNativeAvailable:', _isNativeAvailable);
-  console.log('🔍 [BreezSparkService] sdkInstance:', !!sdkInstance);
-  console.log('🔍 [BreezSparkService] _isInitialized:', _isInitialized);
-
   if (!_isNativeAvailable || !sdkInstance) {
-    console.warn('⚠️ [BreezSparkService] SDK not available, returning 0 balance');
     return { balanceSat: 0, pendingSendSat: 0, pendingReceiveSat: 0 };
   }
 
   try {
-    // First try to get balance from getInfo() - this is the proper way
-    console.log('🔍 [BreezSparkService] Attempting to get wallet info...');
+    // First try to get balance from getInfo()
     try {
-      // Spark SDK requires { ensureSynced: false } parameter
-      // Right after startup, cache may not reflect latest state
-      const info = await sdkInstance.getInfo({ ensureSynced: false });
-      // Note: Can't JSON.stringify BigInt, so just log existence
-      console.log('✅ [BreezSparkService] getInfo() response received, balanceSats:', String(info?.balanceSats));
-
-      // Spark SDK uses "balanceSats" not "balanceSat"
-      if (info && typeof info.balanceSats !== 'undefined') {
-        console.log('✅ [BreezSparkService] Balance from getInfo:', info.balanceSats);
+      const info = await sdkInstance.getInfo({ ensureSynced: true });
+      if (info) {
         return {
-          balanceSat: Number(info.balanceSats) || 0,
-          pendingSendSat: Number(info.pendingSendSats) || 0,
-          pendingReceiveSat: Number(info.pendingReceiveSats) || 0,
+          balanceSat: Number(info.balanceSats || 0),
+          pendingSendSat: Number(info.pendingSendSats || 0),
+          pendingReceiveSat: Number(info.pendingReceiveSats || 0),
         };
       }
     } catch (infoError) {
-      console.warn('⚠️ [BreezSparkService] getInfo() failed, falling back to listPayments:', infoError);
+      console.warn('⚠️ [BreezSparkService] getInfo() failed:', infoError);
     }
 
     // Fallback: Calculate from payments
-    console.log('🔍 [BreezSparkService] Calculating balance from payments...');
     const response = await sdkInstance.listPayments({});
-    // Note: Can't JSON.stringify BigInt values
-    console.log('🔍 [BreezSparkService] listPayments returned, count:', response?.payments?.length || 0);
-
-    const payments = response.payments || response || [];
-    console.log('🔍 [BreezSparkService] Number of payments:', payments.length);
+    const payments = response.payments || [];
 
     let balanceSat = 0;
     let pendingSendSat = 0;
     let pendingReceiveSat = 0;
 
     for (const payment of payments) {
-      const status = payment.status;
-      const paymentType = payment.paymentType;
-      const amount = Number(payment.amountSat);
-      const fees = Number(payment.feesSat || 0);
+      // Spark SDK uses object status and plural Sats
+      const status = mapPaymentStatus(payment.status);
+      const paymentType = (payment.paymentType === 'receive' || String(payment.paymentType).toLowerCase() === 'receive') ? 'receive' : 'send';
+      
+      const amount = typeof payment.amountSats === 'bigint' 
+        ? Number(payment.amountSats) 
+        : Number(payment.amountSats || 0);
+        
+      const fees = typeof payment.feesSats === 'bigint' 
+        ? Number(payment.feesSats) 
+        : Number(payment.feesSats || 0);
 
-      console.log('🔍 [BreezSparkService] Payment:', {
-        status,
-        paymentType,
-        amount,
-        fees,
-      });
-
-      if (status === 'completed' || status === 'Completed') {
-        if (paymentType === 'receive' || paymentType === 'Receive') {
+      if (status === 'completed') {
+        if (paymentType === 'receive') {
           balanceSat += amount;
         } else {
           balanceSat -= amount + fees;
         }
-      } else if (status === 'pending' || status === 'Pending') {
-        if (paymentType === 'receive' || paymentType === 'Receive') {
+      } else if (status === 'pending') {
+        if (paymentType === 'receive') {
           pendingReceiveSat += amount;
         } else {
           pendingSendSat += amount;
         }
       }
     }
-
-    console.log('✅ [BreezSparkService] Calculated balance:', {
-      balanceSat: Math.max(0, balanceSat),
-      pendingSendSat,
-      pendingReceiveSat,
-    });
 
     return {
       balanceSat: Math.max(0, balanceSat),
@@ -403,23 +379,38 @@ export async function listPayments(): Promise<TransactionInfo[]> {
       sortAscending: false,
     });
 
-    return response.payments.map((payment: {
-      id: string;
-      paymentType: string;
-      amountSat: bigint | number;
-      feesSat?: bigint | number;
-      status: string;
-      createdAt: bigint | number;
-      description?: string;
-    }) => ({
-      id: payment.id,
-      type: (payment.paymentType === 'receive' || payment.paymentType === 'Receive') ? 'receive' : 'send',
-      amountSat: Number(payment.amountSat),
-      feeSat: Number(payment.feesSat || 0),
-      status: mapPaymentStatus(payment.status),
-      timestamp: Number(payment.createdAt) * 1000,
-      description: payment.description,
-    }));
+    const payments = response.payments || [];
+
+    return payments.map((payment: any) => {
+      const rawAmount = payment.amount || 0;
+      const amount = typeof rawAmount === 'bigint' ? Number(rawAmount) : Number(rawAmount);
+
+      const rawFees = payment.fees || 0;
+      const feeSats = typeof rawFees === 'bigint' ? Number(rawFees) : Number(rawFees);
+
+      const rawTime = payment.timestamp || 0;
+      let timestamp = typeof rawTime === 'bigint' ? Number(rawTime) : Number(rawTime);
+      if (timestamp > 0 && timestamp < 10000000000) {
+        timestamp *= 1000;
+      }
+
+      let type: 'receive' | 'send' = 'send';
+      if (payment.paymentType === 1 || payment.paymentType === '1') {
+        type = 'receive';
+      }
+
+      const description = payment.details?.description || payment.description || '';
+
+      return {
+        id: payment.id,
+        type,
+        amount,
+        feeSats,
+        status: mapPaymentStatus(payment.status),
+        timestamp: timestamp || Date.now(),
+        description,
+      };
+    });
   } catch (error) {
     console.error('Failed to list payments:', error);
     return [];
@@ -438,13 +429,25 @@ export async function getPayment(paymentId: string): Promise<TransactionInfo | n
     const response = await sdkInstance.getPayment({ paymentId });
     if (response.payment) {
       const p = response.payment;
+      // Properly convert BigInt to number for amounts
+      const amountSat = typeof p.amountSat === 'bigint'
+        ? Number(p.amountSat)
+        : p.amountSat;
+      const feeSat = p.feesSat
+        ? (typeof p.feesSat === 'bigint' ? Number(p.feesSat) : p.feesSat)
+        : 0;
+      // Convert timestamp from seconds to milliseconds
+      const timestamp = typeof p.createdAt === 'bigint'
+        ? Number(p.createdAt) * 1000
+        : p.createdAt * 1000;
+
       return {
         id: p.id,
         type: (p.paymentType === 'receive' || p.paymentType === 'Receive') ? 'receive' : 'send',
-        amountSat: Number(p.amountSat),
-        feeSat: Number(p.feesSat || 0),
+        amountSat,
+        feeSat,
         status: mapPaymentStatus(p.status),
-        timestamp: Number(p.createdAt) * 1000,
+        timestamp,
         description: p.description,
       };
     }

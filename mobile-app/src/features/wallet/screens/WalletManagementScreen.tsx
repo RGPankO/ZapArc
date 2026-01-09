@@ -53,10 +53,9 @@ export function WalletManagementScreen(): React.JSX.Element {
     restoreSubWallet,
     deleteMasterKey,
     canAddSubWallet,
-    switchWallet,
     isLoading,
   } = useWallet();
-  const { activeWalletInfo, verifyPin } = useWalletAuth();
+  const { activeWalletInfo, verifyPin, selectSubWallet } = useWalletAuth();
 
   // State
   const [expandedMasterKeys, setExpandedMasterKeys] = useState<Set<string>>(
@@ -205,9 +204,16 @@ export function WalletManagementScreen(): React.JSX.Element {
     async (masterKeyId: string, subWalletIndex: number) => {
       try {
         setProcessing(true);
-        // For same master key, no PIN needed - use switchWallet from useWallet
+        setError(null);
+
+        // For same master key, no PIN needed - use selectSubWallet which reinitializes SDK
         if (masterKeyId === activeMasterKey?.id) {
-          await switchWallet(masterKeyId, subWalletIndex);
+          const success = await selectSubWallet(subWalletIndex);
+          if (success) {
+            router.replace('/wallet/home');
+          } else {
+            Alert.alert('Error', 'Failed to switch wallet');
+          }
         } else {
           // Navigate to unlock with this wallet pre-selected
           router.push({
@@ -217,12 +223,15 @@ export function WalletManagementScreen(): React.JSX.Element {
           return;
         }
       } catch (err) {
-        Alert.alert('Error', 'Failed to switch wallet');
+        console.error('❌ [WalletManagement] Switch wallet error:', err);
+        const message = err instanceof Error ? err.message : 'Failed to switch wallet';
+        Alert.alert('Error', message);
+        setError(message);
       } finally {
         setProcessing(false);
       }
     },
-    [activeMasterKey?.id, switchWallet]
+    [activeMasterKey?.id, selectSubWallet]
   );
 
   // ========================================

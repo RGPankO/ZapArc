@@ -57,14 +57,13 @@ export function HomeScreen(): React.JSX.Element {
     
     const currency = settings?.currency || 'BTC';
     
-    if (currency === 'BTC') {
+    if (String(currency).toUpperCase() === 'BTC') {
       // Convert sats to BTC
       const btc = sats / 100_000_000;
       return `₿ ${btc.toFixed(8)}`;
-    } else if (currency === 'SATS') {
+    } else if (String(currency).toUpperCase() === 'SATS') {
       return `${sats.toLocaleString()} sats`;
     } else {
-      // TODO: Convert to fiat using exchange rate
       return `${sats.toLocaleString()} sats`;
     }
   };
