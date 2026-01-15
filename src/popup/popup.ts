@@ -41,6 +41,9 @@ import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks } from './sdk
 // Notification imports
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
 
+// UI helper imports
+import { showBalanceLoading, hideBalanceLoading, showTransactionsLoading, hideTransactionsLoading } from './ui-helpers';
+
 // Modal imports
 import { setupModalListeners, showPINModal, promptForPIN, promptForText } from './modals';
 
@@ -1542,8 +1545,7 @@ function showUnlockPrompt() {
             await updateBalanceDisplay();
 
             // Show loading states
-            const balanceLoading = document.getElementById('balance-loading');
-            if (balanceLoading) balanceLoading.classList.remove('hidden');
+            showBalanceLoading();
 
             const transactionList = document.getElementById('transaction-list');
             if (transactionList) {
@@ -2039,25 +2041,25 @@ function setupEventListeners() {
     if (refreshBtn) {
         refreshBtn.onclick = async () => {
             console.log('[Popup] Refresh button clicked');
-
-            // Show loading indicator
-            const balanceLoading = document.getElementById('balance-loading');
-            if (balanceLoading) {
-                balanceLoading.classList.remove('hidden');
-            }
+            showBalanceLoading();
+            showTransactionsLoading();
+            const startTime = Date.now();
 
             try {
-                // Refresh balance and transactions
                 await updateBalanceDisplay();
                 await loadTransactionHistory();
                 console.log('[Popup] Refresh complete');
             } catch (error) {
                 console.error('[Popup] Error during refresh:', error);
             } finally {
-                // Hide loading indicator
-                if (balanceLoading) {
-                    balanceLoading.classList.add('hidden');
+                // Ensure minimum 200ms loading time for better UX
+                const elapsed = Date.now() - startTime;
+                const minDelay = 200;
+                if (elapsed < minDelay) {
+                    await new Promise(resolve => setTimeout(resolve, minDelay - elapsed));
                 }
+                hideBalanceLoading();
+                hideTransactionsLoading();
             }
         };
     }

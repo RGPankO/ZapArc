@@ -9,6 +9,7 @@ export * from './sdk';
 
 // UI modules
 export * from './notifications';
+export * from './ui-helpers';
 export * from './modals';
 export * from './deposit';
 export * from './withdrawal';

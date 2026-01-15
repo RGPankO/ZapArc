@@ -10,6 +10,7 @@ import init, {
     type SdkEvent
 } from '@breeztech/breez-sdk-spark/web';
 import { BREEZ_API_KEY, breezSDK, setBreezSDK } from './state';
+import { hideBalanceLoading } from './ui-helpers';
 import * as bip39 from 'bip39';
 
 // BIP39 wordlist for sub-wallet derivation
@@ -368,11 +369,8 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                     console.log('✅ [Breez-SDK] Wallet synced with Lightning Network');
 
                     // Hide loading indicators now that sync is complete
-                    const balanceLoading = document.getElementById('balance-loading');
-                    if (balanceLoading) {
-                        balanceLoading.classList.add('hidden');
-                        console.log('✅ [Breez-SDK] Hiding balance loading indicator');
-                    }
+                    hideBalanceLoading();
+                    console.log('✅ [Breez-SDK] Hiding balance loading indicator');
 
                     // Trigger callbacks
                     eventCallbacks.onSync?.();
