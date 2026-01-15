@@ -139,7 +139,8 @@ export async function checkWalletHasTransactions(
                  resolve();
              }, SYNC_TIMEOUT_MS);
 
-             // FAST TRACK: Poll for balance AND payments every 500ms while waiting for sync
+             // FAST TRACK: Poll for balance AND payments every 2s while waiting for sync
+             // (Reduced from 500ms to avoid "Concurrency limit exceeded" errors from Spark SDK)
              // If we see balance/payments, we don't need to wait for full sync to know it exists
              pollInterval = setInterval(async () => {
                 if (!tempSdk) {
@@ -176,7 +177,7 @@ export async function checkWalletHasTransactions(
                         }
                     }
                 } catch (e) { /* ignore polling errors */ }
-            }, 500);
+            }, 2000);
 
              // Event listener for sync - also clears the poll interval
              tempSdk!.addEventListener({

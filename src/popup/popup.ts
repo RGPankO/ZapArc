@@ -2034,6 +2034,34 @@ function setupEventListeners() {
         showUnlockPrompt();
     });
 
+    // Refresh button - manually refresh balance and transactions
+    const refreshBtn = document.getElementById('refresh-btn');
+    if (refreshBtn) {
+        refreshBtn.onclick = async () => {
+            console.log('[Popup] Refresh button clicked');
+
+            // Show loading indicator
+            const balanceLoading = document.getElementById('balance-loading');
+            if (balanceLoading) {
+                balanceLoading.classList.remove('hidden');
+            }
+
+            try {
+                // Refresh balance and transactions
+                await updateBalanceDisplay();
+                await loadTransactionHistory();
+                console.log('[Popup] Refresh complete');
+            } catch (error) {
+                console.error('[Popup] Error during refresh:', error);
+            } finally {
+                // Hide loading indicator
+                if (balanceLoading) {
+                    balanceLoading.classList.add('hidden');
+                }
+            }
+        };
+    }
+
     // Modal listeners
     setupModalListeners();
 }
