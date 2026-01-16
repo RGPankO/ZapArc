@@ -98,6 +98,22 @@ function generateMnemonic(): string {
 // Balance & Transaction Functions
 // ========================================
 
+// Transaction data storage for detail view
+interface StoredTransaction {
+    id: string;
+    type: 'receive' | 'send';
+    amount: number;
+    timestamp: number;
+    status: string;
+    description?: string;
+    feeSats?: number;
+    paymentHash?: string;
+    preimage?: string;
+    bolt11?: string;
+}
+
+let storedTransactions: StoredTransaction[] = [];
+
 async function updateBalanceDisplay() {
     console.log('🔍 [Popup] Updating balance display...');
 
@@ -148,6 +164,7 @@ async function loadTransactionHistory() {
     try {
         if (!breezSDK) {
             transactionList.innerHTML = '<div class="no-transactions">Wallet not connected</div>';
+            storedTransactions = [];
             return;
         }
 
@@ -159,6 +176,7 @@ async function loadTransactionHistory() {
 
         if (payments.length === 0) {
             transactionList.innerHTML = '<div class="no-transactions">No transactions yet</div>';
+            storedTransactions = [];
             return;
         }
 
@@ -167,26 +185,28 @@ async function loadTransactionHistory() {
             (b.timestamp || 0) - (a.timestamp || 0)
         );
 
-        // Render transactions (show up to 10)
-        const displayTransactions = sortedPayments.slice(0, 10).map((payment: any) => {
+        // Store full transaction data for detail view
+        storedTransactions = sortedPayments.map((payment: any, index: number) => {
             const isReceive = payment.paymentType === 'receive';
-            const amount = payment.amount || payment.amountSats || 0;
-            const timestamp = payment.timestamp ? new Date(payment.timestamp * 1000).toLocaleString() : 'Unknown';
-            const status = payment.status || 'completed';
-
             return {
+                id: payment.id || `tx-${index}`,
                 type: isReceive ? 'receive' : 'send',
-                amount,
-                timestamp: payment.timestamp * 1000, // Store as milliseconds
-                status
-            };
+                amount: payment.amount || payment.amountSats || 0,
+                timestamp: (payment.timestamp || 0) * 1000,
+                status: payment.status || 'completed',
+                description: payment.description || undefined,
+                feeSats: payment.fees || payment.feeSats || undefined,
+                paymentHash: payment.paymentHash || payment.details?.paymentHash || undefined,
+                preimage: payment.preimage || payment.details?.preimage || undefined,
+                bolt11: payment.bolt11 || payment.details?.bolt11 || undefined,
+            } as StoredTransaction;
         });
 
-        // Cache transactions for faster loading next time (wallet-specific)
+        // Cache for faster loading (wallet-specific)
         const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
         let activeWalletId = null;
         let activeSubWalletIndex = 0;
-        
+
         if (multiWalletResult.multiWalletData) {
             try {
                 const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
@@ -196,12 +216,11 @@ async function loadTransactionHistory() {
                 console.error('⚠️ [Popup] Failed to parse multiWalletData for caching:', e);
             }
         }
-        
+
         if (activeWalletId) {
             const cacheKey = `cachedTransactions_${activeWalletId}`;
-            await chrome.storage.local.set({ [cacheKey]: displayTransactions });
-            
-            // Update hasActivity flag for sub-wallets when we detect transactions
+            await chrome.storage.local.set({ [cacheKey]: storedTransactions.slice(0, 10) });
+
             if (activeSubWalletIndex > 0) {
                 const hasTransactions = payments.length > 0;
                 ExtensionMessaging.updateSubWalletActivity(activeWalletId, activeSubWalletIndex, hasTransactions).catch(e =>
@@ -210,29 +229,280 @@ async function loadTransactionHistory() {
             }
         }
 
-        // Render to UI
-        transactionList.innerHTML = displayTransactions.map(tx => {
+        // Render to UI (only first 10)
+        renderTransactionList(transactionList, storedTransactions.slice(0, 10));
+
+    } catch (error) {
+        console.error('❌ [Popup] Error loading transactions:', error);
+        transactionList.innerHTML = '<div class="no-transactions">Error loading transactions</div>';
+        storedTransactions = [];
+    }
+}
+
+function renderTransactionList(container: HTMLElement, transactions: StoredTransaction[]): void {
+    container.innerHTML = transactions.map((tx, index) => {
+        const isReceive = tx.type === 'receive';
+        const timestamp = new Date(tx.timestamp).toLocaleString();
+
+        return `
+            <div class="transaction-item ${isReceive ? 'receive' : 'send'}" data-tx-index="${index}">
+                <div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
+                <div class="transaction-details">
+                    <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
+                    <div class="transaction-time">${timestamp}</div>
+                </div>
+                <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
+                    ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add click handlers to transaction items
+    container.querySelectorAll('.transaction-item').forEach((item) => {
+        item.addEventListener('click', () => {
+            const index = parseInt(item.getAttribute('data-tx-index') || '0', 10);
+            const tx = transactions[index];
+            if (tx) {
+                showTransactionDetail(tx);
+            }
+        });
+    });
+}
+
+// ========================================
+// Transaction Detail & History Functions
+// ========================================
+
+function showTransactionDetail(tx: StoredTransaction): void {
+    console.log('[Popup] Showing transaction detail:', tx.id);
+
+    const modal = document.getElementById('transaction-detail-modal');
+    const content = document.getElementById('tx-detail-content');
+    const overlay = document.getElementById('modal-overlay');
+
+    if (!modal || !content || !overlay) return;
+
+    const isReceive = tx.type === 'receive';
+    const date = new Date(tx.timestamp);
+    const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // Build status display
+    let statusClass = 'completed';
+    let statusIcon = '✓';
+    let statusText = 'Completed';
+    if (tx.status === 'pending') {
+        statusClass = 'pending';
+        statusIcon = '⏳';
+        statusText = 'Pending';
+    } else if (tx.status === 'failed') {
+        statusClass = 'failed';
+        statusIcon = '✗';
+        statusText = 'Failed';
+    }
+
+    // Build detail rows
+    let detailRows = `
+        <div class="tx-detail-row">
+            <span class="tx-detail-label">Type</span>
+            <span class="tx-detail-value">${isReceive ? 'Received' : 'Sent'}</span>
+        </div>
+        <div class="tx-detail-row">
+            <span class="tx-detail-label">Date</span>
+            <span class="tx-detail-value">${dateStr}</span>
+        </div>
+        <div class="tx-detail-row">
+            <span class="tx-detail-label">Time</span>
+            <span class="tx-detail-value">${timeStr}</span>
+        </div>
+    `;
+
+    if (tx.description) {
+        detailRows += `
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">Description</span>
+                <span class="tx-detail-value">${escapeHtml(tx.description)}</span>
+            </div>
+        `;
+    }
+
+    if (tx.feeSats !== undefined && tx.feeSats > 0) {
+        detailRows += `
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">Fee</span>
+                <span class="tx-detail-value">${tx.feeSats.toLocaleString()} sats</span>
+            </div>
+        `;
+    }
+
+    if (tx.paymentHash) {
+        const truncatedHash = tx.paymentHash.slice(0, 16) + '...' + tx.paymentHash.slice(-8);
+        detailRows += `
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">Payment Hash</span>
+                <span class="tx-detail-value">
+                    <span class="tx-detail-value-with-copy">
+                        <span>${truncatedHash}</span>
+                        <button class="tx-copy-btn" data-copy="${tx.paymentHash}">Copy</button>
+                    </span>
+                </span>
+            </div>
+        `;
+    }
+
+    content.innerHTML = `
+        <div class="tx-detail-amount-section">
+            <div class="tx-detail-icon ${isReceive ? 'receive' : 'send'}">
+                ${isReceive ? '⬇️' : '⬆️'}
+            </div>
+            <div class="tx-detail-amount ${isReceive ? 'positive' : 'negative'}">
+                ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
+            </div>
+            <div class="tx-detail-status ${statusClass}">
+                ${statusIcon} ${statusText}
+            </div>
+        </div>
+        <div class="tx-detail-rows">
+            ${detailRows}
+        </div>
+    `;
+
+    // Add copy button handlers
+    content.querySelectorAll('.tx-copy-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const textToCopy = (btn as HTMLElement).getAttribute('data-copy');
+            if (textToCopy) {
+                await copyToClipboard(textToCopy);
+                (btn as HTMLElement).textContent = 'Copied!';
+                setTimeout(() => {
+                    (btn as HTMLElement).textContent = 'Copy';
+                }, 2000);
+            }
+        });
+    });
+
+    // Show modal
+    overlay.classList.remove('hidden');
+    modal.classList.remove('hidden');
+
+    // Setup close handlers
+    const closeBtn = document.getElementById('tx-detail-close');
+    const closeFooterBtn = document.getElementById('tx-detail-close-btn');
+
+    const closeModal = () => {
+        modal.classList.add('hidden');
+        overlay.classList.add('hidden');
+    };
+
+    closeBtn?.addEventListener('click', closeModal, { once: true });
+    closeFooterBtn?.addEventListener('click', closeModal, { once: true });
+}
+
+function showTransactionHistoryView(): void {
+    console.log('[Popup] Showing transaction history view');
+
+    const historyView = document.getElementById('transaction-history-view');
+    const mainInterface = document.getElementById('main-interface');
+    const historyList = document.getElementById('history-list');
+
+    if (!historyView || !mainInterface || !historyList) return;
+
+    // Hide wallet interface, show history view
+    mainInterface.classList.add('hidden');
+    historyView.classList.remove('hidden');
+
+    // Render all transactions grouped by date
+    if (storedTransactions.length === 0) {
+        historyList.innerHTML = `
+            <div class="history-empty">
+                <div class="history-empty-icon">📋</div>
+                <div class="history-empty-text">No transactions yet</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Group transactions by date
+    const groups: { [key: string]: StoredTransaction[] } = {};
+    storedTransactions.forEach(tx => {
+        const date = new Date(tx.timestamp);
+        const key = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        if (!groups[key]) {
+            groups[key] = [];
+        }
+        groups[key].push(tx);
+    });
+
+    // Render grouped transactions
+    historyList.innerHTML = Object.entries(groups).map(([date, txs]) => {
+        const txItems = txs.map((tx, idx) => {
             const isReceive = tx.type === 'receive';
-            const timestamp = new Date(tx.timestamp).toLocaleString();
-            
+            const time = new Date(tx.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const globalIdx = storedTransactions.indexOf(tx);
+
             return `
-                <div class="transaction-item ${isReceive ? 'receive' : 'send'}">
-                    <div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
-                    <div class="transaction-details">
-                        <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
-                        <div class="transaction-time">${timestamp}</div>
+                <div class="history-transaction-item" data-tx-index="${globalIdx}">
+                    <div class="history-tx-icon ${isReceive ? 'receive' : 'send'}">
+                        ${isReceive ? '⬇️' : '⬆️'}
                     </div>
-                    <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
+                    <div class="history-tx-info">
+                        <div class="history-tx-type">${isReceive ? 'Received' : 'Sent'}</div>
+                        ${tx.description ? `<div class="history-tx-description">${escapeHtml(tx.description)}</div>` : ''}
+                        <div class="history-tx-time">${time}</div>
+                    </div>
+                    <div class="history-tx-amount ${isReceive ? 'positive' : 'negative'}">
                         ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
                     </div>
                 </div>
             `;
         }).join('');
 
-    } catch (error) {
-        console.error('❌ [Popup] Error loading transactions:', error);
-        transactionList.innerHTML = '<div class="no-transactions">Error loading transactions</div>';
+        return `
+            <div class="history-date-group">
+                <div class="history-date-header">${date}</div>
+                ${txItems}
+            </div>
+        `;
+    }).join('');
+
+    // Add click handlers
+    historyList.querySelectorAll('.history-transaction-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const index = parseInt(item.getAttribute('data-tx-index') || '0', 10);
+            const tx = storedTransactions[index];
+            if (tx) {
+                showTransactionDetail(tx);
+            }
+        });
+    });
+}
+
+function hideTransactionHistoryView(): void {
+    console.log('[Popup] Hiding transaction history view');
+
+    const historyView = document.getElementById('transaction-history-view');
+    const mainInterface = document.getElementById('main-interface');
+
+    if (historyView) historyView.classList.add('hidden');
+    if (mainInterface) mainInterface.classList.remove('hidden');
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(text);
+        showSuccess('Copied to clipboard!');
+    } catch (err) {
+        console.error('[Popup] Failed to copy:', err);
+        showError('Failed to copy');
     }
+}
+
+function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ========================================
@@ -2064,6 +2334,18 @@ function setupEventListeners() {
         };
     }
 
+    // View All transactions button
+    const viewAllBtn = document.getElementById('view-all-btn');
+    if (viewAllBtn) {
+        viewAllBtn.onclick = () => showTransactionHistoryView();
+    }
+
+    // History back button
+    const historyBackBtn = document.getElementById('history-back-btn');
+    if (historyBackBtn) {
+        historyBackBtn.onclick = () => hideTransactionHistoryView();
+    }
+
     // Modal listeners
     setupModalListeners();
 }
@@ -2218,24 +2500,10 @@ async function initializePopup() {
                         
                         if (cachedTransactions && cachedTransactions.length > 0) {
                             console.log('💾 [Popup] Using cached transactions for wallet', activeWalletId, ':', cachedTransactions.length);
-                            // Display cached transactions
-                            transactionList.innerHTML = cachedTransactions.map((tx: any) => {
-                                const isReceive = tx.type === 'receive';
-                                const timestamp = new Date(tx.timestamp).toLocaleString();
-                                const amount = tx.amount;
-                                return `
-                                    <div class="transaction-item ${isReceive ? 'receive' : 'send'}">
-                                        <div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
-                                        <div class="transaction-details">
-                                            <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
-                                            <div class="transaction-time">${timestamp}</div>
-                                        </div>
-                                        <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
-                                            ${isReceive ? '+' : '-'}${amount.toLocaleString()} sats
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('');
+                            // Store cached transactions in storedTransactions for detail view and event handlers
+                            storedTransactions = cachedTransactions as StoredTransaction[];
+                            // Use renderTransactionList to properly attach click handlers
+                            renderTransactionList(transactionList, storedTransactions);
                         } else {
                             console.log('⚠️ [Popup] No cached transactions for wallet', activeWalletId);
                             transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transactions...</div>';
