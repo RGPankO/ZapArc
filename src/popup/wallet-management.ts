@@ -1193,6 +1193,13 @@ async function loadHierarchicalWalletList(): Promise<void> {
                     </button>
                 </div>
                 <div class="master-key-actions">
+                    <button class="wallet-mgmt-btn reveal-seed-btn"
+                            data-master-id="${mk.id}"
+                            data-master-name="${mk.nickname}">
+                        🔑 Reveal Seed Phrase
+                    </button>
+                </div>
+                <div class="master-key-actions">
                     <button class="wallet-mgmt-btn add-sub-wallet-btn"
                             data-master-id="${mk.id}"
                             ${!canAddSubWallet ? 'disabled' : ''}
@@ -1263,6 +1270,19 @@ function attachHierarchicalWalletListeners(): void {
             const currentName = target.getAttribute('data-master-name');
             if (masterId && currentName) {
                 await handleRenameMasterKey(masterId, currentName);
+            }
+        });
+    });
+
+    // Reveal seed phrase
+    document.querySelectorAll('.reveal-seed-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const target = e.target as HTMLElement;
+            const masterId = target.getAttribute('data-master-id');
+            const masterName = target.getAttribute('data-master-name');
+            if (masterId && masterName) {
+                await handleRevealSeedPhrase(masterId, masterName);
             }
         });
     });
@@ -1378,6 +1398,117 @@ async function handleRenameMasterKey(masterId: string, currentName: string): Pro
         console.error('[Wallet Management] Failed to show rename interface:', error);
         showError('Failed to open rename screen');
     }
+}
+
+/**
+ * Handle reveal seed phrase for master key
+ */
+async function handleRevealSeedPhrase(masterId: string, masterName: string): Promise<void> {
+    try {
+        console.log(`[Wallet Management] Revealing seed phrase for master key ${masterId}`);
+
+        // Request PIN for security
+        const pin = await promptForPIN(`Enter PIN for "${masterName}" to reveal seed phrase`);
+        if (!pin) {
+            console.log('[Wallet Management] PIN prompt cancelled');
+            return; // User cancelled
+        }
+
+        // Fetch the master mnemonic (not derived, just the original 12 words)
+        const response = await ExtensionMessaging.getMasterMnemonic(masterId, pin);
+        
+        if (!response.success || !response.data) {
+            if (response.error?.includes('decrypt') || response.error?.includes('PIN')) {
+                showError('Incorrect PIN. Please try again.');
+            } else {
+                showError(response.error || 'Failed to retrieve seed phrase');
+            }
+            return;
+        }
+
+        const mnemonic = response.data.mnemonic;
+        
+        // Display seed phrase in modal
+        showSeedPhraseModal(mnemonic, masterName);
+
+    } catch (error) {
+        console.error('[Wallet Management] Failed to reveal seed phrase:', error);
+        showError('Failed to reveal seed phrase: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+}
+
+/**
+ * Show seed phrase modal with copy functionality
+ */
+function showSeedPhraseModal(mnemonic: string, walletName: string): void {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('seed-phrase-reveal-modal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'seed-phrase-reveal-modal';
+    modal.className = 'modal-overlay';
+    
+    const words = mnemonic.split(' ');
+    const mnemonicGrid = words.map((word, index) => `
+        <div class="mnemonic-word">
+            <span class="word-number">${index + 1}</span>
+            <span class="word-text">${word}</span>
+        </div>
+    `).join('');
+
+    modal.innerHTML = `
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🔑 Seed Phrase for "${walletName}"</h3>
+                <button class="modal-close" id="seed-phrase-modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="warning-box" style="margin-bottom: 16px;">
+                    <strong>⚠️ Security Warning:</strong> Never share your seed phrase with anyone. Anyone with these words can access your funds.
+                </div>
+                <div class="mnemonic-grid">${mnemonicGrid}</div>
+                <button id="copy-seed-phrase-btn" class="btn-outline" style="width: 100%; margin-top: 16px;">
+                    📋 Copy to Clipboard
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button id="seed-phrase-close-btn" class="btn-primary" style="width: 100%;">Close</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event listeners
+    const closeModal = () => modal.remove();
+    
+    document.getElementById('seed-phrase-modal-close')?.addEventListener('click', closeModal);
+    document.getElementById('seed-phrase-close-btn')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    // Copy button
+    document.getElementById('copy-seed-phrase-btn')?.addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(mnemonic);
+            showSuccess('Seed phrase copied to clipboard');
+            
+            // Change button text temporarily
+            const btn = document.getElementById('copy-seed-phrase-btn');
+            if (btn) {
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('[Wallet Management] Failed to copy:', error);
+            showError('Failed to copy to clipboard');
+        }
+    });
 }
 
 /**

@@ -604,10 +604,23 @@ header h1 {
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid #f0f0f0;
+  gap: 12px;
 }
 
 .transaction-item:last-child {
   border-bottom: none;
+}
+
+.transaction-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+}
+
+.transaction-details {
+  flex: 1;
+  min-width: 0;
 }
 
 .transaction-info {

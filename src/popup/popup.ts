@@ -244,18 +244,16 @@ function renderTransactionList(container: HTMLElement, transactions: StoredTrans
         const isReceive = tx.type === 'receive';
         const timestamp = new Date(tx.timestamp).toLocaleString();
 
-        return `
-            <div class="transaction-item ${isReceive ? 'receive' : 'send'}" data-tx-index="${index}">
-                <div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
-                <div class="transaction-details">
-                    <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
-                    <div class="transaction-time">${timestamp}</div>
-                </div>
-                <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
-                    ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
-                </div>
-            </div>
-        `;
+        return `<div class="transaction-item ${isReceive ? 'receive' : 'send'}" data-tx-index="${index}">
+<div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
+<div class="transaction-details">
+<div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
+<div class="transaction-time">${timestamp}</div>
+</div>
+<div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
+${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
+</div>
+</div>`;
     }).join('');
 
     // Add click handlers to transaction items
