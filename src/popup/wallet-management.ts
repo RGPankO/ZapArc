@@ -35,7 +35,7 @@ import {
 import type { MasterKeyMetadata, SubWalletEntry } from '../types';
 import { connectBreezSDK, discoverSubWalletsInPopup } from './sdk';
 import { showError, showSuccess, showInfo, showNotification } from './notifications';
-import { showBalanceLoading } from './ui-helpers';
+import { clearWalletDisplay } from './ui-helpers';
 
 // Track which wallets are currently being discovered
 const walletsBeingDiscovered = new Set<string>();
@@ -871,6 +871,9 @@ export async function handleWalletSwitch(walletId: string): Promise<void> {
         await chrome.storage.session.set({ walletSessionPin: pin });
         console.log('🔐 [Multi-Wallet] Updated session PIN for new wallet');
 
+        // Clear old wallet data BEFORE connecting to new wallet
+        clearWalletDisplay();
+
         // Connect new SDK and store in state
         console.log('[Multi-Wallet] Connecting to new wallet SDK');
         const sdk = await connectBreezSDK(switchResponse.data.mnemonic);
@@ -879,14 +882,6 @@ export async function handleWalletSwitch(walletId: string): Promise<void> {
         // Query fresh balance from SDK
         await callbacks?.updateBalanceDisplay();
         console.log('🔄 [Multi-Wallet] Queried fresh balance from new wallet SDK');
-
-        // Show loading states while waiting for sync
-        showBalanceLoading();
-
-        const transactionList = document.getElementById('transaction-list');
-        if (transactionList) {
-            transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transaction history...</div>';
-        }
 
         showInfo('Syncing wallet data...');
 

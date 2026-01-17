@@ -42,7 +42,7 @@ import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks } from './sdk
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
 
 // UI helper imports
-import { showBalanceLoading, hideBalanceLoading, showTransactionsLoading, hideTransactionsLoading } from './ui-helpers';
+import { showBalanceLoading, hideBalanceLoading, showTransactionsLoading, clearWalletDisplay } from './ui-helpers';
 
 // Modal imports
 import { setupModalListeners, showPINModal, promptForPIN, promptForText } from './modals';
@@ -177,6 +177,21 @@ async function loadTransactionHistory() {
         if (payments.length === 0) {
             transactionList.innerHTML = '<div class="no-transactions">No transactions yet</div>';
             storedTransactions = [];
+
+            // Cache the empty state so we don't show loading on next open
+            const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+            if (multiWalletResult.multiWalletData) {
+                try {
+                    const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
+                    const activeWalletId = multiWalletData.activeWalletId;
+                    if (activeWalletId) {
+                        const cacheCheckedKey = `cachedTransactionsChecked_${activeWalletId}`;
+                        await chrome.storage.local.set({ [cacheCheckedKey]: true });
+                    }
+                } catch (e) {
+                    // Ignore cache errors
+                }
+            }
             return;
         }
 
@@ -911,6 +926,9 @@ async function handleAddSubWalletFromWizard(): Promise<void> {
                     setActiveMasterKeyId(activeWalletId);
                     setActiveSubWalletIndex(newSubWalletIndex);
 
+                    // Clear old wallet data before connecting to new wallet
+                    clearWalletDisplay();
+
                     // Reconnect SDK
                     const sdk = await connectBreezSDK(switchResponse.data.mnemonic);
                     setBreezSDK(sdk);
@@ -925,6 +943,7 @@ async function handleAddSubWalletFromWizard(): Promise<void> {
                     // Refresh wallet UI fully
                     await initializeMultiWalletUI();
                     await updateBalanceDisplay();
+                    await loadTransactionHistory();
                 } else {
                     showSuccess(`${walletName} created!`);
                     console.warn('[Wizard] Could not switch to new sub-wallet:', switchResponse.error);
@@ -1409,6 +1428,10 @@ async function finalizeWalletSetup() {
             throw new Error(walletResponse.error || 'Failed to load wallet');
         }
 
+        // Clear old wallet display data before connecting new wallet
+        clearWalletDisplay();
+        showTransactionsLoading();
+
         // Connect SDK
         const sdk = await connectBreezSDK(walletResponse.data.mnemonic);
         setBreezSDK(sdk);
@@ -1433,6 +1456,7 @@ async function finalizeWalletSetup() {
 
         // Initialize UI
         await updateBalanceDisplay();
+        await loadTransactionHistory();
         await initializeMultiWalletUI();
 
         showSuccess('Wallet setup complete!');
@@ -2327,15 +2351,19 @@ function setupEventListeners() {
                     await new Promise(resolve => setTimeout(resolve, minDelay - elapsed));
                 }
                 hideBalanceLoading();
-                hideTransactionsLoading();
+                // Note: Transaction loading indicator is cleared when loadTransactionHistory() renders the list
             }
         };
     }
 
     // View All transactions button
     const viewAllBtn = document.getElementById('view-all-btn');
+    console.log('[Popup] View All button found:', !!viewAllBtn);
     if (viewAllBtn) {
-        viewAllBtn.onclick = () => showTransactionHistoryView();
+        viewAllBtn.onclick = () => {
+            console.log('[Popup] View All button clicked');
+            showTransactionHistoryView();
+        };
     }
 
     // History back button
@@ -2477,7 +2505,9 @@ async function initializePopup() {
                         // Get active wallet ID from multi-wallet data structure
                         const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
                         let activeWalletId = null;
-                        
+
+                        console.log('🔍 [Popup] multiWalletResult:', !!multiWalletResult.multiWalletData);
+
                         if (multiWalletResult.multiWalletData) {
                             try {
                                 const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
@@ -2486,25 +2516,35 @@ async function initializePopup() {
                             } catch (e) {
                                 console.error('⚠️ [Popup] Failed to parse multiWalletData:', e);
                             }
+                        } else {
+                            console.log('⚠️ [Popup] No multiWalletData found in storage');
                         }
-                        
+
                         // Check if we have cached transactions for this specific wallet
                         let cachedTransactions = null;
+                        let cacheWasChecked = false;
+
                         if (activeWalletId) {
                             const cacheKey = `cachedTransactions_${activeWalletId}`;
-                            const cachedTxData = await chrome.storage.local.get([cacheKey]);
+                            const cacheCheckedKey = `cachedTransactionsChecked_${activeWalletId}`;
+                            const cachedTxData = await chrome.storage.local.get([cacheKey, cacheCheckedKey]);
                             cachedTransactions = cachedTxData[cacheKey];
+                            cacheWasChecked = cachedTxData[cacheCheckedKey] === true;
+                            console.log(`🔍 [Popup] Cache for ${activeWalletId}: ${cachedTransactions?.length || 0} transactions, checked: ${cacheWasChecked}`);
                         }
-                        
+
                         if (cachedTransactions && cachedTransactions.length > 0) {
-                            console.log('💾 [Popup] Using cached transactions for wallet', activeWalletId, ':', cachedTransactions.length);
-                            // Store cached transactions in storedTransactions for detail view and event handlers
+                            // Show cached data immediately - SDK sync will update in background
+                            console.log('💾 [Popup] Using cached transactions');
                             storedTransactions = cachedTransactions as StoredTransaction[];
-                            // Use renderTransactionList to properly attach click handlers
                             renderTransactionList(transactionList, storedTransactions);
+                        } else if (cacheWasChecked) {
+                            // We've checked before and there were no transactions
+                            console.log('💾 [Popup] No transactions (cached empty state)');
+                            transactionList.innerHTML = '<div class="no-transactions">No transactions yet</div>';
                         } else {
-                            console.log('⚠️ [Popup] No cached transactions for wallet', activeWalletId);
-                            transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transactions...</div>';
+                            console.log('⚠️ [Popup] No cache - showing loading indicator');
+                            showTransactionsLoading();
                         }
                     }
 
@@ -2592,11 +2632,8 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
         setBreezSDK(sdk);
         setIsSDKInitialized(true);
 
-        // Clear old data first
-        const transactionList = document.getElementById('transaction-list');
-        if (transactionList) {
-            transactionList.innerHTML = '<div class="transaction-item">Loading transactions...</div>';
-        }
+        // Show loading state while fetching new wallet data
+        showTransactionsLoading();
 
         // Update balance and reload transactions
         console.log('🔄 [Popup] Fetching balance and transactions...');

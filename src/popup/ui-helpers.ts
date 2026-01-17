@@ -22,14 +22,25 @@ export function hideBalanceLoading(): void {
 export function showTransactionsLoading(): void {
     const transactionList = document.getElementById('transaction-list');
     if (transactionList) {
-        // Add subtle opacity to indicate loading without clearing content
-        transactionList.style.opacity = '0.5';
+        transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transactions...</div>';
     }
 }
 
-export function hideTransactionsLoading(): void {
+/**
+ * Clear wallet display data (balance and transactions)
+ * Use when switching wallets to remove stale data before fetching new data
+ */
+export function clearWalletDisplay(): void {
+    // Clear balance
+    const balanceElement = document.getElementById('balance');
+    if (balanceElement) {
+        balanceElement.textContent = '-- sats';
+    }
+
+    // Clear transactions
     const transactionList = document.getElementById('transaction-list');
     if (transactionList) {
         transactionList.style.opacity = '1';
+        transactionList.innerHTML = '';
     }
 }
