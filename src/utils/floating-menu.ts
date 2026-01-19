@@ -26,6 +26,9 @@ class FloatingMenu {
   private lastBlacklistFetch: number = 0;
   private readonly BLACKLIST_CACHE_TTL = 60000; // 1 minute cache
 
+  // Toast deduplication - track active toasts to prevent spam
+  private activeToasts = new Set<string>();
+
   constructor() {
     console.log('🔵 [FloatingMenu] CONSTRUCTOR ENTRY', {
       timestamp: new Date().toISOString(),
@@ -739,6 +742,18 @@ class FloatingMenu {
    * Show toast notification
    */
   private showToast(message: string, type: 'success' | 'error' | 'warning' = 'success'): void {
+    // Create a key for deduplication
+    const toastKey = `${type}:${message}`;
+    
+    // If this exact toast is already showing, don't show another
+    if (this.activeToasts.has(toastKey)) {
+      console.log(`[FloatingMenu] Skipping duplicate toast: ${message}`);
+      return;
+    }
+    
+    // Track this toast
+    this.activeToasts.add(toastKey);
+    
     const toast = document.createElement('div');
     toast.style.cssText = `
       position: fixed;
@@ -765,7 +780,11 @@ class FloatingMenu {
     // Remove after 3 seconds
     setTimeout(() => {
       toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 300);
+      setTimeout(() => {
+        toast.remove();
+        // Remove from active tracking
+        this.activeToasts.delete(toastKey);
+      }, 300);
     }, 3000);
   }
 

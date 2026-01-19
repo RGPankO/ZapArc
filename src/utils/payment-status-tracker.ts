@@ -129,6 +129,24 @@ export class PaymentStatusTracker {
    * Show toast notification
    */
   showToast(notification: PaymentNotification): void {
+    // Prevent duplicate toasts - check by ID or by title+message
+    const existingById = document.querySelector(`[data-notification-id="${notification.id}"]`);
+    if (existingById) {
+      console.log(`[PaymentStatusTracker] Skipping duplicate toast by ID: ${notification.id}`);
+      return;
+    }
+    
+    // Also check by title+message to prevent spam from rapid clicks
+    const existingToasts = Array.from(document.querySelectorAll('.lightning-toast-notification'));
+    for (const toast of existingToasts) {
+      const toastTitle = toast.querySelector('div > div > div:first-child')?.textContent;
+      const toastMessage = toast.querySelector('div > div > div:nth-child(2)')?.textContent;
+      if (toastTitle?.trim() === notification.title && toastMessage?.trim() === notification.message) {
+        console.log(`[PaymentStatusTracker] Skipping duplicate toast by content: ${notification.title}`);
+        return;
+      }
+    }
+    
     const toast = this.createToastElement(notification);
     document.body.appendChild(toast);
 

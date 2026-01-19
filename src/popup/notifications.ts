@@ -5,6 +5,9 @@
 // Toast Notifications
 // ========================================
 
+// Track active notifications to prevent duplicates
+const activeNotifications = new Map<string, HTMLElement>();
+
 export function showNotification(message: string, type: 'info' | 'success' | 'error', duration = 4000): void {
     console.log(`[${type.toUpperCase()}] ${message}`);
 
@@ -14,15 +17,31 @@ export function showNotification(message: string, type: 'info' | 'success' | 'er
         return;
     }
 
+    // Create a key for deduplication based on message and type
+    const notificationKey = `${type}:${message}`;
+    
+    // If this exact notification is already showing, don't show another
+    if (activeNotifications.has(notificationKey)) {
+        console.log(`[Notification] Skipping duplicate: ${message}`);
+        return;
+    }
+
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
+
+    // Track this notification
+    activeNotifications.set(notificationKey, notification);
 
     container.appendChild(notification);
 
     setTimeout(() => {
         notification.style.animation = 'slideIn 0.3s ease-out reverse';
-        setTimeout(() => notification.remove(), 300);
+        setTimeout(() => {
+            notification.remove();
+            // Remove from active tracking
+            activeNotifications.delete(notificationKey);
+        }, 300);
     }, duration);
 }
 
