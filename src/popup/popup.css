@@ -604,10 +604,23 @@ header h1 {
   align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid #f0f0f0;
+  gap: 12px;
 }
 
 .transaction-item:last-child {
   border-bottom: none;
+}
+
+.transaction-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+}
+
+.transaction-details {
+  flex: 1;
+  min-width: 0;
 }
 
 .transaction-info {
@@ -2897,4 +2910,298 @@ body.modal-open {
   padding: 6px 12px;
   font-size: 12px;
   flex-shrink: 0;
+}
+
+/* ========================================
+   Transaction Detail Modal
+   ======================================== */
+
+#transaction-detail-modal .modal-body {
+  padding: 0;
+}
+
+.tx-detail-amount-section {
+  text-align: center;
+  padding: 24px 16px;
+  background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
+  border-bottom: 1px solid #eee;
+}
+
+.tx-detail-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 12px;
+  font-size: 24px;
+}
+
+.tx-detail-icon.receive {
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+.tx-detail-icon.send {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.tx-detail-amount {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.tx-detail-amount.positive {
+  color: #28a745;
+}
+
+.tx-detail-amount.negative {
+  color: #dc3545;
+}
+
+.tx-detail-status {
+  font-size: 12px;
+  color: #666;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tx-detail-status.completed {
+  color: #28a745;
+}
+
+.tx-detail-status.pending {
+  color: #ffc107;
+}
+
+.tx-detail-status.failed {
+  color: #dc3545;
+}
+
+.tx-detail-rows {
+  padding: 16px;
+}
+
+.tx-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.tx-detail-row:last-child {
+  border-bottom: none;
+}
+
+.tx-detail-label {
+  font-size: 12px;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.tx-detail-value {
+  font-size: 13px;
+  color: #333;
+  text-align: right;
+  word-break: break-all;
+  max-width: 60%;
+}
+
+.tx-detail-value-with-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tx-copy-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  color: #666;
+  white-space: nowrap;
+}
+
+.tx-copy-btn:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+/* ========================================
+   Transaction History View
+   ======================================== */
+
+#transaction-history-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #f5f5f5;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: white;
+  border-bottom: 1px solid #eee;
+  gap: 12px;
+}
+
+.history-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  flex: 1;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px 16px;
+}
+
+.history-date-group {
+  margin-bottom: 16px;
+}
+
+.history-date-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  padding: 8px 0;
+  position: sticky;
+  top: 0;
+  background: #f5f5f5;
+}
+
+.history-transaction-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.history-transaction-item:hover {
+  background: #fafafa;
+}
+
+.history-tx-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.history-tx-icon.receive {
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+.history-tx-icon.send {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.history-tx-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-tx-type {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.history-tx-description {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-tx-time {
+  font-size: 11px;
+  color: #999;
+}
+
+.history-tx-amount {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.history-tx-amount.positive {
+  color: #28a745;
+}
+
+.history-tx-amount.negative {
+  color: #dc3545;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.history-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.history-empty-text {
+  font-size: 14px;
+}
+
+/* Make transaction items in main list clickable */
+.transaction-item {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.transaction-item:hover {
+  background: #f9f9f9;
+}
+
+.transaction-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.transaction-item.receive .transaction-icon {
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+.transaction-item.send .transaction-icon {
+  background-color: rgba(220, 53, 69, 0.1);
 }

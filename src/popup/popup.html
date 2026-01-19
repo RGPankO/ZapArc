@@ -142,6 +142,20 @@
                 <button id="rename-wallet-save" class="btn-primary">Save</button>
             </div>
         </div>
+
+        <!-- Transaction Detail Modal -->
+        <div id="transaction-detail-modal" class="modal hidden">
+            <div class="modal-header">
+                <h3>Transaction Details</h3>
+                <button class="modal-close" id="tx-detail-close">×</button>
+            </div>
+            <div class="modal-body" id="tx-detail-content">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button id="tx-detail-close-btn" class="btn-primary" style="width: 100%;">Close</button>
+            </div>
+        </div>
     </div>
 
     <div id="app">
@@ -405,6 +419,17 @@
                     <button id="delete-wallet-btn" class="delete-wallet-btn">🗑️ Delete Wallet</button>
                 </div>
             </main>
+        </div>
+
+        <!-- Transaction History View -->
+        <div id="transaction-history-view" class="hidden">
+            <div class="history-header">
+                <button id="history-back-btn" class="back-btn">← Back</button>
+                <h2>Transaction History</h2>
+            </div>
+            <div id="history-list" class="history-list">
+                <!-- Populated dynamically with all transactions grouped by date -->
+            </div>
         </div>
 
         <!-- Unlock Interface -->

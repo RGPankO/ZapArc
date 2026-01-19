@@ -10,6 +10,7 @@ import init, {
     type SdkEvent
 } from '@breeztech/breez-sdk-spark/web';
 import { BREEZ_API_KEY, breezSDK, setBreezSDK } from './state';
+import { hideBalanceLoading } from './ui-helpers';
 import * as bip39 from 'bip39';
 
 // BIP39 wordlist for sub-wallet derivation
@@ -139,7 +140,8 @@ export async function checkWalletHasTransactions(
                  resolve();
              }, SYNC_TIMEOUT_MS);
 
-             // FAST TRACK: Poll for balance AND payments every 500ms while waiting for sync
+             // FAST TRACK: Poll for balance AND payments every 2s while waiting for sync
+             // (Reduced from 500ms to avoid "Concurrency limit exceeded" errors from Spark SDK)
              // If we see balance/payments, we don't need to wait for full sync to know it exists
              pollInterval = setInterval(async () => {
                 if (!tempSdk) {
@@ -176,7 +178,7 @@ export async function checkWalletHasTransactions(
                         }
                     }
                 } catch (e) { /* ignore polling errors */ }
-            }, 500);
+            }, 2000);
 
              // Event listener for sync - also clears the poll interval
              tempSdk!.addEventListener({
@@ -367,11 +369,8 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                     console.log('✅ [Breez-SDK] Wallet synced with Lightning Network');
 
                     // Hide loading indicators now that sync is complete
-                    const balanceLoading = document.getElementById('balance-loading');
-                    if (balanceLoading) {
-                        balanceLoading.classList.add('hidden');
-                        console.log('✅ [Breez-SDK] Hiding balance loading indicator');
-                    }
+                    hideBalanceLoading();
+                    console.log('✅ [Breez-SDK] Hiding balance loading indicator');
 
                     // Trigger callbacks
                     eventCallbacks.onSync?.();
