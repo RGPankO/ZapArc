@@ -10,6 +10,7 @@ import {
     setPreparedPayment
 } from './state';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
+import { triggerPaymentNotification, extractPubkeyFromParsedInvoice } from '../utils/notification-trigger';
 
 // Callback type for withdrawal operations that need main popup functions
 export type WithdrawalCallbacks = {
@@ -350,6 +351,42 @@ export async function sendPayment(): Promise<void> {
 
         // Clear prepared payment
         setPreparedPayment(null);
+
+        // Trigger push notification to recipient (async, don't await)
+        console.log('🔔 [Withdraw] Starting notification trigger...');
+        try {
+            const input = paymentInput.value.trim();
+            const isInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
+            console.log('🔔 [Withdraw] isInvoice:', isInvoice, 'breezSDK:', !!breezSDK);
+            
+            if (isInvoice && breezSDK) {
+                // Parse the invoice to extract destination pubkey
+                console.log('🔔 [Withdraw] Parsing invoice...');
+                const parsed = await parseInput(input);
+                console.log('🔔 [Withdraw] Parsed result:', parsed?.type);
+                const destPubkey = extractPubkeyFromParsedInvoice(parsed);
+                console.log('🔔 [Withdraw] Destination pubkey:', destPubkey ? destPubkey.substring(0, 20) + '...' : 'NOT FOUND');
+                
+                if (destPubkey) {
+                    // Get amount from preview
+                    const amountEl = document.getElementById('preview-amount');
+                    const amountText = amountEl?.textContent || '0';
+                    const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
+                    console.log('🔔 [Withdraw] Sending notification for amount:', amount);
+                    
+                    // Fire and forget - don't block UI
+                    triggerPaymentNotification({ pubKey: destPubkey }, amount)
+                        .then(res => console.log('🔔 [Withdraw] Notification result:', res))
+                        .catch(e => console.warn('🔔 [Withdraw] Notification failed:', e));
+                } else {
+                    console.warn('🔔 [Withdraw] No destination pubkey found - skipping notification');
+                }
+            } else {
+                console.log('🔔 [Withdraw] Not a BOLT11 invoice or no SDK - skipping notification');
+            }
+        } catch (notifError) {
+            console.warn('🔔 [Withdraw] Failed to trigger notification:', notifError);
+        }
 
         // Cleanup stale dialogs
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
