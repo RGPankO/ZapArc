@@ -340,6 +340,44 @@ export async function sendPayment(): Promise<void> {
             if (result.successAction) {
                 console.log('🎉 [Withdraw] Success action:', result.successAction);
             }
+
+            // Trigger push notification for LNURL/Lightning Address payment
+            try {
+                let recipientPubkey: string | undefined;
+                
+                // 1. Best option: destinationPubkey from payment result (matches mobile app registration)
+                if (result.payment?.details?.destinationPubkey) {
+                    recipientPubkey = result.payment.details.destinationPubkey;
+                }
+                
+                // 2. Fallback: Try invoiceDetails
+                if (!recipientPubkey && preparedPayment.invoiceDetails) {
+                    const invoiceDetails = preparedPayment.invoiceDetails as Record<string, unknown>;
+                    const destPubkey = invoiceDetails.payeePubkey || 
+                                       invoiceDetails.destination || 
+                                       invoiceDetails.nodeId ||
+                                       invoiceDetails.destinationPubkey;
+                    if (destPubkey && typeof destPubkey === 'string') {
+                        recipientPubkey = destPubkey;
+                    }
+                }
+                
+                // 3. Fallback: nostrPubkey (for future NIP-57 support)
+                if (!recipientPubkey && preparedPayment.payRequest?.nostrPubkey) {
+                    recipientPubkey = preparedPayment.payRequest.nostrPubkey;
+                }
+                
+                if (recipientPubkey) {
+                    const amountEl = document.getElementById('preview-amount');
+                    const amountText = amountEl?.textContent || '0';
+                    const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
+                    
+                    triggerPaymentNotification({ pubKey: recipientPubkey }, amount)
+                        .catch(e => console.warn('[Withdraw] LNURL notification failed:', e));
+                }
+            } catch (notifError) {
+                console.warn('[Withdraw] Failed to trigger LNURL notification:', notifError);
+            }
         } else {
             console.log('🔵 [Withdraw] Executing BOLT11 payment');
             await breezSDK.sendPayment({
