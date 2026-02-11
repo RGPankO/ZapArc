@@ -64,7 +64,7 @@ module.exports = (env, argv) => {
             to: 'manifest.json'
           },
           {
-            from: 'icons',
+            from: 'assets/icons',
             to: 'icons',
             noErrorOnMissing: true
           }
