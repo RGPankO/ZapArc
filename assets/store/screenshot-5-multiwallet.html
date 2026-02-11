@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1280, height=800">
+    <title>ZapArc - Multi-Wallet</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #0d0d2b 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 80px;
+            padding: 60px;
+            overflow: hidden;
+        }
+        
+        .popup-frame {
+            width: 350px;
+            height: 500px;
+            background: linear-gradient(180deg, #1a1a2e, #16213e, #0f3460);
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        header h1 {
+            font-size: 18px;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        header h1 img { width: 28px; height: 28px; }
+        .refresh-btn {
+            background: none; border: none;
+            font-size: 16px; cursor: pointer;
+            color: rgba(255,255,255,0.6);
+        }
+
+        /* Wallet Selector */
+        .wallet-selector { margin-bottom: 12px; position: relative; }
+        .wallet-selector-header { display: flex; gap: 8px; align-items: center; }
+        .current-wallet-btn {
+            flex: 1;
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .current-wallet-name { flex: 1; text-align: left; font-weight: 500; color: #FFF; }
+        .wallet-count-badge {
+            background: #4CAF50; color: white;
+            font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 600;
+        }
+        .dropdown-arrow { color: rgba(255,255,255,0.6); font-size: 10px; }
+        .add-wallet-btn {
+            width: 40px; height: 40px;
+            background: #4CAF50; color: white; border: none; border-radius: 8px;
+            font-size: 20px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* Dropdown */
+        .wallet-dropdown {
+            position: absolute; top: 48px; left: 0; right: 0;
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 1000;
+        }
+        .wallet-item {
+            display: flex; align-items: center;
+            padding: 10px 12px; cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .wallet-item:last-child { border-bottom: none; }
+        .wallet-item.active { background: rgba(76,175,80,0.15); }
+        .wallet-item-check { width: 20px; color: #4CAF50; font-weight: bold; margin-right: 4px; }
+        .wallet-item-icon { width: 28px; font-size: 18px; margin-right: 8px; }
+        .wallet-item-info { flex: 1; }
+        .wallet-item-name { font-weight: 500; color: #FFF; font-size: 14px; }
+        .wallet-item-detail { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 1px; }
+        .wallet-item-badge {
+            font-size: 14px; margin-left: 4px;
+        }
+        .wallet-dropdown-footer {
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding: 8px;
+        }
+        .manage-wallets-btn {
+            width: 100%; padding: 8px;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 4px; cursor: pointer;
+            font-size: 13px; color: #FFF;
+        }
+
+        /* Wallet actions */
+        .wallet-actions {
+            display: flex; gap: 8px;
+            margin-bottom: 12px;
+            margin-top: 4px;
+            position: relative;
+            z-index: 1;
+        }
+        .wallet-btn {
+            flex: 1; padding: 10px 8px;
+            border: none; border-radius: 12px;
+            background: #F7931A; color: white;
+            font-size: 13px; cursor: pointer;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 2px;
+        }
+        .btn-icon { font-size: 14px; }
+
+        /* Transaction section */
+        .tx-section {
+            background: rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .tx-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 8px;
+        }
+        .tx-header h3 { font-size: 13px; color: #FFF; font-weight: 600; }
+        .tx-header a { font-size: 12px; color: #F7931A; text-decoration: underline; }
+        .tx-empty {
+            text-align: center; padding: 12px 0;
+            color: rgba(255,255,255,0.4); font-size: 13px;
+        }
+
+        /* Bottom buttons */
+        .settings-btn {
+            width: 100%; padding: 10px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px; cursor: pointer;
+            font-size: 13px; color: #FFF;
+            margin-bottom: 6px;
+        }
+        .delete-btn {
+            width: 100%; padding: 8px;
+            background: transparent;
+            border: 1px solid rgba(244,67,54,0.3);
+            border-radius: 8px; cursor: pointer;
+            font-size: 12px; color: #f44336;
+        }
+
+        /* Marketing text */
+        .marketing { max-width: 400px; color: #FFF; }
+        .marketing h1 {
+            font-size: 42px; font-weight: 700;
+            margin-bottom: 20px; line-height: 1.2;
+        }
+        .marketing h1 span { color: #F7931A; }
+        .marketing p {
+            font-size: 18px; color: rgba(255,255,255,0.7); line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-frame">
+        <header>
+            <h1><img src="../icons/icon128.png" alt="">ZapArc</h1>
+            <button class="refresh-btn">🔄</button>
+        </header>
+        
+        <div class="wallet-selector">
+            <div class="wallet-selector-header">
+                <div class="current-wallet-btn">
+                    <span class="current-wallet-name">Wallet 2</span>
+                    <span class="wallet-count-badge">2</span>
+                    <span class="dropdown-arrow">▲</span>
+                </div>
+                <button class="add-wallet-btn">+</button>
+            </div>
+            
+            <div class="wallet-dropdown">
+                <div class="wallet-item">
+                    <span class="wallet-item-check"></span>
+                    <span class="wallet-item-icon">🔑</span>
+                    <div class="wallet-item-info">
+                        <div class="wallet-item-name">Main Wallet</div>
+                        <div class="wallet-item-detail">Last used: 2/11/2026</div>
+                    </div>
+                </div>
+                <div class="wallet-item active">
+                    <span class="wallet-item-check">✓</span>
+                    <span class="wallet-item-icon">🔑</span>
+                    <div class="wallet-item-info">
+                        <div class="wallet-item-name">Wallet 2</div>
+                        <div class="wallet-item-detail">Scanning...</div>
+                    </div>
+                    <span class="wallet-item-badge">🚀</span>
+                </div>
+                <div class="wallet-dropdown-footer">
+                    <button class="manage-wallets-btn">⚙️ Manage Wallets</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="wallet-actions">
+            <button class="wallet-btn">
+                <span class="btn-icon">📥</span>
+                Deposit
+            </button>
+            <button class="wallet-btn">
+                <span class="btn-icon">📤</span>
+                Withdraw
+            </button>
+        </div>
+
+        <div class="tx-section">
+            <div class="tx-header">
+                <h3>Recent Transactions</h3>
+                <a href="#">View All</a>
+            </div>
+            <div class="tx-empty">No transactions yet</div>
+        </div>
+
+        <button class="settings-btn">⚙️ Settings</button>
+        <button class="delete-btn">🗑️ Delete Wallet</button>
+    </div>
+    
+    <div class="marketing">
+        <h1><span>Multiple</span> Wallets</h1>
+        <p>Organize your Bitcoin across multiple wallets. One seed phrase, unlimited sub-wallets, each with its own balance.</p>
+    </div>
+</body>
+</html>

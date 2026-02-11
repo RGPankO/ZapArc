@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1280, height=800">
+    <title>ZapArc - Wallet</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #0d0d2b 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 80px;
+            padding: 60px;
+            overflow: hidden;
+        }
+        
+        .popup-frame {
+            width: 350px;
+            height: 500px;
+            background: linear-gradient(180deg, #1a1a2e, #16213e, #0f3460);
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+        }
+        
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 18px;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        header h1 img {
+            width: 28px;
+            height: 28px;
+        }
+        
+        .refresh-btn {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .wallet-section {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .balance-display {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        
+        .balance-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 4px;
+        }
+        
+        .balance-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #F7931A;
+        }
+        
+        .wallet-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .wallet-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: none;
+            border-radius: 12px;
+            background-color: #F7931A;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .btn-icon {
+            font-size: 16px;
+        }
+        
+        .transaction-section {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .section-header h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #FFFFFF;
+        }
+        
+        .view-all-btn {
+            background: none;
+            border: none;
+            color: #F7931A;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        
+        .transaction-list {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 12px;
+        }
+        
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+        
+        .transaction-icon {
+            flex-shrink: 0;
+            font-size: 16px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+        }
+        
+        .transaction-item.receive .transaction-icon {
+            background-color: rgba(76, 175, 80, 0.2);
+        }
+        
+        .transaction-item.send .transaction-icon {
+            background-color: rgba(244, 67, 54, 0.2);
+        }
+        
+        .transaction-info {
+            flex: 1;
+        }
+        
+        .transaction-type {
+            font-size: 12px;
+            font-weight: 500;
+            color: #FFFFFF;
+        }
+        
+        .transaction-date {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .transaction-amount {
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .transaction-amount.positive {
+            color: #4CAF50;
+        }
+        
+        .transaction-amount.negative {
+            color: #f44336;
+        }
+        
+        .settings-btn {
+            padding: 8px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            background-color: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+            color: #FFFFFF;
+        }
+        
+        .marketing {
+            max-width: 400px;
+            color: #FFFFFF;
+        }
+        
+        .marketing h1 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        
+        .marketing h1 span {
+            color: #F7931A;
+        }
+        
+        .marketing p {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-frame">
+        <header>
+            <h1><img src="../icons/icon128.png" alt="">ZapArc</h1>
+            <button class="refresh-btn">🔄</button>
+        </header>
+        
+        <div class="wallet-section">
+            <div class="balance-display">
+                <div class="balance-label">Balance</div>
+                <div class="balance-amount">125,000 sats</div>
+            </div>
+            
+            <div class="wallet-actions">
+                <button class="wallet-btn">
+                    <span class="btn-icon">📥</span>
+                    Deposit
+                </button>
+                <button class="wallet-btn">
+                    <span class="btn-icon">📤</span>
+                    Withdraw
+                </button>
+            </div>
+        </div>
+        
+        <div class="transaction-section">
+            <div class="section-header">
+                <h3>Recent Transactions</h3>
+                <button class="view-all-btn">View All</button>
+            </div>
+            <div class="transaction-list">
+                <div class="transaction-item receive">
+                    <div class="transaction-icon">📥</div>
+                    <div class="transaction-info">
+                        <div class="transaction-type">Received</div>
+                        <div class="transaction-date">Today, 2:30 PM</div>
+                    </div>
+                    <div class="transaction-amount positive">+50,000 sats</div>
+                </div>
+                <div class="transaction-item send">
+                    <div class="transaction-icon">📤</div>
+                    <div class="transaction-info">
+                        <div class="transaction-type">Sent</div>
+                        <div class="transaction-date">Yesterday, 11:15 AM</div>
+                    </div>
+                    <div class="transaction-amount negative">-25,000 sats</div>
+                </div>
+                <div class="transaction-item receive">
+                    <div class="transaction-icon">📥</div>
+                    <div class="transaction-info">
+                        <div class="transaction-type">Received</div>
+                        <div class="transaction-date">Feb 9, 4:45 PM</div>
+                    </div>
+                    <div class="transaction-amount positive">+100,000 sats</div>
+                </div>
+            </div>
+        </div>
+        
+        <button class="settings-btn">⚙️ Settings</button>
+    </div>
+    
+    <div class="marketing">
+        <h1>Your <span>Lightning</span> Wallet</h1>
+        <p>Send and receive Bitcoin instantly with near-zero fees. Track your transactions and manage your funds with ease.</p>
+    </div>
+</body>
+</html>

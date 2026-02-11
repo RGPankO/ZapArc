@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1280, height=800">
+    <title>ZapArc - Welcome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #0d0d2b 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 80px;
+            padding: 60px;
+            overflow: hidden;
+        }
+        
+        .popup-frame {
+            width: 350px;
+            height: 500px;
+            background: linear-gradient(180deg, #1a1a2e, #16213e, #0f3460);
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .wizard-header {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        
+        .wizard-header h2 {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        
+        .wizard-header h2 img {
+            width: 32px;
+            height: 32px;
+        }
+        
+        .wizard-header p {
+            margin: 0;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.4;
+        }
+        
+        .wizard-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .feature-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .feature-icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        
+        .feature-icon img {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .feature-text {
+            font-size: 14px;
+            color: #FFFFFF;
+        }
+        
+        .wizard-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            padding: 0 0 20px 0;
+        }
+        
+        .wizard-actions button {
+            flex: 1;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .btn-primary {
+            background-color: #F7931A;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            color: #FFFFFF;
+        }
+        
+        .marketing {
+            max-width: 400px;
+            color: #FFFFFF;
+        }
+        
+        .marketing h1 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        
+        .marketing h1 span {
+            color: #F7931A;
+        }
+        
+        .marketing p {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-frame">
+        <div class="wizard-header">
+            <h2><img src="../icons/icon128.png" alt="">Welcome to ZapArc</h2>
+            <p>Set up your Lightning wallet to send and receive Bitcoin</p>
+        </div>
+        <div class="wizard-content">
+            <div class="feature-list">
+                <div class="feature-item">
+                    <span class="feature-icon">🔒</span>
+                    <span class="feature-text">Non-custodial wallet - you control your keys</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <span class="feature-text">Instant Lightning Network payments</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🌐</span>
+                    <span class="feature-text">Works on any website</span>
+                </div>
+            </div>
+        </div>
+        <div class="wizard-actions">
+            <button class="btn-primary">Set Up Wallet</button>
+            <button class="btn-secondary">Skip Setup</button>
+        </div>
+    </div>
+    
+    <div class="marketing">
+        <h1>Get Started with <span>ZapArc</span></h1>
+        <p>Your gateway to instant Bitcoin payments. Non-custodial Lightning wallet that works seamlessly on any website.</p>
+    </div>
+</body>
+</html>

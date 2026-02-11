@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1280, height=800">
+    <title>ZapArc - Setup Choice</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #0d0d2b 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 80px;
+            padding: 60px;
+            overflow: hidden;
+        }
+        
+        .popup-frame {
+            width: 350px;
+            height: 500px;
+            background: linear-gradient(180deg, #1a1a2e, #16213e, #0f3460);
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .wizard-header {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        
+        .wizard-header h2 {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            color: #FFFFFF;
+        }
+        
+        .wizard-header p {
+            margin: 0;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.4;
+        }
+        
+        .wizard-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .choice-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .choice-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            cursor: pointer;
+        }
+        
+        .choice-icon {
+            font-size: 32px;
+        }
+        
+        .choice-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #FFFFFF;
+        }
+        
+        .choice-description {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.6);
+            font-weight: normal;
+        }
+        
+        .wizard-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            padding: 0 0 20px 0;
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+        }
+        
+        .marketing {
+            max-width: 400px;
+            color: #FFFFFF;
+        }
+        
+        .marketing h1 {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+        
+        .marketing h1 span {
+            color: #F7931A;
+        }
+        
+        .marketing p {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-frame">
+        <div class="wizard-header">
+            <h2>Set Up Your Wallet</h2>
+            <p>Choose how you want to set up your wallet</p>
+        </div>
+        <div class="wizard-content">
+            <div class="choice-buttons">
+                <div class="choice-btn">
+                    <span class="choice-icon">✨</span>
+                    <span class="choice-title">Create New Wallet</span>
+                    <span class="choice-description">Generate a new 12-word recovery phrase</span>
+                </div>
+                <div class="choice-btn">
+                    <span class="choice-icon">📥</span>
+                    <span class="choice-title">Import Existing Wallet</span>
+                    <span class="choice-description">Enter your 12-word recovery phrase</span>
+                </div>
+            </div>
+        </div>
+        <div class="wizard-actions">
+            <button class="btn-secondary">Back</button>
+        </div>
+    </div>
+    
+    <div class="marketing">
+        <h1>Your Wallet, <span>Your Choice</span></h1>
+        <p>Create a fresh wallet with a new recovery phrase, or import your existing Bitcoin wallet securely.</p>
+    </div>
+</body>
+</html>
