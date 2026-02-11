@@ -2427,23 +2427,23 @@ body.modal-open {
 }
 
 .notification-info {
-  background: rgba(33, 150, 243, 0.15);
-  color: #64b5f6;
-  border-color: rgba(33, 150, 243, 0.3);
+  background: rgba(33, 150, 243, 0.85);
+  color: #ffffff;
+  border-color: rgba(33, 150, 243, 0.9);
   border-left: 4px solid #2196f3;
 }
 
 .notification-success {
-  background: rgba(76, 175, 80, 0.15);
-  color: var(--success);
-  border-color: rgba(76, 175, 80, 0.3);
+  background: rgba(76, 175, 80, 0.85);
+  color: #ffffff;
+  border-color: rgba(76, 175, 80, 0.9);
   border-left: 4px solid var(--success);
 }
 
 .notification-error {
-  background: rgba(244, 67, 54, 0.15);
-  color: #ef5350;
-  border-color: rgba(244, 67, 54, 0.3);
+  background: rgba(244, 67, 54, 0.85);
+  color: #ffffff;
+  border-color: rgba(244, 67, 54, 0.9);
   border-left: 4px solid var(--error);
 }
 
