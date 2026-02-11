@@ -1,412 +1,522 @@
-/* Settings page styles for Lightning Network Tipping Extension */
+/* Settings page styles for ZapArc Extension - Dark Theme */
+
+/* ========================================
+   CSS Custom Properties (Dark Theme)
+   ======================================== */
+:root {
+  --gradient-start: #1a1a2e;
+  --gradient-mid: #16213e;
+  --gradient-end: #0f3460;
+  --surface: #1a1a2e;
+  --card-bg: rgba(255, 255, 255, 0.08);
+  --container-bg: rgba(255, 255, 255, 0.05);
+  --brand: #F7931A;
+  --brand-hover: #e8850f;
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-placeholder: rgba(255, 255, 255, 0.3);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  --input-bg: #16213e;
+  --success: #4CAF50;
+  --error: #f44336;
+  --warning: #FF9800;
+  --radius-card: 16px;
+  --radius-button: 12px;
+  --radius-input: 8px;
+}
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: linear-gradient(180deg, var(--gradient-start), var(--gradient-mid), var(--gradient-end));
+  min-height: 100vh;
+  box-sizing: border-box;
+  color: var(--text-primary);
+}
+
+/* Dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 #app {
-    max-width: 800px;
-    margin: 0 auto;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    overflow: hidden;
+  max-width: 800px;
+  margin: 0 auto;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
 }
 
 header {
-    background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%);
-    color: white;
-    padding: 20px;
-    text-align: center;
+  background: linear-gradient(135deg, var(--brand) 0%, #ff6b35 100%);
+  color: white;
+  padding: 20px;
+  text-align: center;
 }
 
 header h1 {
-    margin: 0;
-    font-size: 24px;
+  margin: 0;
+  font-size: 24px;
 }
 
 main {
-    padding: 20px;
+  padding: 20px;
 }
 
 section {
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #eee;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 section:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 section h2 {
-    color: #333;
-    font-size: 18px;
-    margin-bottom: 15px;
+  color: var(--text-primary);
+  font-size: 18px;
+  margin-bottom: 15px;
 }
 
 .setting-group {
-    margin-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 .setting-group h3 {
-    color: #555;
-    font-size: 14px;
-    margin-bottom: 10px;
-    font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 10px;
+  font-weight: 600;
 }
 
 .setting-group label {
-    display: block;
-    margin-bottom: 8px;
-    cursor: pointer;
+  display: block;
+  margin-bottom: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
 }
 
 .setting-group input[type="radio"] {
-    margin-right: 8px;
+  margin-right: 8px;
+  accent-color: var(--brand);
 }
 
 .setting-group input[type="text"],
 .setting-group input[type="number"] {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  font-size: 14px;
+  background: var(--input-bg);
+  color: var(--text-primary);
 }
 
-.setting-group input[type="text"]:disabled {
-    background: #f5f5f5;
-    color: #999;
+.setting-group input[type="text"]::placeholder,
+.setting-group input[type="number"]::placeholder {
+  color: var(--text-placeholder);
+}
+
+.setting-group input[type="text"]:focus,
+.setting-group input[type="number"]:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+.setting-group input[type="text"]:disabled,
+.setting-group input[type="number"]:disabled {
+  background: var(--container-bg);
+  color: var(--text-placeholder);
+  cursor: not-allowed;
 }
 
 .amount-inputs {
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 10px;
 }
 
 .amount-inputs input {
-    flex: 1;
-    text-align: center;
+  flex: 1;
+  text-align: center;
 }
 
 .setting-group select {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-    background: white;
+  padding: 8px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  font-size: 14px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.setting-group select:focus {
+  outline: none;
+  border-color: var(--brand);
 }
 
 #actions {
-    text-align: center;
-    padding-top: 20px;
-    border-top: 1px solid #eee;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
 }
 
 #actions button {
-    padding: 12px 24px;
-    margin: 0 10px;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  padding: 12px 24px;
+  margin: 0 10px;
+  border: none;
+  border-radius: var(--radius-button);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 #save-settings {
-    background: #f7931a;
-    color: white;
+  background: var(--brand);
+  color: white;
 }
 
 #save-settings:hover {
-    background: #e8820a;
+  background: var(--brand-hover);
 }
 
 #reset-settings {
-    background: #6c757d;
-    color: white;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border: 1px solid var(--border-medium);
 }
 
 #reset-settings:hover {
-    background: #5a6268;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 #help-button {
-    background: #17a2b8;
-    color: white;
+  background: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
+  border: 1px solid rgba(33, 150, 243, 0.3);
 }
 
 #help-button:hover {
-    background: #138496;
+  background: rgba(33, 150, 243, 0.3);
 }
 
 /* Amount display formatting */
 .amount-display {
-    font-size: 11px;
-    color: #666;
-    margin-left: 8px;
-    font-style: italic;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-left: 8px;
+  font-style: italic;
 }
 
 /* Improved input styling */
 .amount-inputs input:focus {
-    transform: scale(1.02);
-    transition: transform 0.1s ease;
+  transform: scale(1.02);
+  transition: transform 0.1s ease;
 }
 
 /* Better spacing for descriptions */
 .setting-group > div[style*="color: #666"] {
-    line-height: 1.4;
+  line-height: 1.4;
+  color: var(--text-secondary) !important;
 }
 
 .settings-message {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 12px 16px;
-    border-radius: 6px;
-    color: white;
-    font-weight: bold;
-    z-index: 1000;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 16px;
+  border-radius: var(--radius-input);
+  color: white;
+  font-weight: bold;
+  z-index: 1000;
 }
 
 /* Error state styles */
 .setting-group input.error,
 .setting-group select.error {
-    border-color: #f44336;
-    background-color: #ffebee;
-    box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2);
+  border-color: var(--error);
+  background-color: rgba(244, 67, 54, 0.1);
+  box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2);
 }
 
 .setting-group input.error:focus,
 .setting-group select.error:focus {
-    outline: none;
-    border-color: #f44336;
-    box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
+  outline: none;
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.3);
 }
 
 /* Validation feedback */
 .validation-feedback {
-    font-size: 12px;
-    color: #f44336;
-    margin-top: 4px;
-    display: block;
+  font-size: 12px;
+  color: var(--error);
+  margin-top: 4px;
+  display: block;
 }
 
 .validation-feedback.success {
-    color: #4CAF50;
+  color: var(--success);
 }
 
 /* Enhanced form styling */
 .setting-group input:focus,
 .setting-group select:focus {
-    outline: none;
-    border-color: #f7931a;
-    box-shadow: 0 0 0 2px rgba(247, 147, 26, 0.2);
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(247, 147, 26, 0.2);
 }
 
 .setting-group input:valid {
-    border-color: #4CAF50;
+  border-color: var(--success);
 }
 
 /* Loading state for save button */
 #save-settings:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-    opacity: 0.6;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 #save-settings.loading {
-    position: relative;
+  position: relative;
 }
 
 #save-settings.loading::after {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    margin: auto;
-    border: 2px solid transparent;
-    border-top-color: #ffffff;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+  border: 2px solid transparent;
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Facebook Group Management Styles */
 .facebook-group-input {
-    display: flex;
-    align-items: center;
-    margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
 .facebook-group-input input {
-    flex: 1;
-    margin-right: 8px;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
+  flex: 1;
+  margin-right: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  font-size: 14px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.facebook-group-input input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.facebook-group-input input:focus {
+  outline: none;
+  border-color: var(--brand);
 }
 
 .facebook-group-input button {
-    padding: 8px 16px;
-    background: #1877f2;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 14px;
-    cursor: pointer;
-    white-space: nowrap;
+  padding: 8px 16px;
+  background: #1877f2;
+  color: white;
+  border: none;
+  border-radius: var(--radius-input);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .facebook-group-input button:hover {
-    background: #166fe5;
+  background: #166fe5;
 }
 
 .facebook-group-input button:disabled {
-    background: #ccc;
-    cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: not-allowed;
 }
 
 .facebook-groups-container {
-    margin-top: 16px;
-    border: 1px solid #eee;
-    border-radius: 6px;
-    max-height: 300px;
-    overflow-y: auto;
+  margin-top: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-input);
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--container-bg);
 }
 
 .facebook-group-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid #eee;
-    background: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--card-bg);
 }
 
 .facebook-group-item:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .facebook-group-item:hover {
-    background: #f8f9fa;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .facebook-group-info {
-    flex: 1;
-    min-width: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 .facebook-group-id {
-    font-family: monospace;
-    font-size: 13px;
-    color: #333;
-    font-weight: 500;
-    margin-bottom: 2px;
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 2px;
 }
 
 .facebook-group-url {
-    font-size: 11px;
-    color: #666;
-    word-break: break-all;
+  font-size: 11px;
+  color: var(--text-secondary);
+  word-break: break-all;
 }
 
 .facebook-group-actions {
-    display: flex;
-    gap: 8px;
-    margin-left: 12px;
+  display: flex;
+  gap: 8px;
+  margin-left: 12px;
 }
 
 .facebook-group-actions button {
-    padding: 4px 8px;
-    font-size: 12px;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    font-weight: 500;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 500;
 }
 
 .remove-group-btn {
-    background: #dc3545;
-    color: white;
+  background: rgba(244, 67, 54, 0.2);
+  color: #ef5350;
 }
 
 .remove-group-btn:hover {
-    background: #c82333;
+  background: rgba(244, 67, 54, 0.3);
 }
 
 .facebook-groups-empty {
-    padding: 24px;
-    text-align: center;
-    color: #666;
-    font-style: italic;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .facebook-groups-empty .empty-icon {
-    font-size: 32px;
-    margin-bottom: 8px;
-    opacity: 0.5;
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.5;
 }
 
 /* Facebook group validation states */
 .facebook-group-input input.error {
-    border-color: #f44336;
-    background-color: #ffebee;
+  border-color: var(--error);
+  background-color: rgba(244, 67, 54, 0.1);
 }
 
 .facebook-group-input input.success {
-    border-color: #4CAF50;
-    background-color: #f1f8e9;
+  border-color: var(--success);
+  background-color: rgba(76, 175, 80, 0.1);
 }
 
 /* Group counter */
 .facebook-groups-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .facebook-groups-count {
-    font-size: 12px;
-    color: #666;
-    font-weight: 500;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 /* Bulk actions */
 .facebook-bulk-actions {
-    padding: 8px 16px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  padding: 8px 16px;
+  background: var(--container-bg);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .facebook-bulk-actions button {
-    padding: 4px 12px;
-    font-size: 12px;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    background: #6c757d;
-    color: white;
+  padding: 4px 12px;
+  font-size: 12px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .facebook-bulk-actions button:hover {
-    background: #5a6268;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Checkbox styling for dark theme */
+input[type="checkbox"] {
+  accent-color: var(--brand);
+}
+
+/* Radio button styling for dark theme */
+input[type="radio"] {
+  accent-color: var(--brand);
+}
+
+/* Description text override */
+.setting-group div {
+  color: var(--text-secondary);
+}
+
+/* Link styling */
+a {
+  color: var(--brand);
+}
+
+a:hover {
+  color: var(--brand-hover);
 }

@@ -1011,9 +1011,9 @@ function setupWordConfirmation() {
     const selectedWordsDiv = document.getElementById('selected-words');
     if (selectedWordsDiv) {
         selectedWordsDiv.innerHTML = `
-            <p style="color: #666; font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
+            <p style="color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
             <input type="text" id="confirm-paste-input" placeholder="Paste your 12-word phrase here..."
-                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"
+                style="width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box; background: rgba(255,255,255,0.08); color: #fff;"
             />
         `;
 
@@ -1149,9 +1149,9 @@ function updateSelectedWordsDisplay() {
     // If no words selected, show the paste input
     if (selectedWords.length === 0) {
         selectedWordsDiv.innerHTML = `
-            <p style="color: #666; font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
+            <p style="color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 8px;">Select words in order or paste your phrase:</p>
             <input type="text" id="confirm-paste-input" placeholder="Paste your 12-word phrase here..."
-                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"
+                style="width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box; background: rgba(255,255,255,0.08); color: #fff;"
             />
         `;
 
@@ -1169,7 +1169,7 @@ function updateSelectedWordsDisplay() {
         return;
     }
 
-    selectedWordsDiv.innerHTML = '<p style="color: #666; font-size: 14px; margin-bottom: 10px;">Selected words:</p>';
+    selectedWordsDiv.innerHTML = '<p style="color: rgba(255,255,255,0.6); font-size: 14px; margin-bottom: 10px;">Selected words:</p>';
 
     const wordsContainer = document.createElement('div');
     wordsContainer.style.display = 'flex';
@@ -1180,9 +1180,11 @@ function updateSelectedWordsDisplay() {
     selectedWords.forEach((word, index) => {
         const wordSpan = document.createElement('span');
         wordSpan.style.padding = '6px 8px 6px 12px';
-        wordSpan.style.background = '#f0f0f0';
+        wordSpan.style.background = 'rgba(255, 255, 255, 0.1)';
+        wordSpan.style.border = '1px solid rgba(255, 255, 255, 0.15)';
         wordSpan.style.borderRadius = '4px';
         wordSpan.style.fontSize = '14px';
+        wordSpan.style.color = '#ffffff';
         wordSpan.style.display = 'inline-flex';
         wordSpan.style.alignItems = 'center';
         wordSpan.style.gap = '6px';
@@ -1193,13 +1195,13 @@ function updateSelectedWordsDisplay() {
         const removeBtn = document.createElement('span');
         removeBtn.textContent = '×';
         removeBtn.style.cursor = 'pointer';
-        removeBtn.style.color = '#999';
+        removeBtn.style.color = 'rgba(255,255,255,0.5)';
         removeBtn.style.fontSize = '16px';
         removeBtn.style.fontWeight = 'bold';
         removeBtn.style.lineHeight = '1';
         removeBtn.title = 'Remove';
         removeBtn.onmouseover = () => removeBtn.style.color = '#dc3545';
-        removeBtn.onmouseout = () => removeBtn.style.color = '#999';
+        removeBtn.onmouseout = () => removeBtn.style.color = 'rgba(255,255,255,0.5)';
         removeBtn.onclick = () => removeSelectedWord(index);
 
         wordSpan.appendChild(textSpan);
@@ -1947,7 +1949,7 @@ function showQROnlyInterface() {
     if (app) {
         app.innerHTML = `
             <header>
-                <h1>⚡ Lightning Tipping</h1>
+                <h1>⚡ ZapArc</h1>
                 <p style="font-size: 12px; color: #666; margin: 0;">QR Code Mode</p>
             </header>
             
@@ -1956,7 +1958,7 @@ function showQROnlyInterface() {
                     <div style="background: #f0f7ff; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
                         <h3 style="margin: 0 0 8px 0; color: #2196F3;">External Wallet Mode</h3>
                         <p style="margin: 0; font-size: 13px; color: #666;">
-                            Tip detection active. QR codes will be generated for your external Lightning wallet.
+                            QR codes will be generated for your external Lightning wallet.
                         </p>
                     </div>
                     

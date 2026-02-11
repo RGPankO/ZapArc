@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightning Tipping Extension</title>
+    <title>ZapArc</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -163,8 +163,8 @@
         <div id="onboarding-wizard" class="hidden">
             <div class="wizard-step" id="welcome-step">
                 <div class="wizard-header">
-                    <h2>⚡ Welcome to Lightning Tipping</h2>
-                    <p>Set up your Lightning wallet to start tipping and receiving tips</p>
+                    <h2><img src="../icons/bolt32.png" alt="" style="width:32px;height:32px;vertical-align:middle;margin-right:6px;">Welcome to ZapArc</h2>
+                    <p>Set up your Lightning wallet to send and receive Bitcoin</p>
                 </div>
                 <div class="wizard-content">
                     <div class="feature-list">
@@ -173,7 +173,7 @@
                             <span>Non-custodial wallet - you control your keys</span>
                         </div>
                         <div class="feature-item">
-                            <span class="feature-icon">⚡</span>
+                            <span class="feature-icon"><img src="../icons/bolt24.png" alt="⚡" style="width:20px;height:20px;"></span>
                             <span>Instant Lightning Network payments</span>
                         </div>
                         <div class="feature-item">
@@ -347,7 +347,7 @@
         <!-- Main Wallet Interface -->
         <div id="main-interface" class="hidden">
             <header>
-                <h1>Lightning Tipping</h1>
+                <h1><img src="../icons/bolt32.png" alt="" style="width:28px;height:28px;vertical-align:middle;margin-right:4px;">ZapArc</h1>
                 <button id="refresh-btn" class="refresh-btn" title="Refresh Balance">🔄</button>
             </header>
 
@@ -593,14 +593,14 @@
         <!-- QR Only Interface -->
         <div id="qr-only-interface" class="hidden">
             <header>
-                <h1>⚡ Lightning Tipping</h1>
+                <h1><img src="../icons/bolt32.png" alt="" style="width:32px;height:32px;vertical-align:middle;margin-right:6px;">ZapArc</h1>
                 <p class="mode-indicator">External Wallet Mode</p>
             </header>
             
             <main>
                 <div class="info-box">
                     <h3>External Wallet Mode</h3>
-                    <p>Tip detection is active. QR codes will be generated for your external Lightning wallet.</p>
+                    <p>QR codes will be generated for your external Lightning wallet.</p>
                 </div>
                 
                 <div class="qr-actions">

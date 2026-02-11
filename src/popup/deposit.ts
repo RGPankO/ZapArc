@@ -187,7 +187,7 @@ export async function generateDepositInvoice(amount: number): Promise<void> {
         }
 
         // Generate invoice directly using Breez SDK in popup context
-        const description = `Deposit ${amount.toLocaleString()} sats to Lightning Tipping Wallet`;
+        const description = `Deposit ${amount.toLocaleString()} sats to ZapArc Wallet`;
 
         console.log('🔵 [Popup] Generating invoice via Breez SDK...', {
             amount,

@@ -1,4 +1,33 @@
-/* Popup styles for Lightning Tipping Extension */
+/* Popup styles for ZapArc Extension - Dark Theme */
+
+/* ========================================
+   CSS Custom Properties (Dark Theme)
+   ======================================== */
+:root {
+  --gradient-start: #1a1a2e;
+  --gradient-mid: #16213e;
+  --gradient-end: #0f3460;
+  --surface: #1a1a2e;
+  --card-bg: rgba(255, 255, 255, 0.08);
+  --container-bg: rgba(255, 255, 255, 0.05);
+  --brand: #F7931A;
+  --brand-hover: #e8850f;
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-placeholder: rgba(255, 255, 255, 0.3);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-light: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  --input-bg: #16213e;
+  --success: #4CAF50;
+  --error: #f44336;
+  --warning: #FF9800;
+  --wallet-icon-bg: rgba(255, 193, 7, 0.2);
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+  --radius-card: 16px;
+  --radius-button: 12px;
+  --radius-input: 8px;
+}
 
 body {
   width: 350px;
@@ -6,8 +35,28 @@ body {
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background-color: #f5f5f5;
+  background: linear-gradient(180deg, var(--gradient-start), var(--gradient-mid), var(--gradient-end));
+  background-attachment: fixed;
+  color: var(--text-primary);
   overflow-x: hidden;
+}
+
+/* Dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 #app {
@@ -28,7 +77,7 @@ body {
   bottom: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--modal-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -41,21 +90,21 @@ body {
 
 /* Modal containers */
 .modal {
-  background: white;
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   padding: 24px;
   max-width: 90%;
   max-height: 90%;
   overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-light);
 }
 
 /* Common Button Styles */
 .btn-primary {
   padding: 12px 24px;
   border: none;
-  border-radius: 6px;
-  background-color: #f7931a;
+  border-radius: var(--radius-button);
+  background-color: var(--brand);
   color: white;
   cursor: pointer;
   font-size: 14px;
@@ -64,43 +113,45 @@ body {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #e8850f;
+  background-color: var(--brand-hover);
 }
 
 .btn-primary:disabled {
-  background-color: #ccc;
+  background-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.4);
   cursor: not-allowed;
 }
 
 .btn-secondary {
   padding: 12px 24px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background-color: white;
-  color: #333;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-button);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
 .btn-secondary:hover {
-  background-color: #f8f8f8;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--brand);
 }
 
 .btn-outline {
   padding: 8px 16px;
-  border: 1px solid #f7931a;
-  border-radius: 4px;
-  background: white;
-  color: #f7931a;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-input);
+  background: transparent;
+  color: var(--brand);
   cursor: pointer;
   font-size: 12px;
   transition: all 0.2s;
 }
 
 .btn-outline:hover {
-  background-color: #f7931a;
+  background-color: var(--brand);
   color: white;
 }
 
@@ -127,13 +178,13 @@ body {
 .wizard-header h2 {
   margin: 0 0 8px 0;
   font-size: 20px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .wizard-header p {
   margin: 0;
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -167,9 +218,9 @@ body {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
 }
 
 .feature-icon {
@@ -190,23 +241,23 @@ body {
   padding: 20px;
   text-align: center;
   gap: 8px;
-  background: white;
-  border: 2px solid #ddd;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-card);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .choice-btn:hover:not(:disabled) {
-  border-color: #f7931a;
-  background-color: #fff8f0;
+  border-color: var(--brand);
+  background-color: rgba(247, 147, 26, 0.1);
 }
 
 .choice-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-  border-color: #ddd;
-  background-color: #f5f5f5;
+  border-color: var(--border-subtle);
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
 .choice-icon {
@@ -216,27 +267,28 @@ body {
 .choice-title {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .choice-description {
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: normal;
 }
 
-/* Choice Hint (shown when Add Sub-Wallet is disabled) */
+/* Choice Hint */
 .choice-hint {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   padding: 12px 14px;
   margin-top: 0;
-  background: #fff8e6;
-  border: 1px solid #ffe082;
-  border-radius: 8px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-input);
   font-size: 13px;
-  color: #b36b00;
+  color: var(--warning);
   line-height: 1.4;
   text-align: left;
 }
@@ -270,23 +322,29 @@ body {
 .word-input-wrapper input {
   width: 100%;
   padding: 10px 10px 10px 32px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
   font-size: 14px;
   box-sizing: border-box;
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.word-input-wrapper input::placeholder {
+  color: var(--text-placeholder);
 }
 
 .word-input-wrapper input:focus {
   outline: none;
-  border-color: #f7931a;
+  border-color: var(--brand);
 }
 
 .word-input-wrapper input.valid {
-  border-color: #28a745;
+  border-color: var(--success);
 }
 
 .word-input-wrapper input.invalid {
-  border-color: #dc3545;
+  border-color: var(--error);
 }
 
 .word-input-wrapper .word-number {
@@ -295,17 +353,17 @@ body {
   top: 50%;
   transform: translateY(-50%);
   font-size: 11px;
-  color: #999;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 /* Word Suggestions */
 .word-suggestions {
   position: fixed;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-input);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   max-height: 200px;
   overflow-y: auto;
   z-index: 10000;
@@ -318,10 +376,11 @@ body {
   cursor: pointer;
   font-size: 14px;
   font-family: monospace;
+  color: var(--text-primary);
 }
 
 .word-suggestion:hover {
-  background: #f7931a;
+  background: var(--brand);
   color: white;
 }
 
@@ -335,39 +394,41 @@ body {
 
 .mnemonic-word {
   padding: 8px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-input);
   text-align: center;
   font-family: monospace;
   font-size: 12px;
+  color: var(--text-primary);
 }
 
 .mnemonic-word .word-number {
   display: block;
   font-size: 10px;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 4px;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .warning-box {
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 6px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-input);
   padding: 12px;
   font-size: 12px;
-  color: #856404;
+  color: var(--warning);
 }
 
 /* Mnemonic Confirmation */
 .selected-words {
   min-height: 80px;
   padding: 12px;
-  background: white;
-  border: 2px dashed #ddd;
-  border-radius: 6px;
+  background: var(--card-bg);
+  border: 2px dashed var(--border-medium);
+  border-radius: var(--radius-input);
   margin-bottom: 16px;
   display: flex;
   flex-wrap: wrap;
@@ -377,7 +438,7 @@ body {
 
 .selected-word {
   padding: 4px 8px;
-  background: #f7931a;
+  background: var(--brand);
   color: white;
   border-radius: 4px;
   font-size: 12px;
@@ -392,22 +453,47 @@ body {
 
 .word-option {
   padding: 8px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
   text-align: center;
   font-size: 12px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .word-option:hover {
-  background-color: #f8f8f8;
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--brand);
 }
 
 .word-option.used {
-  background-color: #f0f0f0;
-  color: #999;
+  background-color: rgba(255, 255, 255, 0.03);
+  color: var(--text-placeholder);
+  cursor: not-allowed;
+}
+
+.word-button {
+  padding: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  text-align: center;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-primary);
+}
+
+.word-button:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--brand);
+}
+
+.word-button:disabled {
+  background-color: rgba(255, 255, 255, 0.03);
+  color: var(--text-placeholder);
   cursor: not-allowed;
 }
 
@@ -421,10 +507,21 @@ body {
 
 .pin-input-group input {
   padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
   font-size: 16px;
   text-align: center;
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.pin-input-group input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.pin-input-group input:focus {
+  outline: none;
+  border-color: var(--brand);
 }
 
 .pin-strength {
@@ -433,13 +530,13 @@ body {
 }
 
 .pin-strength.weak {
-  color: #dc3545;
+  color: var(--error);
 }
 .pin-strength.medium {
-  color: #ffc107;
+  color: var(--warning);
 }
 .pin-strength.strong {
-  color: #28a745;
+  color: var(--success);
 }
 
 /* Success Message */
@@ -450,7 +547,7 @@ body {
 
 .checkmark {
   font-size: 48px;
-  color: #28a745;
+  color: var(--success);
   margin-bottom: 16px;
 }
 
@@ -471,7 +568,7 @@ header {
 header h1 {
   margin: 0;
   font-size: 18px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .refresh-btn {
@@ -482,18 +579,20 @@ header h1 {
   padding: 4px;
   border-radius: 4px;
   transition: background-color 0.2s;
+  color: var(--text-secondary);
 }
 
 .refresh-btn:hover {
-  background-color: #f0f0f0;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 #wallet-section {
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
 }
 
 #balance-display {
@@ -512,18 +611,18 @@ header h1 {
 
 .balance-label {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .balance-amount {
   font-size: 24px;
   font-weight: bold;
-  color: #f7931a;
+  color: var(--brand);
 }
 
 .balance-loading {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 #wallet-actions {
@@ -535,8 +634,8 @@ header h1 {
   flex: 1;
   padding: 12px 8px;
   border: none;
-  border-radius: 6px;
-  background-color: #f7931a;
+  border-radius: var(--radius-button);
+  background-color: var(--brand);
   color: white;
   cursor: pointer;
   font-size: 14px;
@@ -548,7 +647,7 @@ header h1 {
 }
 
 .wallet-btn:hover {
-  background-color: #e8850f;
+  background-color: var(--brand-hover);
 }
 
 .btn-icon {
@@ -557,11 +656,11 @@ header h1 {
 
 /* Transaction Section */
 #transaction-section {
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
 }
 
 .section-header {
@@ -574,16 +673,20 @@ header h1 {
 .section-header h3 {
   margin: 0;
   font-size: 14px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .view-all-btn {
   background: none;
   border: none;
-  color: #f7931a;
+  color: var(--brand);
   font-size: 12px;
   cursor: pointer;
   text-decoration: underline;
+}
+
+.view-all-btn:hover {
+  color: var(--brand-hover);
 }
 
 .transaction-list {
@@ -593,7 +696,7 @@ header h1 {
 
 .no-transactions {
   text-align: center;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 12px;
   padding: 20px;
 }
@@ -603,8 +706,14 @@ header h1 {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-subtle);
   gap: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.transaction-item:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .transaction-item:last-child {
@@ -614,8 +723,21 @@ header h1 {
 .transaction-icon {
   flex-shrink: 0;
   font-size: 16px;
-  width: 24px;
-  text-align: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+
+.transaction-item.receive .transaction-icon {
+  background-color: rgba(76, 175, 80, 0.2);
+}
+
+.transaction-item.send .transaction-icon {
+  background-color: rgba(244, 67, 54, 0.2);
 }
 
 .transaction-details {
@@ -630,12 +752,12 @@ header h1 {
 .transaction-type {
   font-size: 12px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .transaction-date {
   font-size: 10px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .transaction-amount {
@@ -644,11 +766,11 @@ header h1 {
 }
 
 .transaction-amount.positive {
-  color: #28a745;
+  color: var(--success);
 }
 
 .transaction-amount.negative {
-  color: #dc3545;
+  color: var(--error);
 }
 
 #settings-section {
@@ -658,33 +780,37 @@ header h1 {
 
 .settings-btn {
   padding: 8px 24px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: white;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  background-color: rgba(255, 255, 255, 0.1);
   cursor: pointer;
   font-size: 14px;
   width: 100%;
+  color: var(--text-primary);
+  transition: all 0.2s;
 }
 
 .settings-btn:hover {
-  background-color: #f8f8f8;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--brand);
 }
 
 .delete-wallet-btn {
   padding: 8px 24px;
-  border: 1px solid #dc3545;
-  border-radius: 4px;
-  background-color: white;
-  color: #dc3545;
+  border: 1px solid var(--error);
+  border-radius: var(--radius-input);
+  background-color: transparent;
+  color: var(--error);
   cursor: pointer;
   font-size: 14px;
   width: 100%;
   margin-top: 8px;
+  margin-bottom: 15px;
   transition: all 0.2s;
 }
 
 .delete-wallet-btn:hover {
-  background-color: #dc3545;
+  background-color: var(--error);
   color: white;
 }
 
@@ -713,28 +839,28 @@ header h1 {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
 }
 
 .current-wallet-btn:hover {
-  background: #f8f8f8;
-  border-color: #4caf50;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--success);
 }
 
 #current-wallet-name {
   flex: 1;
   text-align: left;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .wallet-count-badge {
-  background: #4caf50;
+  background: var(--success);
   color: white;
   font-size: 11px;
   padding: 2px 6px;
@@ -743,7 +869,7 @@ header h1 {
 }
 
 .dropdown-arrow {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 10px;
   transition: transform 0.2s;
 }
@@ -755,10 +881,10 @@ header h1 {
 .add-wallet-btn {
   width: 40px;
   height: 40px;
-  background: #4caf50;
+  background: var(--success);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-input);
   font-size: 20px;
   cursor: pointer;
   transition: all 0.2s;
@@ -778,10 +904,10 @@ header h1 {
   top: 48px;
   left: 0;
   right: 0;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-input);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 1000;
   max-height: 300px;
   overflow-y: auto;
@@ -800,7 +926,7 @@ header h1 {
   padding: 10px 12px;
   cursor: pointer;
   transition: background 0.2s;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .wallet-item:last-child {
@@ -808,16 +934,16 @@ header h1 {
 }
 
 .wallet-item:hover {
-  background: #f8f8f8;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .wallet-item.active {
-  background: #e8f5e9;
+  background: rgba(76, 175, 80, 0.15);
 }
 
 .wallet-item-check {
   width: 20px;
-  color: #4caf50;
+  color: var(--success);
   font-weight: bold;
 }
 
@@ -827,35 +953,36 @@ header h1 {
 
 .wallet-item-name {
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   font-size: 14px;
 }
 
 .wallet-item-balance {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
 .wallet-dropdown-footer {
-  border-top: 1px solid #ddd;
+  border-top: 1px solid var(--border-light);
   padding: 8px;
 }
 
 .manage-wallets-btn {
   width: 100%;
   padding: 8px;
-  background: white;
-  border: 1px solid #ddd;
+  background: transparent;
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .manage-wallets-btn:hover {
-  background: #f8f8f8;
-  border-color: #4caf50;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--success);
 }
 
 /* Wallet Switching Indicator */
@@ -865,7 +992,7 @@ header h1 {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(26, 26, 46, 0.95);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -880,8 +1007,8 @@ header h1 {
 .switching-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #4caf50;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top: 4px solid var(--success);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -898,7 +1025,7 @@ header h1 {
 .switching-text {
   margin-top: 12px;
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 /* Unlock Interface */
@@ -919,13 +1046,13 @@ header h1 {
 .unlock-container h2 {
   margin: 0 0 8px 0;
   font-size: 20px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .unlock-container p {
   margin: 0 0 24px 0;
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .pin-input-container {
@@ -936,14 +1063,25 @@ header h1 {
 
 .pin-input-container input {
   padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
   font-size: 16px;
   text-align: center;
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.pin-input-container input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.pin-input-container input:focus {
+  outline: none;
+  border-color: var(--brand);
 }
 
 .error-message {
-  color: #dc3545;
+  color: var(--error);
   font-size: 12px;
   margin-top: 8px;
 }
@@ -967,13 +1105,13 @@ header h1 {
 .wallet-selection-container h2 {
   margin: 8px 0;
   font-size: 18px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .wallet-selection-container p {
   margin: 0 0 16px 0;
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .wallet-selection-list {
@@ -982,25 +1120,25 @@ header h1 {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 0; /* Important for flex overflow to work */
+  min-height: 0;
 }
 
 .wallet-selection-footer {
   flex-shrink: 0;
   padding-top: 16px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-subtle);
   margin-top: 8px;
 }
 
 .wallet-selection-master-item {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-input);
+  background: var(--card-bg);
   transition: border-color 0.2s;
 }
 
 .wallet-selection-master-item:has(.selected) {
-  border-color: #4caf50;
+  border-color: var(--success);
 }
 
 .wallet-selection-header {
@@ -1012,21 +1150,20 @@ header h1 {
   transition: background-color 0.2s, border-left 0.2s;
   position: relative;
   border-left: 4px solid transparent;
-  border-radius: 8px 8px 0 0;
+  border-radius: var(--radius-input) var(--radius-input) 0 0;
 }
 
-/* When there are no sub-wallets, header needs full border radius */
 .wallet-selection-master-item > .wallet-selection-header:only-child {
-  border-radius: 8px;
+  border-radius: var(--radius-input);
 }
 
 .wallet-selection-header:hover {
-  background-color: #f5f5f5;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .wallet-selection-header.selected {
-  background-color: #e8f5e9;
-  border-left-color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.15);
+  border-left-color: var(--success);
 }
 
 .wallet-selection-header .wallet-icon {
@@ -1041,7 +1178,7 @@ header h1 {
 .wallet-selection-header .wallet-name {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1049,20 +1186,20 @@ header h1 {
 
 .wallet-selection-header .wallet-meta {
   font-size: 11px;
-  color: #999;
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
 .wallet-selection-header .selection-check {
-  color: #4caf50;
+  color: var(--success);
   font-size: 16px;
   font-weight: bold;
 }
 
 .wallet-selection-sub-list {
-  border-top: 1px solid #f0f0f0;
-  background-color: #fafafa;
-  border-radius: 0 0 8px 8px;
+  border-top: 1px solid var(--border-subtle);
+  background-color: rgba(255, 255, 255, 0.03);
+  border-radius: 0 0 var(--radius-input) var(--radius-input);
 }
 
 .wallet-selection-sub-item {
@@ -1077,20 +1214,20 @@ header h1 {
 }
 
 .wallet-selection-sub-item:hover {
-  background-color: #f0f0f0;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .wallet-selection-sub-item.selected {
-  background-color: #e8f5e9;
-  border-left-color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.15);
+  border-left-color: var(--success);
 }
 
 .wallet-selection-sub-item:last-child {
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 var(--radius-input) var(--radius-input);
 }
 
 .wallet-selection-sub-item .sub-wallet-indent {
-  color: #999;
+  color: var(--text-secondary);
   font-size: 12px;
   font-family: monospace;
   margin-right: 4px;
@@ -1099,14 +1236,14 @@ header h1 {
 .wallet-selection-sub-item .sub-wallet-name {
   flex: 1;
   font-size: 13px;
-  color: #555;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .wallet-selection-sub-item .selection-check {
-  color: #4caf50;
+  color: var(--success);
   font-size: 14px;
   font-weight: bold;
 }
@@ -1117,7 +1254,7 @@ header h1 {
 .error-wallets {
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: var(--text-secondary);
   font-size: 14px;
 }
 
@@ -1130,11 +1267,11 @@ header h1 {
   padding: 0;
   font-size: 16px;
   font-weight: 500;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .error-wallets {
-  color: #dc3545;
+  color: var(--error);
 }
 
 /* QR Only Interface */
@@ -1151,27 +1288,28 @@ header h1 {
 
 .mode-indicator {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   margin: 4px 0 0 0;
 }
 
 .info-box {
-  background: #f0f7ff;
+  background: rgba(33, 150, 243, 0.1);
+  border: 1px solid rgba(33, 150, 243, 0.3);
   padding: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   margin-bottom: 24px;
 }
 
 .info-box h3 {
   margin: 0 0 8px 0;
-  color: #2196f3;
+  color: #64b5f6;
   font-size: 16px;
 }
 
 .info-box p {
   margin: 0;
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -1179,374 +1317,6 @@ header h1 {
   display: flex;
   gap: 8px;
   justify-content: center;
-} /* Mod
-al Styles */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10000;
-}
-
-.modal-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 400px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 20px 0 20px;
-  border-bottom: 1px solid #eee;
-  margin-bottom: 20px;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #333;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #666;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-}
-
-.modal-close:hover {
-  background-color: #f0f0f0;
-}
-
-.modal-body {
-  padding: 0 20px 20px 20px;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-}
-
-.modal-actions button {
-  flex: 1;
-}
-
-/* Deposit Interface Styles */
-.amount-input-group {
-  position: relative;
-  display: flex;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.amount-input-group input {
-  flex: 1;
-  padding: 12px 50px 12px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 16px;
-}
-
-.input-suffix {
-  position: absolute;
-  right: 12px;
-  color: #666;
-  font-size: 14px;
-  pointer-events: none;
-}
-
-.quick-amounts {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.quick-amount-btn {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.2s;
-}
-
-.quick-amount-btn:hover {
-  background-color: #f7931a;
-  color: white;
-  border-color: #f7931a;
-}
-
-.invoice-container {
-  text-align: center;
-}
-
-.qr-container {
-  margin-bottom: 16px;
-}
-
-.qr-container canvas {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-}
-
-.invoice-details {
-  margin-bottom: 16px;
-}
-
-.invoice-amount {
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 12px;
-  color: #333;
-}
-
-.invoice-text-container {
-  position: relative;
-  margin-bottom: 12px;
-}
-
-.invoice-text-container textarea {
-  width: 100%;
-  height: 80px;
-  padding: 8px 40px 8px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 10px;
-  resize: none;
-  box-sizing: border-box;
-}
-
-.copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #f7931a;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 10px;
-  cursor: pointer;
-}
-
-.copy-btn:hover {
-  background: #e8850f;
-}
-
-.payment-status {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 16px;
-}
-
-.status-indicator {
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.status-indicator.success {
-  color: #28a745;
-}
-
-.status-indicator.error {
-  color: #dc3545;
-}
-
-.status-indicator.expired {
-  color: #ffc107;
-}
-
-.status-timer {
-  font-size: 12px;
-  color: #666;
-}
-
-/* Withdrawal Interface Styles */
-.balance-info {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.withdrawal-form {
-  margin-bottom: 20px;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 500;
-  color: #333;
-  font-size: 14px;
-}
-
-.form-group input,
-.form-group textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 60px;
-}
-
-.payment-preview {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 16px;
-  margin-top: 16px;
-}
-
-.payment-preview h4 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  color: #333;
-}
-
-.preview-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.preview-item:last-child {
-  margin-bottom: 0;
-  font-weight: 500;
-  border-top: 1px solid #dee2e6;
-  padding-top: 8px;
-  margin-top: 8px;
-}
-
-.preview-item span:first-child {
-  color: #666;
-}
-
-.preview-item span:last-child {
-  color: #333;
-}
-
-/* Notification System */
-#notification-container {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 300px;
-}
-
-.notification {
-  padding: 12px 16px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  line-height: 1.4;
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.notification-info {
-  background: #e3f2fd;
-  color: #1565c0;
-  border-left: 4px solid #2196f3;
-}
-
-.notification-success {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border-left: 4px solid #4caf50;
-}
-
-.notification-error {
-  background: #ffebee;
-  color: #c62828;
-  border-left: 4px solid #f44336;
-}
-
-.notification::before {
-  content: "";
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.notification-info::before {
-  content: "ℹ️";
-}
-
-.notification-success::before {
-  content: "✅";
-}
-
-.notification-error::before {
-  content: "❌";
 }
 
 /* ========================================
@@ -1559,7 +1329,7 @@ al Styles */
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--modal-overlay);
   z-index: 10000;
   display: flex;
   align-items: center;
@@ -1581,9 +1351,9 @@ al Styles */
 }
 
 .modal {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   width: 90%;
   max-width: 400px;
   max-height: 85vh;
@@ -1591,6 +1361,7 @@ al Styles */
   flex-direction: column;
   animation: modalScaleIn 0.2s ease-out;
   overflow: hidden;
+  border: 1px solid var(--border-light);
 }
 
 .modal.hidden {
@@ -1613,14 +1384,14 @@ al Styles */
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
 .modal-header h3 {
   margin: 0;
   font-size: 18px;
-  color: #333;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -1629,7 +1400,7 @@ al Styles */
   border: none;
   font-size: 28px;
   line-height: 1;
-  color: #666;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -1642,8 +1413,8 @@ al Styles */
 }
 
 .modal-close:hover {
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .modal-body {
@@ -1655,13 +1426,14 @@ al Styles */
 .modal-body p {
   margin: 0 0 16px 0;
   line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .modal-footer {
   display: flex;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
@@ -1673,21 +1445,23 @@ al Styles */
 .modal-input {
   width: 100%;
   padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
   font-size: 14px;
   box-sizing: border-box;
   font-family: inherit;
   transition: border-color 0.2s;
+  background: var(--card-bg);
+  color: var(--text-primary);
 }
 
 .modal-input:focus {
   outline: none;
-  border-color: #f7931a;
+  border-color: var(--brand);
 }
 
 .modal-input::placeholder {
-  color: #999;
+  color: var(--text-placeholder);
 }
 
 /* Modal Error Message */
@@ -1703,7 +1477,7 @@ al Styles */
   letter-spacing: 2px;
 }
 
-/* Add Wallet Modals - Flow Management */
+/* Add Wallet Modals */
 #add-wallet-choice-modal .modal-body,
 #add-wallet-create-modal .modal-body,
 #add-wallet-import-nickname-modal .modal-body {
@@ -1724,17 +1498,17 @@ al Styles */
 }
 
 #modal-mnemonic-display .mnemonic-word {
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
   padding: 10px 8px;
   text-align: center;
-  border-radius: 6px;
+  border-radius: var(--radius-input);
 }
 
 #modal-mnemonic-display .mnemonic-word .word-number {
   display: block;
   font-size: 10px;
-  color: #999;
+  color: var(--text-secondary);
   margin-bottom: 4px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
@@ -1745,23 +1519,23 @@ al Styles */
   font-family: "Courier New", Courier, monospace;
   font-size: 13px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
 }
 
 /* Copy Mnemonic Button */
 #copy-mnemonic-btn {
-  background: white;
-  border: 1px solid #f7931a;
-  color: #f7931a;
+  background: transparent;
+  border: 1px solid var(--brand);
+  color: var(--brand);
   padding: 10px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-input);
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
 }
 
 #copy-mnemonic-btn:hover {
-  background: #f7931a;
+  background: var(--brand);
   color: white;
 }
 
@@ -1808,12 +1582,12 @@ body.modal-open {
 /* Modal Accessibility - Focus Ring */
 .modal-input:focus,
 .modal button:focus {
-  outline: 2px solid #f7931a;
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
 .modal-close:focus {
-  outline: 2px solid #f7931a;
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
@@ -1854,6 +1628,7 @@ body.modal-open {
     opacity: 0;
   }
 }
+
 /* ========================================
    Wallet Management Interface Styles
    ======================================== */
@@ -1877,23 +1652,23 @@ body.modal-open {
   flex: 1;
   margin: 0;
   font-size: 18px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .back-btn {
-  background: white;
-  border: 1px solid #ddd;
+  background: transparent;
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
   padding: 6px 12px;
   cursor: pointer;
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .back-btn:hover {
-  background: #f8f8f8;
-  color: #333;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
 }
 
 .wallet-mgmt-actions {
@@ -1902,10 +1677,10 @@ body.modal-open {
 
 .add-wallet-full-btn {
   width: 100%;
-  background: #4caf50;
+  background: var(--success);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   padding: 12px 16px;
   cursor: pointer;
   font-size: 15px;
@@ -1929,21 +1704,21 @@ body.modal-open {
 }
 
 .wallet-mgmt-item {
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-input);
   padding: 16px;
   margin-bottom: 12px;
   transition: all 0.2s;
 }
 
 .wallet-mgmt-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--border-medium);
 }
 
 .wallet-mgmt-item.active {
-  border-color: #4caf50;
-  background: #f1f8f4;
+  border-color: var(--success);
+  background: rgba(76, 175, 80, 0.1);
 }
 
 .wallet-mgmt-header {
@@ -1956,14 +1731,14 @@ body.modal-open {
 .wallet-mgmt-name {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .active-badge {
-  background: #4caf50;
+  background: var(--success);
   color: white;
   font-size: 11px;
   padding: 2px 8px;
@@ -1973,7 +1748,7 @@ body.modal-open {
 
 .wallet-mgmt-balance {
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
   margin-bottom: 12px;
 }
 
@@ -1985,16 +1760,17 @@ body.modal-open {
 .wallet-mgmt-btn {
   flex: 1;
   padding: 8px 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
-  background: white;
+  background: transparent;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .wallet-mgmt-btn:hover {
-  background: #f8f8f8;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .wallet-mgmt-btn.rename-btn:hover {
@@ -2003,12 +1779,12 @@ body.modal-open {
 }
 
 .wallet-mgmt-btn.delete-btn {
-  color: #dc3545;
-  border-color: #dc3545;
+  color: var(--error);
+  border-color: var(--error);
 }
 
 .wallet-mgmt-btn.delete-btn:hover {
-  background: #dc3545;
+  background: var(--error);
   color: white;
 }
 
@@ -2023,24 +1799,24 @@ body.modal-open {
 
 /* Master Key Item */
 .master-key-item {
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-input);
   padding: 12px;
   margin-bottom: 12px;
   transition: all 0.2s;
 }
 
 .master-key-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--border-medium);
 }
 
 .master-key-item.active {
-  border-color: #4caf50;
-  background: #f1f8f4;
+  border-color: var(--success);
+  background: rgba(76, 175, 80, 0.1);
 }
 
-/* Master Key Header (clickable for expand/collapse) */
+/* Master Key Header */
 .master-key-header {
   display: flex;
   align-items: center;
@@ -2061,19 +1837,19 @@ body.modal-open {
 .master-key-name {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   flex: 1;
 }
 
 .sub-wallet-count {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   margin-right: 8px;
 }
 
 .expand-icon {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   transition: transform 0.2s;
 }
 
@@ -2088,7 +1864,7 @@ body.modal-open {
 /* Master Key Metadata */
 .master-key-meta {
   font-size: 12px;
-  color: #888;
+  color: var(--text-secondary);
   margin: 8px 0;
   padding-left: 24px;
 }
@@ -2100,20 +1876,15 @@ body.modal-open {
   gap: 8px;
   padding: 8px 12px;
   margin: 8px 0 8px 24px;
-  background: linear-gradient(90deg, #fff7e6 0%, #fffbe6 100%);
-  border: 1px solid #ffe58f;
-  border-radius: 6px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: var(--radius-input);
   font-size: 13px;
-  color: #d48806;
+  color: var(--warning);
 }
 
 .discovery-spinner {
   animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .discovery-status {
@@ -2122,7 +1893,7 @@ body.modal-open {
 
 .discovery-count {
   font-weight: 600;
-  color: #389e0d;
+  color: var(--success);
 }
 
 .discovery-count.hidden {
@@ -2136,11 +1907,11 @@ body.modal-open {
   gap: 8px;
   padding: 10px 12px;
   margin: 0 16px 12px;
-  background: linear-gradient(90deg, #fff7e6 0%, #fffbe6 100%);
-  border: 1px solid #ffe58f;
-  border-radius: 8px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: var(--radius-input);
   font-size: 13px;
-  color: #d48806;
+  color: var(--warning);
 }
 
 .discovery-banner.hidden {
@@ -2157,8 +1928,8 @@ body.modal-open {
 
 .discovery-banner-count {
   font-weight: 600;
-  color: #389e0d;
-  background: #f6ffed;
+  color: var(--success);
+  background: rgba(76, 175, 80, 0.2);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -2184,7 +1955,7 @@ body.modal-open {
 
 /* Sub-Wallet List (nested) */
 .sub-wallet-list {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .sub-wallet-list.hidden {
@@ -2202,37 +1973,37 @@ body.modal-open {
 .add-sub-wallet-btn {
   flex: 1;
   padding: 10px;
-  border: 1px dashed #ccc;
+  border: 1px dashed var(--border-medium);
   background: transparent;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .add-sub-wallet-btn:hover:not(:disabled) {
-  border-color: #4caf50;
-  color: #4caf50;
-  background: #f9fff9;
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(76, 175, 80, 0.1);
 }
 
 .add-sub-wallet-btn:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-  border-color: #ddd;
-  color: #999;
+  border-color: var(--border-subtle);
+  color: var(--text-placeholder);
 }
 
 /* Scan Sub-Wallets Button */
 .scan-sub-wallets-btn {
   padding: 10px 12px;
-  border: 1px dashed #ccc;
+  border: 1px dashed var(--border-medium);
   background: transparent;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   transition: all 0.2s;
   white-space: nowrap;
 }
@@ -2240,26 +2011,26 @@ body.modal-open {
 .scan-sub-wallets-btn:hover {
   border-color: #2196f3;
   color: #2196f3;
-  background: #f5faff;
+  background: rgba(33, 150, 243, 0.1);
 }
 
 /* Sub-Wallet Item */
 .sub-wallet-item {
   padding: 10px;
   margin-bottom: 8px;
-  background: #f9f9f9;
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 4px;
   border: 1px solid transparent;
   transition: all 0.2s;
 }
 
 .sub-wallet-item:hover {
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .sub-wallet-item.active {
-  border-color: #4caf50;
-  background: #e8f5e9;
+  border-color: var(--success);
+  background: rgba(76, 175, 80, 0.1);
 }
 
 /* Sub-Wallet Header */
@@ -2277,7 +2048,7 @@ body.modal-open {
 .sub-wallet-name {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   flex: 1;
 }
 
@@ -2300,6 +2071,7 @@ body.modal-open {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  background: linear-gradient(180deg, var(--gradient-start), var(--gradient-mid), var(--gradient-end));
 }
 
 #deposit-interface main,
@@ -2313,20 +2085,20 @@ body.modal-open {
 
 /* Deposit step containers */
 .deposit-step {
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
 }
 
 /* Invoice display container */
 .invoice-container {
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
   text-align: center;
 }
 
@@ -2340,57 +2112,81 @@ body.modal-open {
 .quick-amount-btn {
   flex: 1;
   padding: 10px 8px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: white;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  background: var(--card-bg);
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .quick-amount-btn:hover {
-  background-color: #f7931a;
+  background-color: var(--brand);
   color: white;
-  border-color: #f7931a;
+  border-color: var(--brand);
 }
 
 .quick-amount-btn.selected {
-  background-color: #f7931a;
+  background-color: var(--brand);
   color: white;
-  border-color: #f7931a;
+  border-color: var(--brand);
 }
 
 /* Withdraw form sections */
 .withdraw-balance-display {
   padding: 12px;
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
 }
 
 .withdraw-form-container {
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
 }
 
 /* Payment preview section */
 .payment-preview {
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-subtle);
 }
 
-/* Add background color to main containers */
-#deposit-interface,
-#withdraw-interface {
-  background: #f5f5f5;
+.payment-preview h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.preview-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.preview-item:last-child {
+  margin-bottom: 0;
+  font-weight: 500;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.preview-item span:first-child {
+  color: var(--text-secondary);
+}
+
+.preview-item span:last-child {
+  color: var(--text-primary);
 }
 
 /* Header styling for withdraw and deposit interfaces */
@@ -2400,8 +2196,8 @@ body.modal-open {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 16px;
 }
 
@@ -2410,33 +2206,263 @@ body.modal-open {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
   flex: 1;
   text-align: right;
 }
 
-/* Back button styling */
-.back-btn {
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: color 0.2s;
+/* Amount Input Group */
+.amount-input-group {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
+  margin-bottom: 16px;
 }
 
-.back-btn:hover {
-  color: #333;
+.amount-input-group input {
+  flex: 1;
+  padding: 12px 50px 12px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  font-size: 16px;
+  background: var(--card-bg);
+  color: var(--text-primary);
 }
 
-/* Delete wallet button spacing */
-.delete-wallet-btn {
-  margin-bottom: 15px;
+.amount-input-group input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.amount-input-group input:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+.input-suffix {
+  position: absolute;
+  right: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* QR Container */
+.qr-container {
+  margin-bottom: 16px;
+}
+
+.qr-container canvas {
+  border: 4px solid white;
+  border-radius: var(--radius-input);
+  background: white;
+}
+
+/* Invoice Details */
+.invoice-details {
+  margin-bottom: 16px;
+}
+
+.invoice-amount {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.invoice-text-container {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.invoice-text-container textarea {
+  width: 100%;
+  height: 80px;
+  padding: 8px 40px 8px 8px;
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 10px;
+  resize: none;
+  box-sizing: border-box;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--brand);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  background: var(--brand-hover);
+}
+
+/* Payment Status */
+.payment-status {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-input);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.status-indicator {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.status-indicator.success {
+  color: var(--success);
+}
+
+.status-indicator.error {
+  color: var(--error);
+}
+
+.status-indicator.expired {
+  color: var(--warning);
+}
+
+.status-timer {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Balance Info */
+.balance-info {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-input);
+  padding: 12px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* Withdrawal Form */
+.withdrawal-form {
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
+  font-size: 14px;
+  box-sizing: border-box;
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Notification System */
+#notification-container {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 300px;
+}
+
+.notification {
+  padding: 12px 16px;
+  border-radius: var(--radius-input);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  animation: slideIn 0.3s ease-out;
+  border: 1px solid;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-info {
+  background: rgba(33, 150, 243, 0.15);
+  color: #64b5f6;
+  border-color: rgba(33, 150, 243, 0.3);
+  border-left: 4px solid #2196f3;
+}
+
+.notification-success {
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--success);
+  border-color: rgba(76, 175, 80, 0.3);
+  border-left: 4px solid var(--success);
+}
+
+.notification-error {
+  background: rgba(244, 67, 54, 0.15);
+  color: #ef5350;
+  border-color: rgba(244, 67, 54, 0.3);
+  border-left: 4px solid var(--error);
+}
+
+.notification::before {
+  content: "";
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.notification-info::before {
+  content: "ℹ️";
+}
+
+.notification-success::before {
+  content: "✅";
+}
+
+.notification-error::before {
+  content: "❌";
 }
 
 /* ========================================
@@ -2446,7 +2472,7 @@ body.modal-open {
 .master-key-dropdown-item {
   margin-bottom: 4px;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 
 .master-key-dropdown-header {
@@ -2454,24 +2480,24 @@ body.modal-open {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #fff;
+  background: var(--surface);
   cursor: pointer;
   transition: background-color 0.2s, border-left 0.2s;
   border-left: 4px solid transparent;
 }
 
 .master-key-dropdown-header:hover {
-  background: #f5f5f5;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .master-key-dropdown-header.active {
-  background: #e8f5e9;
-  border-left-color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+  border-left-color: var(--success);
 }
 
 .dropdown-expand-icon {
   font-size: 10px;
-  color: #666;
+  color: var(--text-secondary);
   width: 12px;
 }
 
@@ -2482,16 +2508,16 @@ body.modal-open {
 .master-key-dropdown-name {
   font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .master-key-dropdown-meta {
   font-size: 11px;
-  color: #888;
+  color: var(--text-secondary);
 }
 
 .active-check {
-  color: #4caf50;
+  color: var(--success);
   font-size: 16px;
   font-weight: bold;
   margin-left: auto;
@@ -2504,60 +2530,40 @@ body.modal-open {
   align-items: center;
   gap: 8px;
   padding: 10px 12px 10px 32px;
-  background: #fafafa;
+  background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   transition: background-color 0.2s, border-left 0.2s;
   border-left: 4px solid transparent;
 }
 
 .sub-wallet-dropdown-item:hover {
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .sub-wallet-dropdown-item.active {
-  background: #e8f5e9;
-  border-left-color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+  border-left-color: var(--success);
 }
 
 .sub-wallet-indent {
   font-family: monospace;
-  color: #ccc;
+  color: var(--text-placeholder);
   font-size: 12px;
 }
 
 .sub-wallet-check {
-  color: #4caf50;
+  color: var(--success);
   font-weight: bold;
   width: 14px;
 }
 
-.sub-wallet-name {
-  flex: 1;
-  font-size: 13px;
-  color: #333;
-}
-
 .active-badge-small {
-  background: #4caf50;
+  background: var(--success);
   color: white;
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 8px;
   font-weight: 500;
-}
-
-/* Loading/Error States */
-.loading-wallets,
-.no-wallets,
-.error-wallets {
-  padding: 20px;
-  text-align: center;
-  color: #888;
-  font-size: 13px;
-}
-
-.error-wallets {
-  color: #dc3545;
 }
 
 /* ========================================
@@ -2566,9 +2572,9 @@ body.modal-open {
 
 /* View Archived Button */
 .view-archived-btn {
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-input);
   padding: 8px 12px;
   font-size: 13px;
   cursor: pointer;
@@ -2576,10 +2582,11 @@ body.modal-open {
   align-items: center;
   gap: 6px;
   transition: background 0.2s;
+  color: var(--text-primary);
 }
 
 .view-archived-btn:hover {
-  background: #eee;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* Wallet Management Actions Row */
@@ -2603,7 +2610,7 @@ body.modal-open {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--modal-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2611,33 +2618,33 @@ body.modal-open {
 }
 
 #archive-confirm-modal .modal-content {
-  background: white;
-  border-radius: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   padding: 24px;
   max-width: 320px;
   width: 90%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-light);
 }
 
 #archive-confirm-modal h3 {
   margin: 0 0 12px 0;
   font-size: 18px;
-  color: #333;
+  color: var(--text-primary);
 }
 
 #archive-confirm-modal p {
   margin: 0 0 12px 0;
   font-size: 14px;
-  color: #555;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
 #archive-confirm-modal .modal-note {
   font-size: 12px;
-  color: #888;
-  background: #f5f5f5;
+  color: var(--text-secondary);
+  background: var(--container-bg);
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-input);
   margin-bottom: 16px;
 }
 
@@ -2649,7 +2656,7 @@ body.modal-open {
 
 #archive-confirm-modal .modal-btn {
   padding: 10px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -2658,21 +2665,21 @@ body.modal-open {
 }
 
 #archive-confirm-modal .modal-btn.secondary {
-  background: #f5f5f5;
-  color: #333;
+  background: var(--card-bg);
+  color: var(--text-primary);
 }
 
 #archive-confirm-modal .modal-btn.secondary:hover {
-  background: #eee;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 #archive-confirm-modal .modal-btn.primary {
-  background: #e65100;
+  background: var(--warning);
   color: white;
 }
 
 #archive-confirm-modal .modal-btn.primary:hover {
-  background: #bf360c;
+  background: #e65100;
 }
 
 /* Archived Wallets Interface */
@@ -2684,7 +2691,7 @@ body.modal-open {
 
 #archived-wallets-interface header {
   padding: 12px 16px 8px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2694,6 +2701,7 @@ body.modal-open {
   flex: 1;
   margin: 0;
   font-size: 18px;
+  color: var(--text-primary);
 }
 
 #archived-wallets-interface main {
@@ -2704,11 +2712,11 @@ body.modal-open {
 
 .archived-wallets-description {
   font-size: 13px;
-  color: #666;
+  color: var(--text-secondary);
   margin: 0 0 8px 0;
   padding: 10px 12px;
-  background: #f5f5f5;
-  border-radius: 8px;
+  background: var(--container-bg);
+  border-radius: var(--radius-input);
 }
 
 .archived-wallets-list {
@@ -2719,9 +2727,9 @@ body.modal-open {
 
 /* Archived Wallet Item */
 .archived-wallet-item {
-  background: #fafafa;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-card);
   padding: 16px;
 }
 
@@ -2743,12 +2751,12 @@ body.modal-open {
 .archived-wallet-name {
   font-size: 15px;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .archived-wallet-meta {
   font-size: 12px;
-  color: #888;
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -2764,34 +2772,34 @@ body.modal-open {
 }
 
 .archived-wallet-actions .restore-archived-btn {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border-color: #a5d6a7;
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--success);
+  border-color: rgba(76, 175, 80, 0.3);
 }
 
 .archived-wallet-actions .restore-archived-btn:hover {
-  background: #c8e6c9;
+  background: rgba(76, 175, 80, 0.25);
 }
 
 .archived-wallet-actions .delete-archived-btn {
-  background: #ffebee;
-  color: #c62828;
-  border-color: #ef9a9a;
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--error);
+  border-color: rgba(244, 67, 54, 0.3);
 }
 
 .archived-wallet-actions .delete-archived-btn:hover {
-  background: #ffcdd2;
+  background: rgba(244, 67, 54, 0.25);
 }
 
 /* Archived section headers */
 .archived-section-header {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 12px 16px 8px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-subtle);
   margin-top: 8px;
 }
 
@@ -2804,32 +2812,32 @@ body.modal-open {
   font-size: 11px;
 }
 
-/* Sub-wallet restore/delete buttons - same green/red styling */
+/* Sub-wallet restore/delete buttons */
 .archived-wallet-actions .restore-archived-sub-btn {
-  background: #e8f5e9;
-  color: #2e7d32;
-  border-color: #a5d6a7;
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--success);
+  border-color: rgba(76, 175, 80, 0.3);
 }
 
 .archived-wallet-actions .restore-archived-sub-btn:hover {
-  background: #c8e6c9;
+  background: rgba(76, 175, 80, 0.25);
 }
 
 .archived-wallet-actions .delete-archived-sub-btn {
-  background: #ffebee;
-  color: #c62828;
-  border-color: #ef9a9a;
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--error);
+  border-color: rgba(244, 67, 54, 0.3);
 }
 
 .archived-wallet-actions .delete-archived-sub-btn:hover {
-  background: #ffcdd2;
+  background: rgba(244, 67, 54, 0.25);
 }
 
 /* Hierarchical Archived Wallets Structure */
 .archived-master-item {
-  background: #fafafa;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 12px;
 }
@@ -2847,7 +2855,7 @@ body.modal-open {
 .archived-master-header.active-parent {
   margin-bottom: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px dashed #ddd;
+  border-bottom: 1px dashed var(--border-light);
 }
 
 .archived-master-header.active-parent .archived-wallet-icon {
@@ -2855,11 +2863,11 @@ body.modal-open {
 }
 
 .archived-master-header.active-parent .archived-wallet-name {
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .active-indicator {
-  color: #4caf50 !important;
+  color: var(--success) !important;
   font-weight: 500;
 }
 
@@ -2876,13 +2884,13 @@ body.modal-open {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
+  background: var(--container-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-input);
 }
 
 .archived-sub-wallet-item .sub-wallet-indent {
-  color: #bbb;
+  color: var(--text-placeholder);
   font-family: monospace;
   font-size: 12px;
   flex-shrink: 0;
@@ -2923,8 +2931,8 @@ body.modal-open {
 .tx-detail-amount-section {
   text-align: center;
   padding: 24px 16px;
-  background: linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%);
-  border-bottom: 1px solid #eee;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .tx-detail-icon {
@@ -2939,11 +2947,11 @@ body.modal-open {
 }
 
 .tx-detail-icon.receive {
-  background-color: rgba(40, 167, 69, 0.1);
+  background-color: rgba(76, 175, 80, 0.2);
 }
 
 .tx-detail-icon.send {
-  background-color: rgba(220, 53, 69, 0.1);
+  background-color: rgba(244, 67, 54, 0.2);
 }
 
 .tx-detail-amount {
@@ -2953,31 +2961,31 @@ body.modal-open {
 }
 
 .tx-detail-amount.positive {
-  color: #28a745;
+  color: var(--success);
 }
 
 .tx-detail-amount.negative {
-  color: #dc3545;
+  color: var(--error);
 }
 
 .tx-detail-status {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
 .tx-detail-status.completed {
-  color: #28a745;
+  color: var(--success);
 }
 
 .tx-detail-status.pending {
-  color: #ffc107;
+  color: var(--warning);
 }
 
 .tx-detail-status.failed {
-  color: #dc3545;
+  color: var(--error);
 }
 
 .tx-detail-rows {
@@ -2989,7 +2997,7 @@ body.modal-open {
   justify-content: space-between;
   align-items: flex-start;
   padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .tx-detail-row:last-child {
@@ -2998,13 +3006,13 @@ body.modal-open {
 
 .tx-detail-label {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
 .tx-detail-value {
   font-size: 13px;
-  color: #333;
+  color: var(--text-primary);
   text-align: right;
   word-break: break-all;
   max-width: 60%;
@@ -3018,18 +3026,18 @@ body.modal-open {
 
 .tx-copy-btn {
   background: none;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-medium);
   border-radius: 4px;
   padding: 4px 8px;
   font-size: 10px;
   cursor: pointer;
-  color: #666;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .tx-copy-btn:hover {
-  background: #f5f5f5;
-  border-color: #ccc;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--brand);
 }
 
 /* ========================================
@@ -3042,7 +3050,7 @@ body.modal-open {
   left: 0;
   right: 0;
   bottom: 0;
-  background: #f5f5f5;
+  background: linear-gradient(180deg, var(--gradient-start), var(--gradient-mid), var(--gradient-end));
   z-index: 100;
   display: flex;
   flex-direction: column;
@@ -3052,15 +3060,15 @@ body.modal-open {
   display: flex;
   align-items: center;
   padding: 16px;
-  background: white;
-  border-bottom: 1px solid #eee;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-subtle);
   gap: 12px;
 }
 
 .history-header h2 {
   margin: 0;
   font-size: 18px;
-  color: #333;
+  color: var(--text-primary);
   flex: 1;
 }
 
@@ -3077,27 +3085,27 @@ body.modal-open {
 .history-date-header {
   font-size: 12px;
   font-weight: 600;
-  color: #666;
+  color: var(--text-secondary);
   padding: 8px 0;
   position: sticky;
   top: 0;
-  background: #f5f5f5;
+  background: linear-gradient(180deg, var(--gradient-start), var(--gradient-mid));
 }
 
 .history-transaction-item {
   display: flex;
   align-items: center;
   padding: 12px;
-  background: white;
-  border-radius: 8px;
+  background: var(--card-bg);
+  border-radius: var(--radius-input);
   margin-bottom: 8px;
   cursor: pointer;
   transition: background 0.15s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 
 .history-transaction-item:hover {
-  background: #fafafa;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .history-tx-icon {
@@ -3113,11 +3121,11 @@ body.modal-open {
 }
 
 .history-tx-icon.receive {
-  background-color: rgba(40, 167, 69, 0.1);
+  background-color: rgba(76, 175, 80, 0.2);
 }
 
 .history-tx-icon.send {
-  background-color: rgba(220, 53, 69, 0.1);
+  background-color: rgba(244, 67, 54, 0.2);
 }
 
 .history-tx-info {
@@ -3128,13 +3136,13 @@ body.modal-open {
 .history-tx-type {
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .history-tx-description {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3142,7 +3150,7 @@ body.modal-open {
 
 .history-tx-time {
   font-size: 11px;
-  color: #999;
+  color: var(--text-placeholder);
 }
 
 .history-tx-amount {
@@ -3153,17 +3161,17 @@ body.modal-open {
 }
 
 .history-tx-amount.positive {
-  color: #28a745;
+  color: var(--success);
 }
 
 .history-tx-amount.negative {
-  color: #dc3545;
+  color: var(--error);
 }
 
 .history-empty {
   text-align: center;
   padding: 40px 20px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .history-empty-icon {
@@ -3174,34 +3182,4 @@ body.modal-open {
 
 .history-empty-text {
   font-size: 14px;
-}
-
-/* Make transaction items in main list clickable */
-.transaction-item {
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.transaction-item:hover {
-  background: #f9f9f9;
-}
-
-.transaction-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 10px;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.transaction-item.receive .transaction-icon {
-  background-color: rgba(40, 167, 69, 0.1);
-}
-
-.transaction-item.send .transaction-icon {
-  background-color: rgba(220, 53, 69, 0.1);
 }

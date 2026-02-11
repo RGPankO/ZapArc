@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightning Tipping Extension - Settings</title>
+    <title>ZapArc - Settings</title>
     <link rel="stylesheet" href="settings.css">
 </head>
 <body>
     <div id="app">
         <header>
-            <h1>Lightning Tipping Settings</h1>
+            <h1>ZapArc Settings</h1>
         </header>
         
         <main>
@@ -26,7 +26,7 @@
                     
                     <label>
                         <input type="radio" id="custom-wallet" name="wallet-type" value="custom">
-                        Use Custom LNURL for Receiving Tips
+                        Use Custom LNURL
                     </label>
                     <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 8px;">
                         For advanced users who want to use their own Lightning wallet or service.
@@ -34,90 +34,12 @@
                     
                     <input type="text" id="custom-lnurl" placeholder="lnurl1dp68gurn8ghj7um9wfmxjcm99e3k7mf0v9cxj0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxfq5fns" disabled style="width: 100%; margin-top: 8px; padding: 8px; font-family: monospace; font-size: 12px;" maxlength="200">
                     <div style="font-size: 12px; color: #666; margin-top: 4px;">
-                        Enter your LNURL-pay address to receive tips directly to your external wallet. Must start with "lnurl" and contain valid bech32 characters.
+                        Enter your LNURL-pay address to receive payments directly to your external wallet. Must start with "lnurl" and contain valid bech32 characters.
                     </div>
                 </div>
             </section>
             
-            <section id="amount-settings">
-                <h2>Default Amounts</h2>
-                <div class="setting-group">
-                    <h3>Posting Amounts (sats)</h3>
-                    <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
-                        Default amounts included in your tip requests when posting content. These will be suggested to people who want to tip you.
-                    </div>
-                    <div class="amount-inputs">
-                        <input type="number" id="post-amount-1" placeholder="100" min="1" max="100000000" step="1" required>
-                        <input type="number" id="post-amount-2" placeholder="500" min="1" max="100000000" step="1" required>
-                        <input type="number" id="post-amount-3" placeholder="1000" min="1" max="100000000" step="1" required>
-                    </div>
-                    <div style="font-size: 11px; color: #999; margin-top: 4px;">
-                        Tip: Use ascending amounts (e.g., 100, 500, 1000) for better user experience
-                    </div>
-                </div>
-                
-                <div class="setting-group">
-                    <h3>Tipping Amounts (sats)</h3>
-                    <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
-                        Your preferred amounts when tipping others. These appear alongside the content creator's suggested amounts.
-                    </div>
-                    <div class="amount-inputs">
-                        <input type="number" id="tip-amount-1" placeholder="100" min="1" max="100000000" step="1" required>
-                        <input type="number" id="tip-amount-2" placeholder="500" min="1" max="100000000" step="1" required>
-                        <input type="number" id="tip-amount-3" placeholder="1000" min="1" max="100000000" step="1" required>
-                    </div>
-                    <div style="font-size: 11px; color: #999; margin-top: 4px;">
-                        Maximum: 100,000,000 sats (1 BTC). All amounts must be unique.
-                    </div>
-                </div>
-            </section>
-            
-            <section id="facebook-settings">
-                <h2>Facebook Group Management</h2>
-                <div class="setting-group">
-                    <h3>Posting Mode</h3>
-                    <div style="font-size: 12px; color: #666; margin-bottom: 12px;">
-                        Control how tip requests are added to Facebook posts and comments.
-                    </div>
-                    
-                    <label>
-                        <input type="radio" id="facebook-global" name="facebook-mode" value="global" checked>
-                        Global Facebook Posting
-                    </label>
-                    <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 12px;">
-                        Enable tip request appending on all Facebook groups and pages.
-                    </div>
-                    
-                    <label>
-                        <input type="radio" id="facebook-selective" name="facebook-mode" value="selective">
-                        Selective Group Posting
-                    </label>
-                    <div style="font-size: 12px; color: #666; margin-left: 24px; margin-bottom: 12px;">
-                        Only enable tip request appending in specific Facebook groups that you choose.
-                    </div>
-                </div>
-                
-                <div class="setting-group" id="facebook-group-management" style="display: none;">
-                    <h3>Allowed Facebook Groups</h3>
-                    <div style="font-size: 12px; color: #666; margin-bottom: 12px;">
-                        Manage which Facebook groups allow tip request appending. Groups are automatically detected when you visit them, or you can add them manually.
-                    </div>
-                    
-                    <div class="facebook-group-input">
-                        <input type="text" id="facebook-group-id" placeholder="Enter Facebook group ID or URL" style="flex: 1; margin-right: 8px;">
-                        <button type="button" id="add-facebook-group">Add Group</button>
-                    </div>
-                    <div style="font-size: 11px; color: #999; margin-top: 4px;">
-                        You can enter a group ID (numbers only) or paste a Facebook group URL like facebook.com/groups/123456789
-                    </div>
-                    
-                    <div id="facebook-groups-list" class="facebook-groups-container">
-                        <!-- Groups will be populated here -->
-                    </div>
-                </div>
-            </section>
-            
-            <section id="ui-settings">
+<section id="ui-settings">
                 <h2>Interface Settings</h2>
                 <div class="setting-group">
                     <label>
