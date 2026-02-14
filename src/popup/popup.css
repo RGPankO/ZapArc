@@ -2141,6 +2141,7 @@ body.modal-open {
   border-radius: var(--radius-card);
   margin-bottom: 16px;
   border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
 }
 
 .withdraw-form-container {
