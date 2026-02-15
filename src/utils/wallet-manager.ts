@@ -50,7 +50,7 @@ export class WalletManager {
       console.log('WalletManager: Got user settings:', settings);
 
       // Generate a proper BIP39 mnemonic if none provided
-      const mnemonic = options.mnemonic || this.generateMnemonic();
+      const mnemonic = options.mnemonic || this.generateAndValidateMnemonic();
       console.log('WalletManager: Using mnemonic (length):', mnemonic.split(' ').length);
 
       // Validate mnemonic
@@ -128,10 +128,28 @@ export class WalletManager {
   }
 
   /**
-   * Generate a proper BIP39 mnemonic (12 words)
+   * Generate and validate a 12-word BIP39 mnemonic with sanity checks.
+   * Retries up to 3 times before throwing.
    */
-  private generateMnemonic(): string {
-    return bip39.generateMnemonic();
+  private generateAndValidateMnemonic(): string {
+    const maxAttempts = 3;
+    const englishWordSet = new Set(bip39.wordlists.english);
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const mnemonic = bip39.generateMnemonic();
+      const words = mnemonic.trim().toLowerCase().split(/\s+/);
+
+      const isValid = bip39.validateMnemonic(mnemonic);
+      const hasTwelveWords = words.length === 12;
+      const hasOnlyEnglishWords = words.every(word => englishWordSet.has(word));
+      const hasNoConsecutiveDuplicates = words.every((word, index) => index === 0 || word !== words[index - 1]);
+
+      if (isValid && hasTwelveWords && hasOnlyEnglishWords && hasNoConsecutiveDuplicates) {
+        return mnemonic;
+      }
+    }
+
+    throw new Error('Failed to generate a valid 12-word mnemonic after 3 attempts');
   }
 
   /**
@@ -455,14 +473,9 @@ export class WalletManager {
     try {
       console.log('WalletManager: Creating new wallet', { nickname });
 
-      // Generate new BIP39 mnemonic (12 words)
-      const mnemonic = bip39.generateMnemonic();
+      // Generate new BIP39 mnemonic (12 words) with sanity checks
+      const mnemonic = this.generateAndValidateMnemonic();
       console.log('WalletManager: Generated new mnemonic');
-
-      // Validate generated mnemonic
-      if (!bip39.validateMnemonic(mnemonic)) {
-        throw new Error('Generated mnemonic validation failed');
-      }
 
       // Create wallet data structure
       const walletData: WalletData = {

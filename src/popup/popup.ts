@@ -89,8 +89,29 @@ import { ChromeStorageManager } from '../utils/storage';
 import * as bip39 from 'bip39';
 
 // Helper to generate mnemonic
-function generateMnemonic(): string {
-    return bip39.generateMnemonic();
+/**
+ * Generate and validate a 12-word BIP39 mnemonic with sanity checks.
+ * Retries up to 3 times before throwing.
+ */
+function generateAndValidateMnemonic(): string {
+    const maxAttempts = 3;
+    const englishWordSet = new Set(bip39.wordlists.english);
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const mnemonic = bip39.generateMnemonic();
+        const words = mnemonic.trim().toLowerCase().split(/\s+/);
+
+        const isValid = bip39.validateMnemonic(mnemonic);
+        const hasTwelveWords = words.length === 12;
+        const hasOnlyEnglishWords = words.every(word => englishWordSet.has(word));
+        const hasNoConsecutiveDuplicates = words.every((word, index) => index === 0 || word !== words[index - 1]);
+
+        if (isValid && hasTwelveWords && hasOnlyEnglishWords && hasNoConsecutiveDuplicates) {
+            return mnemonic;
+        }
+    }
+
+    throw new Error('Failed to generate a valid 12-word mnemonic after 3 attempts');
 }
 
 
@@ -976,16 +997,28 @@ async function handleCreateWallet() {
 
     try {
         // Generate mnemonic
-        const mnemonic = generateMnemonic();
+        let mnemonic = generateAndValidateMnemonic();
+        let words = mnemonic.trim().split(/\s+/);
+
+        if (words.length !== 12 || !bip39.validateMnemonic(words.join(' '))) {
+            console.error('[Wizard] Generated mnemonic display verification failed, regenerating');
+            mnemonic = generateAndValidateMnemonic();
+            words = mnemonic.trim().split(/\s+/);
+
+            if (words.length !== 12 || !bip39.validateMnemonic(words.join(' '))) {
+                throw new Error('Mnemonic display verification failed after regeneration');
+            }
+        }
+
         setGeneratedMnemonic(mnemonic);
-        setMnemonicWords(mnemonic.split(' '));
+        setMnemonicWords(words);
 
         console.log('[Wizard] Mnemonic generated');
 
         // Display mnemonic
         const mnemonicDisplay = document.getElementById('mnemonic-display');
         if (mnemonicDisplay) {
-            mnemonicDisplay.innerHTML = mnemonicWords.map((word, index) => `
+            mnemonicDisplay.innerHTML = words.map((word, index) => `
                 <div class="mnemonic-word">
                     <span class="word-number">${index + 1}.</span> ${word}
                 </div>

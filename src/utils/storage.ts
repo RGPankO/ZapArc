@@ -486,6 +486,90 @@ export class ChromeStorageManager {
   }
 
   /**
+   * Normalize mnemonic for reliable round-trip comparison.
+   */
+  private normalizeMnemonicForComparison(mnemonic: string): string {
+    return mnemonic.trim().toLowerCase().split(/\s+/).join(' ');
+  }
+
+  /**
+   * Verify encrypted mnemonic round-trip after storage write.
+   * If verification fails, removes the stored entry and throws.
+   */
+  private async verifyStoredMnemonicRoundTrip(
+    walletId: string,
+    originalMnemonic: string,
+    pin: string
+  ): Promise<void> {
+    const verificationResult = await chrome.storage.local.get(['multiWalletData', 'walletVersion']);
+
+    if (!verificationResult.multiWalletData) {
+      console.error('❌ [Storage] Round-trip verification failed: multiWalletData missing');
+      throw new Error('Wallet storage verification failed');
+    }
+
+    const verificationData: MultiWalletStorage = JSON.parse(verificationResult.multiWalletData);
+    const storedEntry = verificationData.wallets.find(w => w.metadata.id === walletId);
+
+    if (!storedEntry) {
+      console.error('❌ [Storage] Round-trip verification failed: wallet entry missing', { walletId });
+      throw new Error('Wallet storage verification failed');
+    }
+
+    try {
+      const decryptedMnemonic = await this.decryptMnemonic(storedEntry.encryptedMnemonic, pin);
+      const normalizedOriginal = this.normalizeMnemonicForComparison(originalMnemonic);
+      const normalizedDecrypted = this.normalizeMnemonicForComparison(decryptedMnemonic);
+
+      if (normalizedOriginal !== normalizedDecrypted) {
+        console.error('❌ [Storage] Round-trip verification mismatch', { walletId });
+
+        verificationData.wallets = verificationData.wallets.filter(w => w.metadata.id !== walletId);
+        verificationData.walletOrder = verificationData.walletOrder.filter(id => id !== walletId);
+
+        if (verificationData.wallets.length === 0) {
+          await chrome.storage.local.remove(['multiWalletData', 'walletVersion']);
+        } else {
+          if (!verificationData.wallets.some(w => w.metadata.id === verificationData.activeWalletId)) {
+            verificationData.activeWalletId = verificationData.wallets[0].metadata.id;
+          }
+
+          await chrome.storage.local.set({
+            multiWalletData: JSON.stringify(verificationData),
+            walletVersion: 1
+          });
+        }
+
+        throw new Error('Wallet storage verification failed: mnemonic mismatch after write');
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('mnemonic mismatch after write')) {
+        throw error;
+      }
+
+      console.error('❌ [Storage] Round-trip verification decrypt failed', { walletId, error });
+
+      verificationData.wallets = verificationData.wallets.filter(w => w.metadata.id !== walletId);
+      verificationData.walletOrder = verificationData.walletOrder.filter(id => id !== walletId);
+
+      if (verificationData.wallets.length === 0) {
+        await chrome.storage.local.remove(['multiWalletData', 'walletVersion']);
+      } else {
+        if (!verificationData.wallets.some(w => w.metadata.id === verificationData.activeWalletId)) {
+          verificationData.activeWalletId = verificationData.wallets[0].metadata.id;
+        }
+
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(verificationData),
+          walletVersion: 1
+        });
+      }
+
+      throw new Error('Wallet storage verification failed');
+    }
+  }
+
+  /**
    * Save multiple wallets to storage
    * Each wallet is encrypted individually with unique IV
    */
@@ -675,6 +759,9 @@ export class ChromeStorageManager {
         multiWalletData: JSON.stringify(multiWalletData),
         walletVersion: 1
       });
+
+      // Verify post-storage round-trip
+      await this.verifyStoredMnemonicRoundTrip(walletId, wallet.mnemonic, pin);
 
       console.log('✅ [Storage] ADD_WALLET SUCCESS', { walletId, nickname });
       return walletId;
@@ -1192,7 +1279,13 @@ export class ChromeStorageManager {
       balance: 0,
       transactions: []
     };
-    return this.addWallet(walletData, nickname, pin);
+
+    const walletId = await this.addWallet(walletData, nickname, pin);
+
+    // Explicit verification for master key storage path
+    await this.verifyStoredMnemonicRoundTrip(walletId, mnemonic, pin);
+
+    return walletId;
   }
 
   /**

@@ -19,11 +19,44 @@ const storageManager = new ChromeStorageManager();
 const lnurlManager = new LnurlManager(walletManager);
 
 /**
- * Generate a 12-word BIP39 mnemonic phrase
- * Uses the standard BIP39 wordlist (2048 words)
+ * Generate and validate a 12-word BIP39 mnemonic with sanity checks.
+ * Retries up to 3 times before throwing.
  */
-function generateMnemonic(): string {
-  return bip39.generateMnemonic();
+function generateAndValidateMnemonic(): string {
+  const maxAttempts = 3;
+  const englishWordSet = new Set(bip39.wordlists.english);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const mnemonic = bip39.generateMnemonic();
+    const words = mnemonic.trim().toLowerCase().split(/\s+/);
+
+    const isValid = bip39.validateMnemonic(mnemonic);
+    const hasTwelveWords = words.length === 12;
+    const hasOnlyEnglishWords = words.every(word => englishWordSet.has(word));
+    const hasNoConsecutiveDuplicates = words.every((word, index) => index === 0 || word !== words[index - 1]);
+
+    if (isValid && hasTwelveWords && hasOnlyEnglishWords && hasNoConsecutiveDuplicates) {
+      return mnemonic;
+    }
+  }
+
+  throw new Error('Failed to generate a valid 12-word mnemonic after 3 attempts');
+}
+
+/**
+ * Validate a mnemonic against extension seed phrase sanity rules.
+ */
+function validateMnemonicSanity(mnemonic: string): boolean {
+  const normalizedMnemonic = mnemonic.trim().toLowerCase();
+  const words = normalizedMnemonic.split(/\s+/);
+  const englishWordSet = new Set(bip39.wordlists.english);
+
+  const isValid = bip39.validateMnemonic(normalizedMnemonic);
+  const hasTwelveWords = words.length === 12;
+  const hasOnlyEnglishWords = words.every(word => englishWordSet.has(word));
+  const hasNoConsecutiveDuplicates = words.every((word, index) => index === 0 || word !== words[index - 1]);
+
+  return isValid && hasTwelveWords && hasOnlyEnglishWords && hasNoConsecutiveDuplicates;
 }
 
 // Message handler for communication with other components
@@ -41,7 +74,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'GENERATE_MNEMONIC':
         try {
           // Generate a new mnemonic phrase
-          const mnemonic = generateMnemonic();
+          const mnemonic = generateAndValidateMnemonic();
           console.log('Background: Generated mnemonic phrase');
           sendResponse({ success: true, data: mnemonic });
         } catch (error) {
@@ -58,7 +91,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           console.log('Background: Starting wallet setup (storage only)');
 
           // Validate mnemonic
-          if (!bip39.validateMnemonic(message.mnemonic)) {
+          if (!validateMnemonicSanity(message.mnemonic)) {
             throw new Error('Invalid mnemonic phrase');
           }
 
