@@ -284,6 +284,35 @@ async function handleSaveContact(): Promise<void> {
     return;
   }
 
+  // Verify lightning address actually resolves (skip if editing and address unchanged)
+  const existingContact = currentEditId ? cachedContacts.find(c => c.id === currentEditId) : null;
+  const addressChanged = !existingContact || existingContact.lightningAddress.toLowerCase() !== lightningAddress.toLowerCase();
+
+  if (addressChanged) {
+    const saveBtn = document.getElementById('contact-save-btn') as HTMLButtonElement | null;
+    const origText = saveBtn?.textContent || 'Save';
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Verifying...';
+    }
+
+    try {
+      const resolveResult = await verifyLightningAddress(lightningAddress);
+      if (!resolveResult.isValid) {
+        if (errorEl) {
+          errorEl.textContent = resolveResult.error || 'Lightning address could not be verified';
+          errorEl.classList.remove('hidden');
+        }
+        return;
+      }
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = origText;
+      }
+    }
+  }
+
   const now = Date.now();
   try {
     if (currentEditId) {
@@ -340,6 +369,49 @@ function matchesQuery(contact: Contact, query: string): boolean {
   return contact.name.toLowerCase().includes(query)
     || contact.lightningAddress.toLowerCase().includes(query)
     || (contact.notes || '').toLowerCase().includes(query);
+}
+
+async function verifyLightningAddress(address: string): Promise<{ isValid: boolean; error?: string }> {
+  const [username, domain] = address.trim().split('@');
+  const lnurlEndpoint = `https://${domain}/.well-known/lnurlp/${username}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(lnurlEndpoint, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { isValid: false, error: 'Lightning Address not found — check spelling' };
+      }
+      return { isValid: false, error: `Server error (${response.status})` };
+    }
+
+    const data = await response.json();
+
+    if (data.tag !== 'payRequest') {
+      return { isValid: false, error: 'Address does not support payments' };
+    }
+
+    if (!data.callback || !data.minSendable || !data.maxSendable) {
+      return { isValid: false, error: 'Invalid LNURL pay response' };
+    }
+
+    return { isValid: true };
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        return { isValid: false, error: 'Verification timed out — check the domain' };
+      }
+    }
+    return { isValid: false, error: 'Could not reach address — check the domain' };
+  }
 }
 
 function validateContact(name: string, lightningAddress: string, notes: string): { isValid: boolean; error?: string } {
