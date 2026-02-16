@@ -2575,11 +2575,13 @@ function setupEventListeners() {
     const lightningAddressCopyBtn = document.getElementById('lightning-address-copy-btn');
     if (lightningAddressCopyBtn) {
         lightningAddressCopyBtn.addEventListener('click', async () => {
-            if (!currentLightningAddressInfo?.lightningAddress) {
+            const addressEl = document.getElementById('lightning-address-value');
+            const address = addressEl?.textContent?.trim() || currentLightningAddressInfo?.lightningAddress;
+            if (!address) {
                 showError('No Lightning Address to copy');
                 return;
             }
-            await copyToClipboard(currentLightningAddressInfo.lightningAddress);
+            await copyToClipboard(address);
         });
     }
 
