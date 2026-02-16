@@ -2730,7 +2730,13 @@ function setupModuleCallbacks(): void {
 // Initialization
 // ========================================
 
+let popupInitialized = false;
 async function initializePopup() {
+    if (popupInitialized) {
+        console.warn('[Popup] Already initialized, skipping duplicate init');
+        return;
+    }
+    popupInitialized = true;
     console.log('🔵 [Popup] Initializing...');
 
     try {
