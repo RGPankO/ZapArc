@@ -394,8 +394,12 @@
             <header>
                 <h1><img src="icons/bolt32.png" alt="" class="brand-logo logo-28">ZapArc</h1>
                 <div class="header-actions">
-                    <button id="contacts-btn" class="header-icon-btn" title="Contacts">📇</button>
-                    <button id="refresh-btn" class="refresh-btn" title="Refresh Balance">🔄</button>
+                    <button id="contacts-btn" class="header-icon-btn" title="Contacts" aria-label="Contacts">
+                        <span class="icon-contacts" aria-hidden="true"></span>
+                    </button>
+                    <button id="refresh-btn" class="refresh-btn" title="Refresh Balance" aria-label="Refresh Balance">
+                        <span class="icon-refresh" aria-hidden="true"></span>
+                    </button>
                 </div>
             </header>
 
@@ -442,35 +446,13 @@
                     
                     <div id="wallet-actions">
                         <button id="withdraw-btn" class="wallet-btn action-card action-send">
-                            <span class="btn-icon">📤</span>
+                            <span class="btn-icon icon-send" aria-hidden="true"></span>
                             <span class="action-label">Send</span>
                         </button>
                         <button id="deposit-btn" class="wallet-btn action-card action-deposit">
-                            <span class="btn-icon">📥</span>
+                            <span class="btn-icon icon-deposit" aria-hidden="true"></span>
                             <span class="action-label">Deposit</span>
                         </button>
-                    </div>
-
-                    <div id="lightning-address-section" class="lightning-address-section hidden">
-                        <div class="lightning-address-header">⚡ Lightning Address</div>
-
-                        <div id="lightning-address-unregistered" class="lightning-address-unregistered hidden">
-                            <div class="lightning-address-register-row">
-                                <input id="lightning-address-username-input" type="text" maxlength="32" placeholder="username" autocomplete="off" />
-                                <span class="lightning-address-domain">@breez.tips</span>
-                            </div>
-                            <button id="lightning-address-register-btn" class="lightning-address-register-btn">Register</button>
-                        </div>
-
-                        <div id="lightning-address-registered" class="lightning-address-registered hidden">
-                            <div class="lightning-address-value-row">
-                                <span id="lightning-address-value" class="lightning-address-value"></span>
-                                <button id="lightning-address-copy-btn" class="lightning-address-copy-btn" title="Copy Lightning Address">📋</button>
-                            </div>
-                            <button id="lightning-address-unregister-btn" class="lightning-address-unregister-btn">Unregister</button>
-                        </div>
-
-                        <div id="lightning-address-status" class="lightning-address-status hidden"></div>
                     </div>
                 </div>
 
@@ -512,9 +494,34 @@
             <div class="settings-actions">
                 <button id="settings-rename-wallet-btn" class="settings-action-btn">✏️ Rename wallet</button>
                 <button id="settings-view-seed-btn" class="settings-action-btn">🔑 View recovery phrase</button>
+                <button id="settings-lightning-address-toggle-btn" class="settings-action-btn settings-toggle-btn" aria-expanded="false">
+                    ⚡ Lightning Address
+                    <span class="settings-toggle-chevron" aria-hidden="true">▾</span>
+                </button>
+
+                <div id="lightning-address-section" class="lightning-address-section hidden">
+                    <div id="lightning-address-unregistered" class="lightning-address-unregistered hidden">
+                        <div class="lightning-address-register-row">
+                            <input id="lightning-address-username-input" type="text" maxlength="32" placeholder="username" autocomplete="off" />
+                            <span class="lightning-address-domain">@breez.tips</span>
+                        </div>
+                        <button id="lightning-address-register-btn" class="lightning-address-register-btn">Register</button>
+                    </div>
+
+                    <div id="lightning-address-registered" class="lightning-address-registered hidden">
+                        <div class="lightning-address-value-row">
+                            <span id="lightning-address-value" class="lightning-address-value"></span>
+                            <button id="lightning-address-copy-btn" class="lightning-address-copy-btn" title="Copy Lightning Address">📋</button>
+                        </div>
+                        <button id="lightning-address-unregister-btn" class="lightning-address-unregister-btn">Unregister</button>
+                    </div>
+
+                    <div id="lightning-address-status" class="lightning-address-status hidden"></div>
+                </div>
             </div>
 
             <div class="settings-danger-zone">
+                <div class="settings-danger-label">Danger Zone</div>
                 <button id="settings-delete-wallet-btn" class="delete-wallet-btn">🗑️ Delete Wallet</button>
             </div>
         </div>

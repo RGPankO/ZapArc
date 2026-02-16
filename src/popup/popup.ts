@@ -202,7 +202,6 @@ function renderLightningAddressUI(): void {
         return;
     }
 
-    section.classList.remove('hidden');
     status.classList.add('hidden');
     status.textContent = '';
 
@@ -2600,6 +2599,24 @@ function setupEventListeners() {
         settingsViewSeedBtn.onclick = () => { handleSettingsViewRecoveryPhrase(); };
     }
 
+    const settingsLightningAddressToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
+    if (settingsLightningAddressToggleBtn) {
+        settingsLightningAddressToggleBtn.onclick = async () => {
+            const section = document.getElementById('lightning-address-section');
+            if (!section) return;
+
+            const isExpanded = settingsLightningAddressToggleBtn.getAttribute('aria-expanded') === 'true';
+            const nextExpanded = !isExpanded;
+
+            settingsLightningAddressToggleBtn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+            section.classList.toggle('hidden', !nextExpanded);
+
+            if (nextExpanded) {
+                await refreshLightningAddress(true);
+            }
+        };
+    }
+
     const settingsDeleteWalletBtn = document.getElementById('settings-delete-wallet-btn');
     if (settingsDeleteWalletBtn) {
         settingsDeleteWalletBtn.onclick = showForgotPinModal;
@@ -2739,9 +2756,13 @@ function setupEventListeners() {
 async function handleSettings(): Promise<void> {
     const mainInterface = document.getElementById('main-interface');
     const settingsInterface = document.getElementById('settings-interface');
+    const lightningSection = document.getElementById('lightning-address-section');
+    const lightningToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
 
     if (mainInterface) mainInterface.classList.add('hidden');
     if (settingsInterface) settingsInterface.classList.remove('hidden');
+    if (lightningSection) lightningSection.classList.add('hidden');
+    if (lightningToggleBtn) lightningToggleBtn.setAttribute('aria-expanded', 'false');
 
     await refreshSettingsInterface();
 }
@@ -2783,9 +2804,13 @@ async function refreshSettingsInterface(): Promise<void> {
 function hideSettingsInterface(): void {
     const settingsInterface = document.getElementById('settings-interface');
     const mainInterface = document.getElementById('main-interface');
+    const lightningSection = document.getElementById('lightning-address-section');
+    const lightningToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
 
     if (settingsInterface) settingsInterface.classList.add('hidden');
     if (mainInterface) mainInterface.classList.remove('hidden');
+    if (lightningSection) lightningSection.classList.add('hidden');
+    if (lightningToggleBtn) lightningToggleBtn.setAttribute('aria-expanded', 'false');
 }
 
 async function handleSettingsRenameWallet(): Promise<void> {
