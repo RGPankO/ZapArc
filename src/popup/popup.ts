@@ -83,6 +83,9 @@ import {
     setWithdrawalCallbacks,
 } from './withdrawal';
 
+// Contacts imports
+import { initializeContactsUI, showContactsInterface } from './contacts';
+
 // Utility imports
 import { ExtensionMessaging } from '../utils/messaging';
 import { ChromeStorageManager } from '../utils/storage';
@@ -2547,6 +2550,12 @@ function setupEventListeners() {
         settingsBtn.onclick = handleSettings;
     }
 
+    // Contacts button
+    const contactsBtn = document.getElementById('contacts-btn');
+    if (contactsBtn) {
+        contactsBtn.onclick = () => showContactsInterface();
+    }
+
     // Lightning Address actions
     const lightningAddressRegisterBtn = document.getElementById('lightning-address-register-btn');
     if (lightningAddressRegisterBtn) {
@@ -2746,6 +2755,7 @@ async function initializePopup() {
         // Setup event listeners
         setupEventListeners();
         setupWizardListeners();
+        initializeContactsUI();
 
         // Check for existing wallet
         const storageData = await chrome.storage.local.get(['isUnlocked', 'cachedBalance']);

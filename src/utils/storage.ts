@@ -13,7 +13,8 @@ import {
   MasterKeyMetadata,
   EncryptedData,
   HIERARCHICAL_WALLET_CONSTANTS,
-  LightningAddressInfo
+  LightningAddressInfo,
+  Contact
 } from '../types';
 
 import { deriveSubWalletMnemonic } from './mnemonic-derivation';
@@ -259,6 +260,71 @@ export class ChromeStorageManager {
     } catch (error) {
       console.error('Failed to clear cached Lightning Address:', error);
     }
+  }
+
+  // ========================================
+  // Contacts / Address Book
+  // ========================================
+
+  async getContacts(): Promise<Contact[]> {
+    try {
+      const result = await chrome.storage.local.get(['contacts']);
+      return Array.isArray(result.contacts) ? result.contacts : [];
+    } catch (error) {
+      console.error('Failed to get contacts:', error);
+      return [];
+    }
+  }
+
+  async saveContacts(contacts: Contact[]): Promise<void> {
+    try {
+      await chrome.storage.local.set({ contacts });
+    } catch (error) {
+      console.error('Failed to save contacts:', error);
+      throw error;
+    }
+  }
+
+  async addContact(contact: Contact): Promise<void> {
+    const contacts = await this.getContacts();
+    const normalized = contact.lightningAddress.trim().toLowerCase();
+    const duplicate = contacts.find(c => c.lightningAddress.trim().toLowerCase() === normalized);
+    if (duplicate) {
+      throw new Error('A contact with this Lightning address already exists');
+    }
+    contacts.push({ ...contact, lightningAddress: normalized });
+    await this.saveContacts(contacts);
+  }
+
+  async updateContact(id: string, updates: Partial<Contact>): Promise<void> {
+    const contacts = await this.getContacts();
+    const index = contacts.findIndex(c => c.id === id);
+    if (index === -1) {
+      throw new Error('Contact not found');
+    }
+
+    if (updates.lightningAddress) {
+      const normalized = updates.lightningAddress.trim().toLowerCase();
+      const duplicate = contacts.find(c => c.id !== id && c.lightningAddress.trim().toLowerCase() === normalized);
+      if (duplicate) {
+        throw new Error('A contact with this Lightning address already exists');
+      }
+      updates.lightningAddress = normalized;
+    }
+
+    contacts[index] = {
+      ...contacts[index],
+      ...updates,
+      updatedAt: updates.updatedAt || Date.now()
+    };
+
+    await this.saveContacts(contacts);
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    const contacts = await this.getContacts();
+    const filtered = contacts.filter(c => c.id !== id);
+    await this.saveContacts(filtered);
   }
 
   /**

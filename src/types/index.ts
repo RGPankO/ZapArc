@@ -178,6 +178,15 @@ export interface LightningAddressInfo {
   lnurl: string;
 }
 
+export interface Contact {
+  id: string;
+  name: string;
+  lightningAddress: string;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface PostingContext {
   element: HTMLElement;
   platform: string;

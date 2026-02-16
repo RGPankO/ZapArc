@@ -11,6 +11,7 @@ import {
 } from './state';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { triggerPaymentNotification, extractPubkeyFromParsedInvoice } from '../utils/notification-trigger';
+import { openContactPicker } from './contacts';
 
 // Callback type for withdrawal operations that need main popup functions
 export type WithdrawalCallbacks = {
@@ -113,6 +114,18 @@ export function setupWithdrawalListeners(): void {
     const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
     const previewBtn = document.getElementById('preview-payment-btn') as HTMLButtonElement;
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
+
+    const contactsBtn = document.getElementById('withdraw-contacts-btn');
+    if (contactsBtn && !contactsBtn.onclick) {
+        contactsBtn.onclick = () => {
+            openContactPicker((contact) => {
+                if (paymentInput) {
+                    paymentInput.value = contact.lightningAddress;
+                    validateWithdrawalForm();
+                }
+            });
+        };
+    }
 
     // Input validation
     if (paymentInput) {

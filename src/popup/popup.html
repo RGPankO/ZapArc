@@ -156,6 +156,51 @@
                 <button id="tx-detail-close-btn" class="btn-primary" style="width: 100%;">Close</button>
             </div>
         </div>
+
+        <!-- Contact Add/Edit Modal -->
+        <div id="contact-modal" class="modal hidden">
+            <div class="modal-header">
+                <h3 id="contact-modal-title">Add Contact</h3>
+                <button class="modal-close" id="contact-modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="contact-name-input" class="modal-input" placeholder="Contact name" maxlength="100" />
+                </div>
+                <div class="form-group">
+                    <label>Lightning Address</label>
+                    <input type="text" id="contact-lightning-input" class="modal-input" placeholder="user@domain.com" />
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <textarea id="contact-notes-input" class="modal-input" placeholder="Add a note" maxlength="500"></textarea>
+                </div>
+                <div id="contact-modal-error" class="error-message hidden"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="contact-modal-cancel" class="btn-secondary">Cancel</button>
+                <button id="contact-modal-save" class="btn-primary">Save</button>
+            </div>
+        </div>
+
+        <!-- Contact Picker Modal -->
+        <div id="contact-picker-modal" class="modal hidden">
+            <div class="modal-header">
+                <h3>Select Contact</h3>
+                <button class="modal-close" id="contact-picker-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <input type="text" id="contact-picker-search" class="modal-input" placeholder="Search contacts" />
+                </div>
+                <div id="contact-picker-empty" class="contacts-empty hidden">No contacts available</div>
+                <div id="contact-picker-list" class="contacts-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="contact-picker-cancel" class="btn-secondary">Close</button>
+            </div>
+        </div>
     </div>
 
     <div id="app">
@@ -437,7 +482,10 @@
                 </div>
                 
                 <div id="settings-section">
-                    <button id="settings-btn" class="settings-btn">⚙️ Settings</button>
+                    <div class="settings-actions">
+                        <button id="settings-btn" class="settings-btn">⚙️ Settings</button>
+                        <button id="contacts-btn" class="settings-btn">📇 Contacts</button>
+                    </div>
                     <button id="delete-wallet-btn" class="delete-wallet-btn">🗑️ Delete Wallet</button>
                 </div>
             </main>
@@ -452,6 +500,20 @@
             <div id="history-list" class="history-list">
                 <!-- Populated dynamically with all transactions grouped by date -->
             </div>
+        </div>
+
+        <!-- Contacts Interface -->
+        <div id="contacts-interface" class="hidden">
+            <div class="contacts-header">
+                <button id="contacts-back-btn" class="back-btn">← Back</button>
+                <h2>Contacts</h2>
+                <button id="contacts-add-btn" class="btn-outline">＋ Add</button>
+            </div>
+            <div class="form-group">
+                <input type="text" id="contacts-search-input" placeholder="Search contacts" />
+            </div>
+            <div id="contacts-empty" class="contacts-empty hidden">No contacts yet</div>
+            <div id="contacts-list" class="contacts-list"></div>
         </div>
 
         <!-- Unlock Interface -->
@@ -565,7 +627,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Lightning Invoice or Address:</label>
+                    <div class="form-label-row">
+                        <label>Lightning Invoice or Address:</label>
+                        <button id="withdraw-contacts-btn" class="btn-outline btn-icon" title="Choose from contacts">📇</button>
+                    </div>
                     <textarea id="payment-input" placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)" rows="3"></textarea>
                 </div>
 
