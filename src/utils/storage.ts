@@ -21,21 +21,9 @@ import { deriveSubWalletMnemonic } from './mnemonic-derivation';
 
 /**
  * Generate a UUID v4 string
- * Uses crypto.randomUUID() with fallback to manual generation
  */
 export function generateUUID(): string {
-  // Modern browsers and Node.js 14.17+ support crypto.randomUUID()
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  // Fallback for older environments
-  // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
+  return crypto.randomUUID();
 }
 
 export class ChromeStorageManager {
@@ -458,10 +446,95 @@ export class ChromeStorageManager {
     }
   }
 
+  // ========================================
+  // PIN Lockout Management
+  // ========================================
+
+  async checkPinLockout(): Promise<{ locked: boolean; remainingMs?: number }> {
+    try {
+      const result = await chrome.storage.local.get(['pinAttempts', 'pinLockUntil']);
+      const lockUntil = result.pinLockUntil || 0;
+      const now = Date.now();
+
+      if (lockUntil > now) {
+        return { locked: true, remainingMs: lockUntil - now };
+      }
+
+      if (lockUntil && lockUntil <= now) {
+        await chrome.storage.local.set({ pinLockUntil: 0 });
+      }
+
+      return { locked: false };
+    } catch (error) {
+      console.error('Failed to check PIN lockout status:', error);
+      return { locked: false };
+    }
+  }
+
+  async recordFailedPin(): Promise<void> {
+    try {
+      const result = await chrome.storage.local.get(['pinAttempts']);
+      const attempts = (result.pinAttempts || 0) + 1;
+      let lockMs = 0;
+
+      if (attempts >= 10) {
+        lockMs = 30 * 60 * 1000;
+      } else if (attempts >= 5) {
+        lockMs = 5 * 60 * 1000;
+      } else if (attempts >= 3) {
+        lockMs = 30 * 1000;
+      }
+
+      await chrome.storage.local.set({
+        pinAttempts: attempts,
+        pinLockUntil: lockMs > 0 ? Date.now() + lockMs : 0
+      });
+    } catch (error) {
+      console.error('Failed to record failed PIN attempt:', error);
+    }
+  }
+
+  async resetPinAttempts(): Promise<void> {
+    try {
+      await chrome.storage.local.set({ pinAttempts: 0, pinLockUntil: 0 });
+    } catch (error) {
+      console.error('Failed to reset PIN attempts:', error);
+    }
+  }
+
+  private formatLockoutDuration(remainingMs: number): string {
+    const totalSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+
+    return `${seconds}s`;
+  }
+
+  private encodeBytesToBase64(bytes: Uint8Array): string {
+    let binary = '';
+    bytes.forEach(byte => {
+      binary += String.fromCharCode(byte);
+    });
+    return btoa(binary);
+  }
+
+  private decodeBase64ToBytes(value: string): Uint8Array {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
   /**
    * Derive encryption key from PIN
    */
-  private async deriveKey(pin: string): Promise<CryptoKey> {
+  private async deriveKey(pin: string, salt?: Uint8Array): Promise<CryptoKey> {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
@@ -471,10 +544,12 @@ export class ChromeStorageManager {
       ['deriveBits', 'deriveKey']
     );
 
+    const derivedSalt = (salt || encoder.encode(ChromeStorageManager.SALT)) as BufferSource;
+
     return await crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: encoder.encode(ChromeStorageManager.SALT),
+        salt: derivedSalt,
         iterations: ChromeStorageManager.ITERATIONS,
         hash: 'SHA-256'
       },
@@ -542,9 +617,10 @@ export class ChromeStorageManager {
    * Encrypt a single wallet mnemonic
    * Used for individual wallet encryption in multi-wallet structure
    */
-  private async encryptMnemonic(mnemonic: string, pin: string): Promise<{ data: number[], iv: number[], timestamp: number }> {
+  private async encryptMnemonic(mnemonic: string, pin: string): Promise<{ data: number[], iv: number[], timestamp: number, salt: string }> {
     try {
-      const key = await this.deriveKey(pin);
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const key = await this.deriveKey(pin, salt);
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const encodedData = new TextEncoder().encode(mnemonic);
 
@@ -557,7 +633,8 @@ export class ChromeStorageManager {
       return {
         data: Array.from(new Uint8Array(encrypted)),
         iv: Array.from(iv),
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        salt: this.encodeBytesToBase64(salt)
       };
     } catch (error) {
       console.error('❌ [Storage] Mnemonic encryption failed', error);
@@ -570,14 +647,15 @@ export class ChromeStorageManager {
    * Used for individual wallet decryption in multi-wallet structure
    */
   private async decryptMnemonic(
-    encryptedData: { data: number[], iv: number[], timestamp: number },
+    encryptedData: { data: number[], iv: number[], timestamp: number, salt?: string },
     pin: string
   ): Promise<string> {
     try {
       // Validate integrity
       this.validatePayloadIntegrity(encryptedData.timestamp);
 
-      const key = await this.deriveKey(pin);
+      const salt = encryptedData.salt ? this.decodeBase64ToBytes(encryptedData.salt) : undefined;
+      const key = await this.deriveKey(pin, salt);
       const decrypted = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv: new Uint8Array(encryptedData.iv) },
         key,
@@ -2095,6 +2173,11 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED');
 
     try {
+      const lockout = await this.checkPinLockout();
+      if (lockout.locked) {
+        return null;
+      }
+
       // Check if a specific wallet is selected for unlock
       const selectedResult = await chrome.storage.local.get(['selectedWalletForUnlock']);
       const selectedWallet = selectedResult.selectedWalletForUnlock;
@@ -2117,8 +2200,11 @@ export class ChromeStorageManager {
 
       if (!unlocked) {
         console.log('❌ [Storage] TRY_UNLOCK_ANY_WALLET_UNIFIED - No wallet matched PIN');
+        await this.recordFailedPin();
         return null;
       }
+
+      await this.resetPinAttempts();
 
       // We already have the decrypted master mnemonic from tryUnlockAnyMasterKey
       // Now get the active wallet info (without decrypting again)

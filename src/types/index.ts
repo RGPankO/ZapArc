@@ -38,6 +38,7 @@ export interface EncryptedWalletEntry {
     data: number[];             // Encrypted mnemonic data
     iv: number[];               // Initialization vector
     timestamp: number;          // Encryption timestamp for integrity check
+    salt?: string;              // Optional per-wallet salt (base64)
   };
   subWallets?: SubWalletEntry[];  // Optional: derived sub-wallets (if empty/undefined, wallet works as before)
   isExpanded?: boolean;           // UI state: whether sub-wallets are expanded in dropdown
@@ -65,6 +66,7 @@ export interface EncryptedData {
   data: number[];      // AES-GCM encrypted data
   iv: number[];        // Initialization vector (12 bytes)
   timestamp: number;   // Encryption timestamp for integrity check
+  salt?: string;       // Optional per-wallet salt (base64)
 }
 
 /**

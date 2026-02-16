@@ -10,6 +10,12 @@ import { FacebookManager } from '../utils/facebook-manager';
 import { TippingUI } from '../utils/tipping-ui';
 import FloatingMenu from '../utils/floating-menu';
 
+function escapeHtml(str: string): string {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 console.log('🔵 [ContentScript] LIGHTNING TIPPING EXTENSION LOADED', {
   timestamp: new Date().toISOString(),
   location: window.location.href,
@@ -928,6 +934,8 @@ class TipDetector {
       transition: all 0.3s ease;
     `;
 
+    const safeComment = comment ? escapeHtml(comment) : '';
+
     successEl.innerHTML = `
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
         <span style="font-size: 20px; margin-right: 8px;">✅</span>
@@ -935,7 +943,7 @@ class TipDetector {
       </div>
       <div style="font-size: 13px; opacity: 0.9;">
         Successfully sent ${amount.toLocaleString()} sats via Lightning Network
-        ${comment ? `<br><em>"${comment}"</em>` : ''}
+        ${safeComment ? `<br><em>"${safeComment}"</em>` : ''}
       </div>
     `;
     
@@ -985,13 +993,15 @@ class TipDetector {
       transition: all 0.3s ease;
     `;
 
+    const safeMessage = escapeHtml(message);
+
     errorEl.innerHTML = `
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
         <span style="font-size: 20px; margin-right: 8px;">❌</span>
         <strong>Payment Failed</strong>
       </div>
       <div style="font-size: 13px; opacity: 0.9; margin-bottom: ${isRetryable ? '12px' : '0'};">
-        ${message}
+        ${safeMessage}
       </div>
       ${isRetryable && retryCallback ? `
         <div style="display: flex; gap: 8px;">
@@ -1104,12 +1114,6 @@ const tipDetector = new TipDetector();
 console.log('🔵 [ContentScript] INITIALIZING FLOATING MENU', { timestamp: new Date().toISOString() });
 const floatingMenu = new FloatingMenu();
 
-// Debug helper - expose to window for testing
-(window as any).lightningDebug = {
-  getDomainStatus: () => tipDetector.domainManager.getDomainStatus(),
-  getBlacklist: () => tipDetector.blacklistManager.getBlacklistedLnurls(),
-  refreshIndicator: () => tipDetector.domainManager.updateDomainIndicator()
-};
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {

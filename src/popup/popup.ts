@@ -754,6 +754,18 @@ function escapeHtml(text: string): string {
     return div.innerHTML;
 }
 
+function formatLockoutDuration(remainingMs: number): string {
+    const totalSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    if (minutes > 0) {
+        return `${minutes}m ${seconds}s`;
+    }
+
+    return `${seconds}s`;
+}
+
 // ========================================
 // Wizard Functions (kept in popup.ts as they're complex and state-heavy)
 // ========================================
@@ -2029,8 +2041,22 @@ function showUnlockPrompt() {
             newUnlockBtn.textContent = 'Unlocking...';
             if (unlockError) unlockError.classList.add('hidden');
 
-            // Check for migration
             const storage = new ChromeStorageManager();
+            const lockoutStatus = await storage.checkPinLockout();
+            if (lockoutStatus.locked) {
+                const message = `Too many failed attempts. Try again in ${formatLockoutDuration(lockoutStatus.remainingMs || 0)}.`;
+                showError(message);
+                if (unlockError) {
+                    unlockError.textContent = message;
+                    unlockError.classList.remove('hidden');
+                }
+                newUnlockBtn.disabled = false;
+                newUnlockBtn.textContent = 'Unlock';
+                isUnlocking = false;
+                return false;
+            }
+
+            // Check for migration
             if (await storage.needsMigration()) {
                 console.log('🔄 [Unlock] Migrating to multi-wallet format...');
                 await storage.migrateToMultiWallet(pin);
@@ -2043,7 +2069,10 @@ function showUnlockPrompt() {
                 // Show error for manual attempts OR auto-attempts with complete PIN (6+ digits)
                 const shouldShowError = !isAutoAttempt || pin.length >= 6;
                 if (shouldShowError) {
-                    const errorMsg = walletResponse.error || 'Invalid PIN';
+                    const updatedLockout = await storage.checkPinLockout();
+                    const errorMsg = updatedLockout.locked
+                        ? `Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`
+                        : (walletResponse.error || 'Invalid PIN');
                     showError(errorMsg);
                     if (unlockError) {
                         unlockError.textContent = errorMsg;

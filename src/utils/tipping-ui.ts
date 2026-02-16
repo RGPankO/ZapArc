@@ -7,6 +7,12 @@ import { paymentProcessor, PaymentOptions } from './payment-processor';
 import { qrGenerator } from './qr-generator';
 import { paymentStatusTracker } from './payment-status-tracker';
 
+function escapeHtml(str: string): string {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 export interface TipPromptOptions {
   tip: TipRequest;
   userSettings: UserSettings;
@@ -462,6 +468,7 @@ export class TippingUI {
    */
   static showEnhancedPaymentConfirmation(options: PaymentConfirmationOptions): void {
     const { amount, comment, balance, onConfirm, onCancel } = options;
+    const safeComment = comment ? escapeHtml(comment) : '';
     
     const modal = document.createElement('div');
     modal.className = 'lightning-payment-confirmation';
@@ -518,10 +525,10 @@ export class TippingUI {
           </div>
         </div>
         
-        ${comment ? `
+        ${safeComment ? `
           <div style="background: #f0f7ff; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
             <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Comment:</div>
-            <div style="font-style: italic; color: #333;">"${comment}"</div>
+            <div style="font-style: italic; color: #333;">"${safeComment}"</div>
           </div>
         ` : ''}
         
@@ -631,6 +638,7 @@ export class TippingUI {
    * Show QR code modal with generated QR image
    */
   static showQRCodeModal(lnurl: string, amount: number, comment?: string, qrDataUrl?: string): void {
+    const safeComment = comment ? escapeHtml(comment) : '';
     const modal = document.createElement('div');
     modal.className = 'lightning-qr-modal';
     modal.style.cssText = `
@@ -697,10 +705,10 @@ export class TippingUI {
           </div>
         </div>
         
-        ${comment ? `
+        ${safeComment ? `
           <div style="background: #f0f7ff; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
             <div style="font-size: 12px; color: #666; margin-bottom: 4px;">Comment:</div>
-            <div style="font-style: italic; color: #333;">"${comment}"</div>
+            <div style="font-style: italic; color: #333;">"${safeComment}"</div>
           </div>
         ` : ''}
         

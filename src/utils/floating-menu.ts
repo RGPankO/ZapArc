@@ -3,6 +3,13 @@
 
 import { ExtensionMessaging } from './messaging';
 import { DomainManager } from './domain-manager';
+import { qrGenerator } from './qr-generator';
+
+function escapeHtml(str: string): string {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
 
 interface FloatingMenuOptions {
   position?: { x: number; y: number };
@@ -1055,7 +1062,7 @@ class FloatingMenu {
       <div style="margin-bottom: 8px; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
         Copied to clipboard:
       </div>
-      <div style="opacity: 0.8;">${tipString}</div>
+      <div style="opacity: 0.8;">${escapeHtml(tipString)}</div>
     `;
 
     document.body.appendChild(preview);
@@ -1469,7 +1476,9 @@ class FloatingMenu {
       <div class="blacklist-content" style="margin-bottom: 20px;">
         ${blacklistedLnurls.length === 0 ? 
           '<div style="text-align: center; color: #999; padding: 20px;">No blocked LNURLs</div>' :
-          blacklistedLnurls.map((lnurl, index) => `
+          blacklistedLnurls.map((lnurl, index) => {
+            const displayLnurl = escapeHtml(lnurl.length > 40 ? `${lnurl.substring(0, 40)}...` : lnurl);
+            return `
             <div class="blacklist-item" style="
               display: flex;
               align-items: center;
@@ -1480,9 +1489,9 @@ class FloatingMenu {
               background: #f8f9fa;
             ">
               <div style="flex: 1; font-family: monospace; font-size: 12px; word-break: break-all;">
-                ${lnurl.substring(0, 40)}${lnurl.length > 40 ? '...' : ''}
+                ${displayLnurl}
               </div>
-              <button class="unblock-btn" data-lnurl="${lnurl}" style="
+              <button class="unblock-btn" data-index="${index}" style="
                 margin-left: 12px;
                 padding: 6px 12px;
                 border: 1px solid #f44336;
@@ -1494,7 +1503,8 @@ class FloatingMenu {
                 font-weight: bold;
               ">Unblock</button>
             </div>
-          `).join('')
+          `;
+          }).join('')
         }
       </div>
       
@@ -1537,6 +1547,14 @@ class FloatingMenu {
       background: rgba(0,0,0,0.5);
       z-index: 100;
     `;
+
+    modal.querySelectorAll('.unblock-btn').forEach(btn => {
+      const index = Number(btn.getAttribute('data-index'));
+      const lnurl = blacklistedLnurls[index];
+      if (lnurl) {
+        btn.setAttribute('data-lnurl', lnurl);
+      }
+    });
 
     // Unblock individual LNURL handlers
     modal.querySelectorAll('.unblock-btn').forEach(btn => {
@@ -1685,7 +1703,9 @@ class FloatingMenu {
       <div class="blocked-tips-content" style="margin-bottom: 20px;">
         ${blockedTips.length === 0 ? 
           '<div style="text-align: center; color: #999; padding: 20px;">No blocked tips found on this page</div>' :
-          blockedTips.map(lnurl => `
+          blockedTips.map((lnurl, index) => {
+            const displayLnurl = escapeHtml(lnurl.length > 40 ? `${lnurl.substring(0, 40)}...` : lnurl);
+            return `
             <div class="blocked-tip-item" style="
               display: flex;
               align-items: center;
@@ -1696,9 +1716,9 @@ class FloatingMenu {
               background: #fff3cd;
             ">
               <div style="flex: 1; font-family: monospace; font-size: 12px; word-break: break-all;">
-                ${lnurl.substring(0, 40)}${lnurl.length > 40 ? '...' : ''}
+                ${displayLnurl}
               </div>
-              <button class="unblock-tip-btn" data-lnurl="${lnurl}" style="
+              <button class="unblock-tip-btn" data-index="${index}" style="
                 margin-left: 12px;
                 padding: 6px 12px;
                 border: 1px solid #4CAF50;
@@ -1710,7 +1730,8 @@ class FloatingMenu {
                 font-weight: bold;
               ">Unblock</button>
             </div>
-          `).join('')
+          `;
+          }).join('')
         }
       </div>
       
@@ -1739,6 +1760,14 @@ class FloatingMenu {
       background: rgba(0,0,0,0.5);
       z-index: 100;
     `;
+
+    modal.querySelectorAll('.unblock-tip-btn').forEach(btn => {
+      const index = Number(btn.getAttribute('data-index'));
+      const lnurl = blockedTips[index];
+      if (lnurl) {
+        btn.setAttribute('data-lnurl', lnurl);
+      }
+    });
 
     // Unblock tip handlers
     modal.querySelectorAll('.unblock-tip-btn').forEach(btn => {
@@ -1801,10 +1830,16 @@ class FloatingMenu {
    * Generate QR code for text (simple implementation)
    */
   private async generateQRCode(text: string): Promise<string> {
-    // Simple QR code generation using a service
-    // In production, you might want to use a local QR library
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(text)}`;
-    return qrApiUrl;
+    const qrResult = await qrGenerator.createQRWithFallback(text, {
+      size: 200,
+      margin: 2
+    });
+
+    if (!qrResult.success || !qrResult.dataUrl) {
+      throw new Error(qrResult.error || 'QR code generation failed');
+    }
+
+    return qrResult.dataUrl;
   }
 
   /**

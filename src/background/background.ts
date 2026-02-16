@@ -59,6 +59,18 @@ function validateMnemonicSanity(mnemonic: string): boolean {
   return isValid && hasTwelveWords && hasOnlyEnglishWords && hasNoConsecutiveDuplicates;
 }
 
+function formatLockoutDuration(remainingMs: number): string {
+  const totalSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+}
+
 // Message handler for communication with other components
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   handleMessage(message, sender, sendResponse);
@@ -67,6 +79,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleMessage(message: any, sender: any, sendResponse: (response: any) => void) {
   try {
+    const isExtensionSender = sender?.id === chrome.runtime.id;
+    if (!isExtensionSender) {
+      sendResponse({ success: false, error: 'Unauthorized sender' });
+      return;
+    }
+
     // Update activity timestamp for auto-lock
     await storageManager.updateActivity();
 
@@ -358,13 +376,28 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
       case 'LOAD_WALLET':
         console.log('🔵 [Background] LOAD_WALLET');
 
+        const lockout = await storageManager.checkPinLockout();
+        if (lockout.locked) {
+          sendResponse({
+            success: false,
+            error: `Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.`
+          });
+          break;
+        }
+
         // Try to unlock any wallet (v1 flat or v2 hierarchical) with the given PIN
         // For v2, this returns the derived sub-wallet mnemonic based on activeSubWalletIndex
         const unlockedWallet = await storageManager.tryUnlockAnyWalletUnified(message.pin);
 
         if (!unlockedWallet) {
           console.error('❌ [Background] LOAD_WALLET - No wallet matched the PIN');
-          sendResponse({ success: false, error: 'Incorrect PIN' });
+          const updatedLockout = await storageManager.checkPinLockout();
+          sendResponse({
+            success: false,
+            error: updatedLockout.locked
+              ? `Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`
+              : 'Incorrect PIN'
+          });
           break;
         }
 
