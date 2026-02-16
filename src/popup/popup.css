@@ -889,6 +889,23 @@ header h1 {
   min-width: 0;
 }
 
+.contact-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.contact-self-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
 .contact-name {
   font-size: 14px;
   font-weight: 600;

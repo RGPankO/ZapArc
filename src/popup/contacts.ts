@@ -14,6 +14,11 @@ let cachedContacts: Contact[] = [];
 let currentEditId: string | null = null;
 let pickerCallback: ((contact: Contact) => void) | null = null;
 
+function getMyLightningAddress(): string | null {
+  const el = document.getElementById('lightning-address-value');
+  return el?.textContent?.trim() || null;
+}
+
 export function initializeContactsUI(): void {
   const backBtn = document.getElementById('contacts-back-btn');
   if (backBtn && !backBtn.onclick) {
@@ -112,15 +117,28 @@ function renderContactsList(): void {
     const info = document.createElement('div');
     info.className = 'contact-info';
 
+    const nameRow = document.createElement('div');
+    nameRow.className = 'contact-name-row';
+
     const nameEl = document.createElement('div');
     nameEl.className = 'contact-name';
     nameEl.textContent = contact.name;
+
+    nameRow.appendChild(nameEl);
+
+    const myAddress = getMyLightningAddress();
+    if (myAddress && contact.lightningAddress.toLowerCase() === myAddress.toLowerCase()) {
+      const badge = document.createElement('span');
+      badge.className = 'contact-self-badge';
+      badge.textContent = 'You';
+      nameRow.appendChild(badge);
+    }
 
     const addressEl = document.createElement('div');
     addressEl.className = 'contact-address';
     addressEl.textContent = contact.lightningAddress;
 
-    info.appendChild(nameEl);
+    info.appendChild(nameRow);
     info.appendChild(addressEl);
 
     const actions = document.createElement('div');
@@ -188,15 +206,28 @@ function renderContactPickerList(): void {
     const info = document.createElement('div');
     info.className = 'contact-info';
 
+    const nameRow2 = document.createElement('div');
+    nameRow2.className = 'contact-name-row';
+
     const nameEl = document.createElement('div');
     nameEl.className = 'contact-name';
     nameEl.textContent = contact.name;
+
+    nameRow2.appendChild(nameEl);
+
+    const myAddr = getMyLightningAddress();
+    if (myAddr && contact.lightningAddress.toLowerCase() === myAddr.toLowerCase()) {
+      const badge = document.createElement('span');
+      badge.className = 'contact-self-badge';
+      badge.textContent = 'You';
+      nameRow2.appendChild(badge);
+    }
 
     const addressEl = document.createElement('div');
     addressEl.className = 'contact-address';
     addressEl.textContent = contact.lightningAddress;
 
-    info.appendChild(nameEl);
+    info.appendChild(nameRow2);
     info.appendChild(addressEl);
 
     item.appendChild(info);
