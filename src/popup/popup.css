@@ -809,16 +809,22 @@ header h1 {
 }
 
 .view-all-btn {
-  background: none;
-  border: none;
+  background: rgba(247, 147, 26, 0.14);
+  border: 1px solid rgba(247, 147, 26, 0.45);
   color: var(--brand);
   font-size: 12px;
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-weight: 600;
+  transition: all 0.2s;
 }
 
 .view-all-btn:hover {
-  color: var(--brand-hover);
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
 }
 
 .transaction-list {
@@ -2328,6 +2334,16 @@ body.modal-open {
   overflow-y: auto;
 }
 
+#deposit-interface main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#deposit-interface .deposit-step {
+  margin-bottom: 0;
+}
+
 /* Professional Card Styling for Deposit/Withdraw */
 
 /* Deposit step containers */
@@ -2654,6 +2670,10 @@ body.modal-open {
 .form-group textarea {
   resize: vertical;
   min-height: 60px;
+}
+
+#payment-input {
+  resize: none;
 }
 
 /* Notification System */
@@ -3478,9 +3498,17 @@ body.modal-open {
 .wallet-btn.action-deposit:hover { background: rgba(76,175,80,0.2); border-color: rgba(76,175,80,0.45); }
 
 #settings-section { display: flex; justify-content: flex-end; }
-.settings-btn.subtle { width: auto; padding: 8px 12px; font-size: 13px; background: rgba(255,255,255,0.06); }
+.settings-btn.subtle {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(255,255,255,0.06);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 
-#settings-interface { height: 100%; box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+#settings-interface { height: 100%; box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
 .settings-header { display: flex; align-items: center; gap: 10px; }
 .settings-header h2 { margin: 0; font-size: 18px; }
 .settings-wallet-card { border: 1px solid var(--border-light); border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.05); }
@@ -3599,6 +3627,52 @@ body.modal-open {
   border-top: 3px solid transparent;
   border-bottom: 3px solid transparent;
   transform: rotate(12deg);
+}
+
+.icon-gear {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.icon-gear::before,
+.icon-gear::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 16px;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.icon-gear::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+#withdraw-contacts-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#withdraw-contacts-btn .icon-contacts {
+  width: 14px;
+  height: 14px;
+}
+
+#generate-invoice-btn:not(:disabled) {
+  border: 1px solid rgba(247, 147, 26, 0.9);
+  box-shadow: 0 4px 12px rgba(247, 147, 26, 0.28);
 }
 
 .wallet-btn.action-card .btn-icon {

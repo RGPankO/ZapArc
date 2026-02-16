@@ -471,7 +471,10 @@
                 </div>
                 
                 <div id="settings-section">
-                    <button id="settings-btn" class="settings-btn subtle">⚙️ Settings</button>
+                    <button id="settings-btn" class="settings-btn subtle">
+                        <span class="icon-gear" aria-hidden="true"></span>
+                        <span>Settings</span>
+                    </button>
                 </div>
             </main>
         </div>
@@ -666,19 +669,21 @@
 
                 <div class="form-group">
                     <div class="form-label-row">
-                        <label>Lightning Invoice or Address:</label>
-                        <button id="withdraw-contacts-btn" class="btn-outline btn-icon" title="Choose from contacts">📇</button>
+                        <label>Destination</label>
+                        <button id="withdraw-contacts-btn" class="btn-outline btn-icon" title="Choose from contacts" aria-label="Choose from contacts">
+                            <span class="icon-contacts" aria-hidden="true"></span>
+                        </button>
                     </div>
                     <textarea id="payment-input" placeholder="Paste Lightning invoice (lnbc...) or Lightning address (user@domain.com)" rows="3"></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label>Amount (leave empty for invoice amount):</label>
+                    <label>Amount (sats)</label>
                     <input type="number" id="withdrawal-amount" placeholder="Amount in sats" min="1">
                 </div>
 
                 <div class="form-group">
-                    <label>Comment (optional):</label>
+                    <label>Note</label>
                     <input type="text" id="withdrawal-comment" placeholder="Payment description" maxlength="144">
                 </div>
 
