@@ -2574,14 +2574,23 @@ function setupEventListeners() {
 
     const lightningAddressCopyBtn = document.getElementById('lightning-address-copy-btn');
     if (lightningAddressCopyBtn) {
-        lightningAddressCopyBtn.addEventListener('click', async () => {
-            const addressEl = document.getElementById('lightning-address-value');
-            const address = addressEl?.textContent?.trim() || currentLightningAddressInfo?.lightningAddress;
-            if (!address) {
-                showError('No Lightning Address to copy');
-                return;
+        let copyInProgress = false;
+        lightningAddressCopyBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (copyInProgress) return;
+            copyInProgress = true;
+            try {
+                const addressEl = document.getElementById('lightning-address-value');
+                const address = addressEl?.textContent?.trim() || currentLightningAddressInfo?.lightningAddress;
+                if (!address) {
+                    showError('No Lightning Address to copy');
+                    return;
+                }
+                await copyToClipboard(address);
+            } finally {
+                setTimeout(() => { copyInProgress = false; }, 1000);
             }
-            await copyToClipboard(address);
         });
     }
 
