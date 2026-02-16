@@ -12,7 +12,8 @@ import {
   SubWalletEntry,
   MasterKeyMetadata,
   EncryptedData,
-  HIERARCHICAL_WALLET_CONSTANTS
+  HIERARCHICAL_WALLET_CONSTANTS,
+  LightningAddressInfo
 } from '../types';
 
 import { deriveSubWalletMnemonic } from './mnemonic-derivation';
@@ -218,6 +219,45 @@ export class ChromeStorageManager {
     } catch (error) {
       console.error('Failed to get blacklist:', error);
       return { lnurls: [], lastUpdated: 0 };
+    }
+  }
+
+  /**
+   * Cache Lightning Address info for a specific wallet
+   */
+  async cacheLightningAddress(walletId: string, info: LightningAddressInfo): Promise<void> {
+    try {
+      const key = `lightningAddress_${walletId}`;
+      await chrome.storage.local.set({ [key]: info });
+    } catch (error) {
+      console.error('Failed to cache Lightning Address:', error);
+    }
+  }
+
+  /**
+   * Get cached Lightning Address info for a specific wallet
+   */
+  async getCachedLightningAddress(walletId: string): Promise<LightningAddressInfo | null> {
+    try {
+      const key = `lightningAddress_${walletId}`;
+      const result = await chrome.storage.local.get([key]);
+      const cached = result[key] as LightningAddressInfo | undefined;
+      return cached || null;
+    } catch (error) {
+      console.error('Failed to get cached Lightning Address:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Clear cached Lightning Address info for a specific wallet
+   */
+  async clearCachedLightningAddress(walletId: string): Promise<void> {
+    try {
+      const key = `lightningAddress_${walletId}`;
+      await chrome.storage.local.remove([key]);
+    } catch (error) {
+      console.error('Failed to clear cached Lightning Address:', error);
     }
   }
 

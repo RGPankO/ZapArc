@@ -87,6 +87,7 @@ import {
 import { ExtensionMessaging } from '../utils/messaging';
 import { ChromeStorageManager } from '../utils/storage';
 import * as bip39 from 'bip39';
+import type { LightningAddressInfo } from '../types';
 
 // Helper to generate mnemonic
 /**
@@ -134,6 +135,217 @@ interface StoredTransaction {
 }
 
 let storedTransactions: StoredTransaction[] = [];
+
+const lightningAddressStorage = new ChromeStorageManager();
+const LIGHTNING_ADDRESS_USERNAME_PATTERN = /^[a-z0-9][a-z0-9_-]{1,30}[a-z0-9]$/;
+let currentLightningAddressInfo: LightningAddressInfo | null = null;
+
+async function getActiveWalletId(): Promise<string | null> {
+    const result = await chrome.storage.local.get(['multiWalletData']);
+    if (!result.multiWalletData) return null;
+
+    try {
+        const multiWalletData = JSON.parse(result.multiWalletData);
+        return typeof multiWalletData.activeWalletId === 'string' ? multiWalletData.activeWalletId : null;
+    } catch (error) {
+        console.warn('[Popup] Failed to parse multiWalletData for active wallet id:', error);
+        return null;
+    }
+}
+
+function validateLightningAddressUsername(username: string): { isValid: boolean; error?: string; normalized: string } {
+    const normalized = username.trim().toLowerCase();
+
+    if (!normalized) {
+        return { isValid: false, error: 'Username cannot be empty', normalized };
+    }
+
+    if (normalized.length < 3) {
+        return { isValid: false, error: 'Username must be at least 3 characters', normalized };
+    }
+
+    if (normalized.length > 32) {
+        return { isValid: false, error: 'Username must be 32 characters or less', normalized };
+    }
+
+    if (!LIGHTNING_ADDRESS_USERNAME_PATTERN.test(normalized)) {
+        if (!/^[a-z0-9]/.test(normalized)) {
+            return { isValid: false, error: 'Username must start with a letter or number', normalized };
+        }
+        if (!/[a-z0-9]$/.test(normalized)) {
+            return { isValid: false, error: 'Username must end with a letter or number', normalized };
+        }
+        if (/[^a-z0-9_-]/.test(normalized)) {
+            return { isValid: false, error: 'Only letters, numbers, hyphens, and underscores are allowed', normalized };
+        }
+        return { isValid: false, error: 'Invalid username format', normalized };
+    }
+
+    return { isValid: true, normalized };
+}
+
+function renderLightningAddressUI(): void {
+    const section = document.getElementById('lightning-address-section');
+    const unregistered = document.getElementById('lightning-address-unregistered');
+    const registered = document.getElementById('lightning-address-registered');
+    const addressValue = document.getElementById('lightning-address-value');
+    const status = document.getElementById('lightning-address-status');
+
+    if (!section || !unregistered || !registered || !addressValue || !status) {
+        return;
+    }
+
+    section.classList.remove('hidden');
+    status.classList.add('hidden');
+    status.textContent = '';
+
+    if (currentLightningAddressInfo?.lightningAddress) {
+        unregistered.classList.add('hidden');
+        registered.classList.remove('hidden');
+        addressValue.textContent = currentLightningAddressInfo.lightningAddress;
+    } else {
+        registered.classList.add('hidden');
+        unregistered.classList.remove('hidden');
+        addressValue.textContent = '';
+    }
+}
+
+function setLightningAddressStatus(message: string): void {
+    const status = document.getElementById('lightning-address-status');
+    if (!status) return;
+    status.textContent = message;
+    status.classList.remove('hidden');
+}
+
+async function refreshLightningAddress(forceSDK: boolean = false): Promise<void> {
+    const section = document.getElementById('lightning-address-section');
+    if (!section) return;
+
+    const activeWalletId = await getActiveWalletId();
+    if (!activeWalletId) {
+        currentLightningAddressInfo = null;
+        renderLightningAddressUI();
+        return;
+    }
+
+    if (!forceSDK) {
+        const cached = await lightningAddressStorage.getCachedLightningAddress(activeWalletId);
+        if (cached) {
+            currentLightningAddressInfo = cached;
+            renderLightningAddressUI();
+        }
+    }
+
+    if (!breezSDK) {
+        renderLightningAddressUI();
+        return;
+    }
+
+    try {
+        const sdkAny = breezSDK as any;
+        const result = await sdkAny.getLightningAddress();
+
+        if (result?.lightningAddress) {
+            currentLightningAddressInfo = {
+                lightningAddress: result.lightningAddress,
+                username: result.username || result.lightningAddress.split('@')[0] || '',
+                description: result.description || '',
+                lnurl: result.lnurl || ''
+            };
+            await lightningAddressStorage.cacheLightningAddress(activeWalletId, currentLightningAddressInfo);
+        } else {
+            currentLightningAddressInfo = null;
+            await lightningAddressStorage.clearCachedLightningAddress(activeWalletId);
+        }
+    } catch (error) {
+        console.warn('[Popup] getLightningAddress failed (likely unavailable on current SDK):', error);
+    }
+
+    renderLightningAddressUI();
+}
+
+async function handleRegisterLightningAddress(): Promise<void> {
+    if (!breezSDK) {
+        showError('Wallet not connected');
+        return;
+    }
+
+    const input = document.getElementById('lightning-address-username-input') as HTMLInputElement | null;
+    const registerBtn = document.getElementById('lightning-address-register-btn') as HTMLButtonElement | null;
+    if (!input || !registerBtn) return;
+
+    const { isValid, error, normalized } = validateLightningAddressUsername(input.value);
+    if (!isValid) {
+        showError(error || 'Invalid username');
+        return;
+    }
+
+    try {
+        registerBtn.disabled = true;
+        registerBtn.textContent = 'Checking...';
+        setLightningAddressStatus('Checking username availability...');
+
+        const sdkAny = breezSDK as any;
+        const available = await sdkAny.checkLightningAddressAvailable({ username: normalized });
+        if (!available) {
+            showError('This username is already taken');
+            setLightningAddressStatus('Username is not available');
+            return;
+        }
+
+        registerBtn.textContent = 'Registering...';
+        const result = await sdkAny.registerLightningAddress({ username: normalized, description: '' });
+
+        currentLightningAddressInfo = {
+            lightningAddress: result?.lightningAddress || `${normalized}@breez.tips`,
+            username: result?.username || normalized,
+            description: result?.description || '',
+            lnurl: result?.lnurl || ''
+        };
+
+        const activeWalletId = await getActiveWalletId();
+        if (activeWalletId) {
+            await lightningAddressStorage.cacheLightningAddress(activeWalletId, currentLightningAddressInfo);
+        }
+
+        input.value = '';
+        renderLightningAddressUI();
+        showSuccess(`Lightning Address registered: ${currentLightningAddressInfo.lightningAddress}`);
+    } catch (error) {
+        console.error('[Popup] Failed to register Lightning Address:', error);
+        showError(error instanceof Error ? error.message : 'Failed to register Lightning Address');
+    } finally {
+        registerBtn.disabled = false;
+        registerBtn.textContent = 'Register';
+    }
+}
+
+async function handleUnregisterLightningAddress(): Promise<void> {
+    if (!breezSDK || !currentLightningAddressInfo?.lightningAddress) {
+        return;
+    }
+
+    try {
+        const sdkAny = breezSDK as any;
+        if (typeof sdkAny.unregisterLightningAddress === 'function') {
+            await sdkAny.unregisterLightningAddress();
+        } else {
+            await sdkAny.deleteLightningAddress();
+        }
+
+        const activeWalletId = await getActiveWalletId();
+        if (activeWalletId) {
+            await lightningAddressStorage.clearCachedLightningAddress(activeWalletId);
+        }
+
+        currentLightningAddressInfo = null;
+        renderLightningAddressUI();
+        showSuccess('Lightning Address unregistered');
+    } catch (error) {
+        console.error('[Popup] Failed to unregister Lightning Address:', error);
+        showError(error instanceof Error ? error.message : 'Failed to unregister Lightning Address');
+    }
+}
 
 async function updateBalanceDisplay() {
     console.log('🔍 [Popup] Updating balance display...');
@@ -1883,6 +2095,7 @@ function showUnlockPrompt() {
 
             enableWalletControls();
             await initializeMultiWalletUI();
+            await refreshLightningAddress();
 
             // Check for any pending sub-wallet discovery to resume
             resumePendingDiscovery(async (masterKeyId: string) => {
@@ -2334,6 +2547,49 @@ function setupEventListeners() {
         settingsBtn.onclick = handleSettings;
     }
 
+    // Lightning Address actions
+    const lightningAddressRegisterBtn = document.getElementById('lightning-address-register-btn');
+    if (lightningAddressRegisterBtn) {
+        lightningAddressRegisterBtn.addEventListener('click', () => {
+            handleRegisterLightningAddress();
+        });
+    }
+
+    const lightningAddressUsernameInput = document.getElementById('lightning-address-username-input') as HTMLInputElement | null;
+    if (lightningAddressUsernameInput) {
+        lightningAddressUsernameInput.addEventListener('input', () => {
+            const normalized = lightningAddressUsernameInput.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            if (normalized !== lightningAddressUsernameInput.value) {
+                lightningAddressUsernameInput.value = normalized;
+            }
+        });
+
+        lightningAddressUsernameInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                handleRegisterLightningAddress();
+            }
+        });
+    }
+
+    const lightningAddressCopyBtn = document.getElementById('lightning-address-copy-btn');
+    if (lightningAddressCopyBtn) {
+        lightningAddressCopyBtn.addEventListener('click', async () => {
+            if (!currentLightningAddressInfo?.lightningAddress) {
+                showError('No Lightning Address to copy');
+                return;
+            }
+            await copyToClipboard(currentLightningAddressInfo.lightningAddress);
+        });
+    }
+
+    const lightningAddressUnregisterBtn = document.getElementById('lightning-address-unregister-btn');
+    if (lightningAddressUnregisterBtn) {
+        lightningAddressUnregisterBtn.addEventListener('click', () => {
+            handleUnregisterLightningAddress();
+        });
+    }
+
     // Lock button
     const lockBtn = document.getElementById('lock-btn');
     if (lockBtn) {
@@ -2375,6 +2631,7 @@ function setupEventListeners() {
             try {
                 await updateBalanceDisplay();
                 await loadTransactionHistory();
+                await refreshLightningAddress(true);
                 console.log('[Popup] Refresh complete');
             } catch (error) {
                 console.error('[Popup] Error during refresh:', error);
@@ -2585,6 +2842,7 @@ async function initializePopup() {
 
                     enableWalletControls();
                     await initializeMultiWalletUI();
+                    await refreshLightningAddress();
 
                     // Check for any pending sub-wallet discovery to resume
                     const pin = sessionData.walletSessionPin;
@@ -2677,6 +2935,7 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
         // Small delay to allow SDK to sync before loading transactions
         await new Promise(resolve => setTimeout(resolve, 500));
         await loadTransactionHistory();
+        await refreshLightningAddress();
 
         console.log('✅ [Popup] SDK reconnected for new wallet', {
             masterKeyNickname: customEvent.detail.masterKeyNickname,

@@ -1,7 +1,7 @@
 // Breez SDK Spark wrapper for Lightning Network operations
 // Handles wallet initialization, payments, and LNURL operations
 
-import { Transaction } from '../types';
+import { Transaction, LightningAddressInfo } from '../types';
 import * as bip39 from 'bip39';
 
 export interface BreezConfig {
@@ -260,6 +260,93 @@ export class BreezSDKWrapper {
         success: false,
         error: error instanceof Error ? error.message : 'LNURL payment failed'
       };
+    }
+  }
+
+  /**
+   * Check if a Lightning Address username is available
+   */
+  async checkLightningAddressAvailable(username: string): Promise<boolean> {
+    this.ensureConnected();
+
+    try {
+      const normalizedUsername = username.trim().toLowerCase();
+      const sdkAny = this.sdk as any;
+      const available = await sdkAny.checkLightningAddressAvailable({ username: normalizedUsername });
+      return Boolean(available);
+    } catch (error) {
+      console.warn('[BreezSDK] checkLightningAddressAvailable failed (method may be unavailable):', error);
+      throw new Error(`Failed to check username availability: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Register a Lightning Address
+   */
+  async registerLightningAddress(username: string, description: string = ''): Promise<LightningAddressInfo> {
+    this.ensureConnected();
+
+    try {
+      const normalizedUsername = username.trim().toLowerCase();
+      const sdkAny = this.sdk as any;
+      const result = await sdkAny.registerLightningAddress({
+        username: normalizedUsername,
+        description
+      });
+
+      return {
+        lightningAddress: result?.lightningAddress || `${normalizedUsername}@breez.tips`,
+        username: result?.username || normalizedUsername,
+        description: result?.description || description || '',
+        lnurl: result?.lnurl || ''
+      };
+    } catch (error) {
+      console.warn('[BreezSDK] registerLightningAddress failed (method may be unavailable):', error);
+      throw new Error(`Failed to register Lightning Address: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get currently registered Lightning Address
+   */
+  async getLightningAddress(): Promise<LightningAddressInfo | null> {
+    this.ensureConnected();
+
+    try {
+      const sdkAny = this.sdk as any;
+      const result = await sdkAny.getLightningAddress();
+      if (!result || !result.lightningAddress) {
+        return null;
+      }
+
+      return {
+        lightningAddress: result.lightningAddress,
+        username: result.username || result.lightningAddress.split('@')[0] || '',
+        description: result.description || '',
+        lnurl: result.lnurl || ''
+      };
+    } catch (error) {
+      console.warn('[BreezSDK] getLightningAddress failed (method may be unavailable):', error);
+      return null;
+    }
+  }
+
+  /**
+   * Unregister currently registered Lightning Address
+   */
+  async unregisterLightningAddress(): Promise<void> {
+    this.ensureConnected();
+
+    try {
+      const sdkAny = this.sdk as any;
+      if (typeof sdkAny.unregisterLightningAddress === 'function') {
+        await sdkAny.unregisterLightningAddress();
+      } else {
+        await sdkAny.deleteLightningAddress();
+      }
+    } catch (error) {
+      console.warn('[BreezSDK] unregisterLightningAddress failed (method may be unavailable):', error);
+      throw new Error(`Failed to unregister Lightning Address: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

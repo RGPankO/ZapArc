@@ -402,6 +402,28 @@
                             Withdraw
                         </button>
                     </div>
+
+                    <div id="lightning-address-section" class="lightning-address-section hidden">
+                        <div class="lightning-address-header">⚡ Lightning Address</div>
+
+                        <div id="lightning-address-unregistered" class="lightning-address-unregistered hidden">
+                            <div class="lightning-address-register-row">
+                                <input id="lightning-address-username-input" type="text" maxlength="32" placeholder="username" autocomplete="off" />
+                                <span class="lightning-address-domain">@breez.tips</span>
+                            </div>
+                            <button id="lightning-address-register-btn" class="lightning-address-register-btn">Register</button>
+                        </div>
+
+                        <div id="lightning-address-registered" class="lightning-address-registered hidden">
+                            <div class="lightning-address-value-row">
+                                <span id="lightning-address-value" class="lightning-address-value"></span>
+                                <button id="lightning-address-copy-btn" class="lightning-address-copy-btn" title="Copy Lightning Address">📋</button>
+                            </div>
+                            <button id="lightning-address-unregister-btn" class="lightning-address-unregister-btn">Unregister</button>
+                        </div>
+
+                        <div id="lightning-address-status" class="lightning-address-status hidden"></div>
+                    </div>
                 </div>
 
                 <div id="transaction-section">

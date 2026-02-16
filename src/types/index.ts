@@ -171,6 +171,13 @@ export interface Transaction {
   status: 'pending' | 'completed' | 'failed';
 }
 
+export interface LightningAddressInfo {
+  lightningAddress: string;
+  username: string;
+  description: string;
+  lnurl: string;
+}
+
 export interface PostingContext {
   element: HTMLElement;
   platform: string;
