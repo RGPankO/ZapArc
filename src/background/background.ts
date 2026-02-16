@@ -75,7 +75,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         try {
           // Generate a new mnemonic phrase
           const mnemonic = generateAndValidateMnemonic();
-          console.log('Background: Generated mnemonic phrase');
+          console.log('Background: Generated wallet seed');
           sendResponse({ success: true, data: mnemonic });
         } catch (error) {
           console.error('Background: Mnemonic generation failed:', error);
@@ -356,7 +356,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         break;
 
       case 'LOAD_WALLET':
-        console.log('🔵 [Background] LOAD_WALLET - PIN received, length:', message.pin?.length);
+        console.log('🔵 [Background] LOAD_WALLET');
 
         // Try to unlock any wallet (v1 flat or v2 hierarchical) with the given PIN
         // For v2, this returns the derived sub-wallet mnemonic based on activeSubWalletIndex
@@ -371,7 +371,6 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
         console.log('✅ [Background] LOAD_WALLET - Wallet unlocked successfully');
         console.log('🔍 [Background] LOAD_WALLET - Response data:', {
           hasWallet: !!unlockedWallet.wallet,
-          hasMnemonic: !!unlockedWallet.wallet?.mnemonic,
           walletId: unlockedWallet.metadata.id,
           nickname: unlockedWallet.metadata.nickname,
           isHierarchical: unlockedWallet.isHierarchical,
@@ -621,8 +620,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           const { walletId, newNickname, pin } = message;
           console.log('[Background] RENAME_WALLET - Payload received', {
             walletId,
-            newNickname,
-            pinLength: typeof pin === 'string' ? pin.length : undefined
+            newNickname
           });
 
           // Validate parameters
@@ -689,7 +687,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           }
 
           const isDuplicate = await walletManager.isDuplicateMnemonic(mnemonic, pin);
-          console.log('[Background] CHECK_DUPLICATE_MNEMONIC - Check complete:', { isDuplicate });
+          console.log('[Background] CHECK_DUPLICATE_MNEMONIC - Check complete');
           sendResponse({ success: true, data: isDuplicate });
         } catch (error) {
           console.error('[Background] CHECK_DUPLICATE_MNEMONIC - Failed:', error);
@@ -939,7 +937,7 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           if (!masterKeyId || subWalletIndex === undefined || !pin) {
             throw new Error('Master key ID, sub-wallet index, and PIN are required');
           }
-          console.log('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC', { masterKeyId, subWalletIndex });
+          console.log('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC');
 
           const mnemonic = await walletManager.getHierarchicalWalletMnemonic(
             masterKeyId,

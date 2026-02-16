@@ -992,13 +992,13 @@ export class ChromeStorageManager {
       // Try to decrypt each wallet with the PIN
       for (const walletEntry of walletsData.wallets) {
         try {
-          console.log(`🔐 [Storage] Trying wallet: ${walletEntry.metadata.nickname} (${walletEntry.metadata.id})`);
+          console.log('🔐 [Storage] Trying wallet');
           
           // Attempt to decrypt the mnemonic
           const mnemonic = await this.decryptMnemonic(walletEntry.encryptedMnemonic, pin);
           
           // If we get here, decryption succeeded!
-          console.log(`✅ [Storage] PIN matched wallet: ${walletEntry.metadata.nickname}`);
+          console.log('✅ [Storage] PIN matched wallet');
           
           // Set this wallet as active
           await this.setActiveWallet(walletEntry.metadata.id);
@@ -1020,7 +1020,7 @@ export class ChromeStorageManager {
           };
         } catch (decryptError) {
           // Decryption failed for this wallet, try the next one
-          console.log(`❌ [Storage] PIN did not match wallet: ${walletEntry.metadata.nickname}`);
+          console.log('❌ [Storage] PIN did not match wallet');
           continue;
         }
       }
@@ -1674,7 +1674,7 @@ export class ChromeStorageManager {
         if (activeWallet) {
           try {
             const mnemonic = await this.decryptMnemonic(activeWallet.encryptedMnemonic, pin);
-            console.log(`✅ [Storage] PIN matched active wallet: ${activeWallet.metadata.nickname}`);
+            console.log('✅ [Storage] PIN matched active wallet');
 
             // Keep current sub-wallet index
             const subWalletIndex = data.activeSubWalletIndex ?? 0;
@@ -1696,7 +1696,7 @@ export class ChromeStorageManager {
 
         try {
           const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
-          console.log(`✅ [Storage] PIN matched wallet: ${wallet.metadata.nickname}`);
+          console.log('✅ [Storage] PIN matched wallet');
 
           // Different wallet matched - reset to sub-wallet 0
           await this.setActiveHierarchicalWallet(wallet.metadata.id, 0);
@@ -1746,14 +1746,14 @@ export class ChromeStorageManager {
       try {
         // Try to decrypt with the provided PIN
         const mnemonic = await this.decryptMnemonic(wallet.encryptedMnemonic, pin);
-        console.log(`✅ [Storage] PIN matched wallet: ${wallet.metadata.nickname}`);
+        console.log('✅ [Storage] PIN matched wallet');
 
         // Set this as active wallet with the specified sub-wallet index
         await this.setActiveHierarchicalWallet(masterKeyId, subWalletIndex);
 
         return { masterKeyId, mnemonic };
       } catch (error) {
-        console.log(`❌ [Storage] PIN did not match wallet: ${wallet.metadata.nickname}`);
+        console.log('❌ [Storage] PIN did not match wallet');
         return null;
       }
     } catch (error) {

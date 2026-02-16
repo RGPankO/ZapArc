@@ -253,7 +253,6 @@ export async function resumePendingDiscovery(getMnemonic: (masterKeyId: string) 
     }
 
     // Get the mnemonic for the wallet
-    console.log(`[Discovery] Requesting mnemonic for masterKeyId: ${pending.masterKeyId}`);
     const mnemonic = await getMnemonic(pending.masterKeyId);
 
     if (!mnemonic) {
@@ -262,8 +261,6 @@ export async function resumePendingDiscovery(getMnemonic: (masterKeyId: string) 
         return;
     }
 
-    console.log(`[Discovery] Got mnemonic (${mnemonic.split(' ').length} words)`);
-    console.log(`[Discovery] Resuming discovery for ${pending.masterKeyId} from index ${pending.nextIndexToCheck}`);
 
     // Mark wallet for UI display before starting
     markWalletForDiscovery(pending.masterKeyId);

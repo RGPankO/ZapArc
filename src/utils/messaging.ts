@@ -16,7 +16,6 @@ export class ExtensionMessaging {
   static async sendToBackground<T = any>(message: any): Promise<MessageResponse<T>> {
     console.log('🔵 [ExtensionMessaging] SENDING MESSAGE', {
       messageType: message.type,
-      message: message,
       timestamp: new Date().toISOString()
     });
     
@@ -35,7 +34,6 @@ export class ExtensionMessaging {
         } else {
           console.log('🟢 [ExtensionMessaging] MESSAGE RESPONSE', {
             messageType: message.type,
-            response: response,
             timestamp: new Date().toISOString()
           });
           resolve(response || { success: false, error: 'No response' });
@@ -677,7 +675,6 @@ export class ExtensionMessaging {
     console.log('?? [ExtensionMessaging] RENAME_WALLET request', {
       walletId,
       newNickname,
-      pinLength: typeof pin === 'string' ? pin.length : undefined,
       timestamp: new Date().toISOString()
     });
     return this.sendToBackground({

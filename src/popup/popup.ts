@@ -1228,8 +1228,6 @@ async function handleCreateWallet() {
         setGeneratedMnemonic(mnemonic);
         setMnemonicWords(words);
 
-        console.log('[Wizard] Mnemonic generated');
-
         // Display mnemonic
         const mnemonicDisplay = document.getElementById('mnemonic-display');
         if (mnemonicDisplay) {
@@ -1587,8 +1585,6 @@ async function handlePinConfirm() {
 
     const pin = pinInput.value;
     setUserPin(pin);
-
-    console.log('[Wizard] PIN set, moving to completion');
 
     try {
         if (pinContinueBtn) {
@@ -2875,10 +2871,8 @@ async function initializePopup() {
                     const pin = sessionData.walletSessionPin;
                     console.log('🔍 [Popup] Auto-unlock: Checking for pending discovery to resume...');
                     resumePendingDiscovery(async (masterKeyId: string) => {
-                        console.log(`🔍 [Popup] Resume getMnemonic callback called for: ${masterKeyId}`);
                         try {
                             const result = await ExtensionMessaging.getMasterMnemonic(masterKeyId, pin);
-                            console.log(`🔍 [Popup] getMasterMnemonic result:`, result.success, !!result.data);
                             return result.success && result.data ? result.data.mnemonic : null;
                         } catch (err) {
                             console.error('[Popup] getMasterMnemonic failed:', err);
