@@ -833,6 +833,10 @@ header h1 {
   padding: 20px;
 }
 
+#contacts-interface {
+  padding: 16px;
+}
+
 .contacts-header {
   display: flex;
   align-items: center;
