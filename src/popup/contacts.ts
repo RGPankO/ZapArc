@@ -14,6 +14,25 @@ let cachedContacts: Contact[] = [];
 let currentEditId: string | null = null;
 let pickerCallback: ((contact: Contact) => void) | null = null;
 
+function getContactAvatarColor(name: string): string {
+  const palette = ['#f7931a', '#4caf50', '#03a9f4', '#9c27b0', '#ff7043', '#26a69a', '#5c6bc0', '#ec407a'];
+  const key = name.trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash |= 0;
+  }
+  return palette[Math.abs(hash) % palette.length];
+}
+
+function createContactAvatar(name: string): HTMLElement {
+  const avatar = document.createElement('div');
+  avatar.className = 'contact-avatar';
+  avatar.textContent = (name.trim().charAt(0) || '?').toUpperCase();
+  avatar.style.background = getContactAvatarColor(name);
+  return avatar;
+}
+
 function getMyLightningAddress(): string | null {
   const el = document.getElementById('lightning-address-value');
   return el?.textContent?.trim() || null;
@@ -114,6 +133,11 @@ function renderContactsList(): void {
     item.className = 'contact-item';
     item.dataset.id = contact.id;
 
+    const mainInfo = document.createElement('div');
+    mainInfo.className = 'contact-main-info';
+
+    const avatar = createContactAvatar(contact.name);
+
     const info = document.createElement('div');
     info.className = 'contact-info';
 
@@ -141,12 +165,16 @@ function renderContactsList(): void {
     info.appendChild(nameRow);
     info.appendChild(addressEl);
 
+    mainInfo.appendChild(avatar);
+    mainInfo.appendChild(info);
+
     const actions = document.createElement('div');
     actions.className = 'contact-actions';
 
     const editBtn = document.createElement('button');
     editBtn.className = 'contact-action-btn';
     editBtn.textContent = '✏️';
+    editBtn.setAttribute('aria-label', 'Edit contact');
     editBtn.title = 'Edit contact';
     editBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -156,6 +184,7 @@ function renderContactsList(): void {
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'contact-action-btn danger';
     deleteBtn.textContent = '🗑️';
+    deleteBtn.setAttribute('aria-label', 'Delete contact');
     deleteBtn.title = 'Delete contact';
     deleteBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -165,7 +194,7 @@ function renderContactsList(): void {
     actions.appendChild(editBtn);
     actions.appendChild(deleteBtn);
 
-    item.appendChild(info);
+    item.appendChild(mainInfo);
     item.appendChild(actions);
 
     item.addEventListener('click', () => {
@@ -203,6 +232,11 @@ function renderContactPickerList(): void {
     item.className = 'contact-item';
     item.dataset.id = contact.id;
 
+    const mainInfo = document.createElement('div');
+    mainInfo.className = 'contact-main-info';
+
+    const avatar = createContactAvatar(contact.name);
+
     const info = document.createElement('div');
     info.className = 'contact-info';
 
@@ -230,7 +264,10 @@ function renderContactPickerList(): void {
     info.appendChild(nameRow2);
     info.appendChild(addressEl);
 
-    item.appendChild(info);
+    mainInfo.appendChild(avatar);
+    mainInfo.appendChild(info);
+
+    item.appendChild(mainInfo);
     item.addEventListener('click', () => {
       if (pickerCallback) {
         pickerCallback(contact);

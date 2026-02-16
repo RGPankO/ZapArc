@@ -139,6 +139,10 @@ interface StoredTransaction {
 
 let storedTransactions: StoredTransaction[] = [];
 
+function getTransactionEmptyStateHtml(message: string = 'No transactions yet', subtitle: string = 'Send or receive your first payment'): string {
+    return `<div class="no-transactions"><div class="empty-icon">⚡</div><div class="empty-title">${message}</div><div class="empty-subtitle">${subtitle}</div></div>`;
+}
+
 const lightningAddressStorage = new ChromeStorageManager();
 const LIGHTNING_ADDRESS_USERNAME_PATTERN = /^[a-z0-9][a-z0-9_-]{1,30}[a-z0-9]$/;
 let currentLightningAddressInfo: LightningAddressInfo | null = null;
@@ -399,7 +403,7 @@ async function loadTransactionHistory() {
 
     try {
         if (!breezSDK) {
-            transactionList.innerHTML = '<div class="no-transactions">Wallet not connected</div>';
+            transactionList.innerHTML = getTransactionEmptyStateHtml('Wallet not connected', 'Unlock your wallet to view activity');
             storedTransactions = [];
             return;
         }
@@ -411,7 +415,7 @@ async function loadTransactionHistory() {
         console.log(`📋 [Popup] Loaded ${payments.length} transactions`);
 
         if (payments.length === 0) {
-            transactionList.innerHTML = '<div class="no-transactions">No transactions yet</div>';
+            transactionList.innerHTML = getTransactionEmptyStateHtml();
             storedTransactions = [];
 
             // Cache the empty state so we don't show loading on next open
@@ -485,7 +489,7 @@ async function loadTransactionHistory() {
 
     } catch (error) {
         console.error('❌ [Popup] Error loading transactions:', error);
-        transactionList.innerHTML = '<div class="no-transactions">Error loading transactions</div>';
+        transactionList.innerHTML = getTransactionEmptyStateHtml('Error loading transactions', 'Please try refreshing');
         storedTransactions = [];
     }
 }
@@ -1153,7 +1157,7 @@ async function handleAddSubWalletFromWizard(): Promise<void> {
                 // Clear UI first
                 const transactionList = document.getElementById('transaction-list');
                 if (transactionList) {
-                    transactionList.innerHTML = '<div class="no-transactions">Loading history...</div>';
+                    transactionList.innerHTML = getTransactionEmptyStateHtml('Loading history...', 'Please wait a moment');
                 }
                 const balanceDisplay = document.getElementById('balance');
                 if (balanceDisplay) {
@@ -1986,9 +1990,11 @@ function showUnlockPrompt() {
     const wizard = document.getElementById('onboarding-wizard');
     const mainInterface = document.getElementById('main-interface');
     const unlockInterface = document.getElementById('unlock-interface');
+    const settingsInterface = document.getElementById('settings-interface');
 
     if (wizard) wizard.classList.add('hidden');
     if (mainInterface) mainInterface.classList.add('hidden');
+    if (settingsInterface) settingsInterface.classList.add('hidden');
 
     if (unlockInterface) {
         unlockInterface.classList.remove('hidden');
@@ -2116,7 +2122,7 @@ function showUnlockPrompt() {
 
             const transactionList = document.getElementById('transaction-list');
             if (transactionList) {
-                transactionList.innerHTML = '<div class="no-transactions">⏳ Loading transaction history...</div>';
+                transactionList.innerHTML = getTransactionEmptyStateHtml('Loading transaction history...', 'Please wait a moment');
             }
 
             showInfo('Syncing wallet data...');
@@ -2269,7 +2275,7 @@ function showQROnlyInterface() {
             window.location.reload();
         });
 
-        document.getElementById('settings-btn-qr')?.addEventListener('click', handleSettings);
+        document.getElementById('settings-btn-qr')?.addEventListener('click', handleOpenSettingsPage);
     }
 }
 
@@ -2474,9 +2480,11 @@ function restoreMainInterface() {
 
     const wizard = document.getElementById('onboarding-wizard');
     const mainInterface = document.getElementById('main-interface');
+    const settingsInterface = document.getElementById('settings-interface');
 
     if (wizard && mainInterface) {
         wizard.classList.add('hidden');
+        if (settingsInterface) settingsInterface.classList.add('hidden');
         mainInterface.classList.remove('hidden');
     } else {
         console.warn('⚠️ [Restore] Elements not found - reloading');
@@ -2498,9 +2506,11 @@ function showWalletSetupPrompt() {
     const mainInterface = document.getElementById('main-interface');
     const wizard = document.getElementById('onboarding-wizard');
     const unlockInterface = document.getElementById('unlock-interface');
+    const settingsInterface = document.getElementById('settings-interface');
 
     if (mainInterface) mainInterface.classList.add('hidden');
     if (unlockInterface) unlockInterface.classList.add('hidden');
+    if (settingsInterface) settingsInterface.classList.add('hidden');
 
     if (wizard) {
         wizard.classList.remove('hidden');
@@ -2572,7 +2582,27 @@ function setupEventListeners() {
     // Settings button
     const settingsBtn = document.getElementById('settings-btn');
     if (settingsBtn) {
-        settingsBtn.onclick = handleSettings;
+        settingsBtn.onclick = () => { handleSettings(); };
+    }
+
+    const settingsBackBtn = document.getElementById('settings-back-btn');
+    if (settingsBackBtn) {
+        settingsBackBtn.onclick = () => hideSettingsInterface();
+    }
+
+    const settingsRenameBtn = document.getElementById('settings-rename-wallet-btn');
+    if (settingsRenameBtn) {
+        settingsRenameBtn.onclick = () => { handleSettingsRenameWallet(); };
+    }
+
+    const settingsViewSeedBtn = document.getElementById('settings-view-seed-btn');
+    if (settingsViewSeedBtn) {
+        settingsViewSeedBtn.onclick = () => { handleSettingsViewRecoveryPhrase(); };
+    }
+
+    const settingsDeleteWalletBtn = document.getElementById('settings-delete-wallet-btn');
+    if (settingsDeleteWalletBtn) {
+        settingsDeleteWalletBtn.onclick = showForgotPinModal;
     }
 
     // Contacts button
@@ -2641,13 +2671,6 @@ function setupEventListeners() {
         lockBtn.onclick = lockWallet;
     }
 
-    // Delete wallet button - shows reset/delete confirmation modal
-    // Delete wallet button
-    const deleteWalletBtn = document.getElementById('delete-wallet-btn');
-    if (deleteWalletBtn) {
-        deleteWalletBtn.onclick = showForgotPinModal;
-    }
-    
     // Show all wallets button
     const showWalletSelectorBtn = document.getElementById('show-wallet-selector-btn');
     if (showWalletSelectorBtn) {
@@ -2713,8 +2736,160 @@ function setupEventListeners() {
     setupModalListeners();
 }
 
-function handleSettings() {
+async function handleSettings(): Promise<void> {
+    const mainInterface = document.getElementById('main-interface');
+    const settingsInterface = document.getElementById('settings-interface');
+
+    if (mainInterface) mainInterface.classList.add('hidden');
+    if (settingsInterface) settingsInterface.classList.remove('hidden');
+
+    await refreshSettingsInterface();
+}
+
+function handleOpenSettingsPage() {
     chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
+}
+
+function formatWalletCreatedAt(createdAt?: number): string {
+    if (!createdAt || Number.isNaN(createdAt)) return 'Created: --';
+    return `Created: ${new Date(createdAt).toLocaleDateString()}`;
+}
+
+async function refreshSettingsInterface(): Promise<void> {
+    const nameEl = document.getElementById('settings-wallet-name');
+    const createdEl = document.getElementById('settings-wallet-created');
+
+    try {
+        const result = await chrome.storage.local.get(['multiWalletData']);
+        if (!result.multiWalletData) {
+            if (nameEl) nameEl.textContent = 'Current Wallet';
+            if (createdEl) createdEl.textContent = 'Created: --';
+            return;
+        }
+
+        const data = JSON.parse(result.multiWalletData);
+        const activeWalletId = data.activeWalletId;
+        const wallet = data.wallets?.find((w: any) => w?.metadata?.id === activeWalletId);
+
+        if (nameEl) nameEl.textContent = wallet?.metadata?.nickname || 'Current Wallet';
+        if (createdEl) createdEl.textContent = formatWalletCreatedAt(wallet?.metadata?.createdAt);
+    } catch (error) {
+        console.warn('[Popup] Failed to refresh settings interface:', error);
+        if (nameEl) nameEl.textContent = 'Current Wallet';
+        if (createdEl) createdEl.textContent = 'Created: --';
+    }
+}
+
+function hideSettingsInterface(): void {
+    const settingsInterface = document.getElementById('settings-interface');
+    const mainInterface = document.getElementById('main-interface');
+
+    if (settingsInterface) settingsInterface.classList.add('hidden');
+    if (mainInterface) mainInterface.classList.remove('hidden');
+}
+
+async function handleSettingsRenameWallet(): Promise<void> {
+    try {
+        const result = await chrome.storage.local.get(['multiWalletData']);
+        if (!result.multiWalletData) {
+            showError('No active wallet found');
+            return;
+        }
+
+        const data = JSON.parse(result.multiWalletData);
+        const activeWalletId = data.activeWalletId;
+        const wallet = data.wallets?.find((w: any) => w?.metadata?.id === activeWalletId);
+
+        if (!activeWalletId || !wallet?.metadata) {
+            showError('No active wallet found');
+            return;
+        }
+
+        const newName = await promptForText('Enter a new wallet name:', wallet.metadata.nickname || 'Wallet', 'Wallet name');
+        if (!newName || !newName.trim()) return;
+
+        const pin = sessionPin || await promptForPIN('Enter PIN to rename wallet');
+        if (!pin) return;
+
+        const response = await ExtensionMessaging.renameWallet(activeWalletId, newName.trim(), pin);
+        if (!response.success) {
+            showError(response.error || 'Failed to rename wallet');
+            return;
+        }
+
+        showSuccess('Wallet renamed');
+        await initializeMultiWalletUI();
+        await refreshSettingsInterface();
+    } catch (error) {
+        showError(error instanceof Error ? error.message : 'Failed to rename wallet');
+    }
+}
+
+async function handleSettingsViewRecoveryPhrase(): Promise<void> {
+    try {
+        const pin = sessionPin || await promptForPIN('Enter PIN to reveal recovery phrase');
+        if (!pin) return;
+
+        const result = await chrome.storage.local.get(['multiWalletData']);
+        if (!result.multiWalletData) {
+            showError('No active wallet found');
+            return;
+        }
+
+        const data = JSON.parse(result.multiWalletData);
+        const activeWalletId = data.activeWalletId;
+        const wallet = data.wallets?.find((w: any) => w?.metadata?.id === activeWalletId);
+        const walletName = wallet?.metadata?.nickname || 'Wallet';
+
+        const response = await ExtensionMessaging.getMasterMnemonic(activeWalletId, pin);
+        if (!response.success || !response.data?.mnemonic) {
+            showError(response.error || 'Failed to retrieve recovery phrase');
+            return;
+        }
+
+        showSeedPhraseModal(response.data.mnemonic, walletName);
+    } catch (error) {
+        showError(error instanceof Error ? error.message : 'Failed to reveal recovery phrase');
+    }
+}
+
+function showSeedPhraseModal(mnemonic: string, walletName: string): void {
+    const words = mnemonic.split(' ');
+    const grid = words.map((word, index) => `
+        <div class="mnemonic-word"><span class="word-number">${index + 1}.</span> ${word}</div>
+    `).join('');
+
+    const existingModal = document.getElementById('seed-phrase-reveal-modal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'seed-phrase-reveal-modal';
+    modal.className = 'settings-seed-overlay';
+    modal.innerHTML = `
+        <div class="settings-seed-modal">
+            <div class="modal-header"><h3>🔑 Recovery Phrase — ${walletName}</h3></div>
+            <div class="modal-body">
+                <div class="warning-box"><strong>⚠️ Security Warning:</strong> Never share your recovery phrase.</div>
+                <div class="mnemonic-grid">${grid}</div>
+            </div>
+            <div class="modal-footer">
+                <button id="seed-phrase-close-btn" class="btn-secondary">Close</button>
+                <button id="seed-phrase-copy-btn" class="btn-primary">Copy</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => modal.remove();
+    document.getElementById('seed-phrase-close-btn')?.addEventListener('click', close);
+    document.getElementById('seed-phrase-copy-btn')?.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(mnemonic);
+        showSuccess('Recovery phrase copied to clipboard');
+    });
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) close();
+    });
 }
 
 // ========================================
@@ -2885,7 +3060,7 @@ async function initializePopup() {
                         } else if (cacheWasChecked) {
                             // We've checked before and there were no transactions
                             console.log('💾 [Popup] No transactions (cached empty state)');
-                            transactionList.innerHTML = '<div class="no-transactions">No transactions yet</div>';
+                            transactionList.innerHTML = getTransactionEmptyStateHtml();
                         } else {
                             console.log('⚠️ [Popup] No cache - showing loading indicator');
                             showTransactionsLoading();

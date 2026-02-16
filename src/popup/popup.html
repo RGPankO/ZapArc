@@ -35,7 +35,7 @@
                 <button class="modal-close" id="add-wallet-choice-close">×</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 16px; color: rgba(255,255,255,0.6); font-size: 14px;">Choose how you want to add a new wallet</p>
+                <p class="modal-helper-text">Choose how you want to add a new wallet</p>
                 <div class="choice-buttons">
                     <button id="modal-create-new-wallet-btn" class="choice-btn">
                         <span class="choice-icon">✨</span>
@@ -61,7 +61,7 @@
                 <button class="modal-close" id="add-wallet-create-close">×</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 16px; color: rgba(255,255,255,0.6); font-size: 14px;">Enter a nickname for this wallet</p>
+                <p class="modal-helper-text">Enter a nickname for this wallet</p>
                 <input type="text" id="create-wallet-nickname" class="modal-input" placeholder="e.g., Savings Wallet" maxlength="50" />
                 <div id="create-wallet-error" class="error-message hidden"></div>
             </div>
@@ -78,12 +78,12 @@
                 <button class="modal-close" id="add-wallet-mnemonic-close">×</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 12px; color: rgba(255,255,255,0.6); font-size: 13px;">Write down these 12 words in order. You'll need them to recover your wallet.</p>
+                <p class="modal-helper-text compact">Write down these 12 words in order. You'll need them to recover your wallet.</p>
                 <div id="modal-mnemonic-display" class="mnemonic-grid"></div>
                 <div class="warning-box">
                     <strong>⚠️ Important:</strong> Store this phrase safely offline. Anyone with these words can access your funds.
                 </div>
-                <button id="copy-mnemonic-btn" class="btn-outline" style="width: 100%; margin-top: 12px;">📋 Copy to Clipboard</button>
+                <button id="copy-mnemonic-btn" class="btn-outline btn-full mt-sm">📋 Copy to Clipboard</button>
             </div>
             <div class="modal-footer">
                 <button id="mnemonic-modal-back" class="btn-secondary">Back</button>
@@ -98,7 +98,7 @@
                 <button class="modal-close" id="add-wallet-import-nickname-close">×</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 16px; color: rgba(255,255,255,0.6); font-size: 14px;">Enter a nickname for this wallet</p>
+                <p class="modal-helper-text">Enter a nickname for this wallet</p>
                 <input type="text" id="import-wallet-nickname" class="modal-input" placeholder="e.g., My Mobile Wallet" maxlength="50" />
                 <div id="import-nickname-error" class="error-message hidden"></div>
             </div>
@@ -115,7 +115,7 @@
                 <button class="modal-close" id="add-wallet-import-close">×</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 12px; color: rgba(255,255,255,0.6); font-size: 13px;">Enter your 12-word recovery phrase</p>
+                <p class="modal-helper-text compact">Enter your 12-word recovery phrase</p>
                 <div id="modal-import-words-container" class="import-words-grid"></div>
                 <div id="modal-word-suggestions" class="word-suggestions"></div>
                 <div id="import-mnemonic-error" class="error-message hidden"></div>
@@ -133,7 +133,7 @@
                 <button class="modal-close" id="rename-wallet-close">×</button>
             </div>
             <div class="modal-body">
-                <p style="margin-bottom: 16px; color: rgba(255,255,255,0.6); font-size: 14px;">Enter a new nickname for this wallet</p>
+                <p class="modal-helper-text">Enter a new nickname for this wallet</p>
                 <input type="text" id="rename-wallet-input" class="modal-input" placeholder="Wallet nickname" maxlength="50" />
                 <div id="rename-wallet-error" class="error-message hidden"></div>
             </div>
@@ -153,7 +153,7 @@
                 <!-- Populated dynamically -->
             </div>
             <div class="modal-footer">
-                <button id="tx-detail-close-btn" class="btn-primary" style="width: 100%;">Close</button>
+                <button id="tx-detail-close-btn" class="btn-primary btn-full">Close</button>
             </div>
         </div>
 
@@ -208,7 +208,7 @@
         <div id="onboarding-wizard" class="hidden">
             <div class="wizard-step" id="welcome-step">
                 <div class="wizard-header">
-                    <h2><img src="icons/bolt32.png" alt="" style="width:32px;height:32px;vertical-align:middle;margin-right:6px;">Welcome to ZapArc</h2>
+                    <h2><img src="icons/bolt32.png" alt="" class="brand-logo logo-32">Welcome to ZapArc</h2>
                     <p>Set up your Lightning wallet to send and receive Bitcoin</p>
                 </div>
                 <div class="wizard-content">
@@ -218,7 +218,7 @@
                             <span>Non-custodial wallet - you control your keys</span>
                         </div>
                         <div class="feature-item">
-                            <span class="feature-icon"><img src="icons/bolt24.png" alt="⚡" style="width:20px;height:20px;"></span>
+                            <span class="feature-icon"><img src="icons/bolt24.png" alt="⚡" class="brand-logo logo-20"></span>
                             <span>Instant Lightning Network payments</span>
                         </div>
                         <div class="feature-item">
@@ -290,7 +290,7 @@
                 </div>
                 <div class="wizard-content">
                     <div id="mnemonic-display" class="mnemonic-grid"></div>
-                    <button id="wizard-copy-mnemonic-btn" class="btn-outline" style="width: 100%; margin-bottom: 12px;">📋 Copy to Clipboard</button>
+                    <button id="wizard-copy-mnemonic-btn" class="btn-outline btn-full mb-sm">📋 Copy to Clipboard</button>
                     <div class="warning-box">
                         <strong>⚠️ Important:</strong> Store this phrase safely offline. Anyone with these words can access your funds.
                     </div>
@@ -392,7 +392,7 @@
         <!-- Main Wallet Interface -->
         <div id="main-interface" class="hidden">
             <header>
-                <h1><img src="icons/bolt32.png" alt="" style="width:28px;height:28px;vertical-align:middle;margin-right:4px;">ZapArc</h1>
+                <h1><img src="icons/bolt32.png" alt="" class="brand-logo logo-28">ZapArc</h1>
                 <div class="header-actions">
                     <button id="contacts-btn" class="header-icon-btn" title="Contacts">📇</button>
                     <button id="refresh-btn" class="refresh-btn" title="Refresh Balance">🔄</button>
@@ -441,13 +441,13 @@
                     </div>
                     
                     <div id="wallet-actions">
-                        <button id="withdraw-btn" class="wallet-btn">
+                        <button id="withdraw-btn" class="wallet-btn action-card action-send">
                             <span class="btn-icon">📤</span>
-                            Send
+                            <span class="action-label">Send</span>
                         </button>
-                        <button id="deposit-btn" class="wallet-btn">
+                        <button id="deposit-btn" class="wallet-btn action-card action-deposit">
                             <span class="btn-icon">📥</span>
-                            Deposit
+                            <span class="action-label">Deposit</span>
                         </button>
                     </div>
 
@@ -480,15 +480,43 @@
                         <button id="view-all-btn" class="view-all-btn">View All</button>
                     </div>
                     <div id="transaction-list" class="transaction-list">
-                        <div class="no-transactions">No transactions yet</div>
+                        <div class="no-transactions">
+                            <div class="empty-icon">⚡</div>
+                            <div class="empty-title">No transactions yet</div>
+                            <div class="empty-subtitle">Send or receive your first payment</div>
+                        </div>
                     </div>
                 </div>
                 
                 <div id="settings-section">
-                    <button id="settings-btn" class="settings-btn">⚙️ Settings</button>
-                    <button id="delete-wallet-btn" class="delete-wallet-btn">🗑️ Delete Wallet</button>
+                    <button id="settings-btn" class="settings-btn subtle">⚙️ Settings</button>
                 </div>
             </main>
+        </div>
+
+
+
+        <!-- Settings Interface -->
+        <div id="settings-interface" class="hidden">
+            <div class="settings-header">
+                <button id="settings-back-btn" class="back-btn">← Back</button>
+                <h2>Settings</h2>
+            </div>
+
+            <div class="settings-wallet-card">
+                <div class="settings-wallet-title">Wallet</div>
+                <div id="settings-wallet-name" class="settings-wallet-name">Current Wallet</div>
+                <div id="settings-wallet-created" class="settings-wallet-created">Created: --</div>
+            </div>
+
+            <div class="settings-actions">
+                <button id="settings-rename-wallet-btn" class="settings-action-btn">✏️ Rename wallet</button>
+                <button id="settings-view-seed-btn" class="settings-action-btn">🔑 View recovery phrase</button>
+            </div>
+
+            <div class="settings-danger-zone">
+                <button id="settings-delete-wallet-btn" class="delete-wallet-btn">🗑️ Delete Wallet</button>
+            </div>
         </div>
 
         <!-- Transaction History View -->
@@ -519,15 +547,18 @@
         <!-- Unlock Interface -->
         <div id="unlock-interface" class="hidden">
             <div class="unlock-container">
-                <button id="show-wallet-selector-btn" class="back-btn" style="position: absolute; top: 16px; left: 16px; text-decoration: underline;">Show all wallets</button>
-                <h2>🔒 Wallet Locked</h2>
+                <div class="unlock-logo-wrap">
+                    <img src="icons/bolt32.png" alt="ZapArc" class="brand-logo logo-32">
+                </div>
+                <h2>Wallet Locked</h2>
                 <p>Enter your PIN to unlock your wallet</p>
                 <div class="pin-input-container">
                     <input type="password" id="unlock-pin" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*">
                     <button id="unlock-btn" class="btn-primary">Unlock</button>
                 </div>
                 <div id="unlock-error" class="error-message hidden"></div>
-                <a href="#" id="forgot-pin-link" style="display: block; text-align: center; margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.6); text-decoration: underline; cursor: pointer;">Forgot PIN?</a>
+                <a href="#" id="forgot-pin-link" class="unlock-forgot-link">Forgot PIN?</a>
+                <button id="show-wallet-selector-btn" class="unlock-wallet-link" type="button">Show all wallets</button>
             </div>
         </div>
 
@@ -553,7 +584,7 @@
                 <h2>Rename Wallet</h2>
             </div>
             <div class="wizard-content">
-                <p style="margin-bottom: 16px; color: rgba(255,255,255,0.6); font-size: 14px;">Enter a new name for your wallet</p>
+                <p class="modal-helper-text">Enter a new name for your wallet</p>
                 <div class="form-group">
                     <input type="text" id="rename-wallet-name-input" class="form-input" placeholder="Wallet name" maxlength="50" />
                 </div>
@@ -573,11 +604,11 @@
 
             <main>
                 <div class="deposit-step" id="deposit-amount-step">
-                    <p style="margin-bottom: 16px;">Enter the amount you want to deposit:</p>
+                    <p class="section-intro">Enter the amount you want to deposit:</p>
                     <div class="form-group">
                         <input type="number" id="deposit-amount" placeholder="Amount in sats" min="1" max="100000000">
                     </div>
-                    <div class="quick-amounts" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                    <div class="quick-amounts">
                         <button class="quick-amount-btn btn-secondary" data-amount="10000">10K</button>
                         <button class="quick-amount-btn btn-secondary" data-amount="50000">50K</button>
                         <button class="quick-amount-btn btn-secondary" data-amount="100000">100K</button>
@@ -590,19 +621,19 @@
 
                 <div class="deposit-step hidden" id="deposit-invoice-step">
                     <div class="invoice-container">
-                        <div class="qr-container" style="text-align: center; margin-bottom: 16px;">
+                        <div class="qr-container">
                             <canvas id="deposit-qr-canvas"></canvas>
                         </div>
                         <div class="invoice-details">
-                            <p style="margin-bottom: 8px;">Amount: <strong><span id="invoice-amount-display"></span> sats</strong></p>
-                            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-                                <textarea id="invoice-text" readonly style="flex: 1; min-height: 80px; font-family: monospace; font-size: 12px;"></textarea>
+                            <p class="invoice-amount-row">Amount: <strong><span id="invoice-amount-display"></span> sats</strong></p>
+                            <div class="invoice-row">
+                                <textarea id="invoice-text" readonly class="invoice-text"></textarea>
                                 <button id="copy-invoice-btn" class="btn-secondary">Copy</button>
                             </div>
                         </div>
                         <div class="payment-status" id="payment-status">
-                            <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.08); border-radius: 8px;">
-                                <div style="margin-bottom: 8px;">⏳ Waiting for payment...</div>
+                            <div class="payment-status-card">
+                                <div class="payment-status-line">⏳ Waiting for payment...</div>
                                 <div>Expires in: <strong><span id="invoice-timer">15:00</span></strong></div>
                             </div>
                         </div>
@@ -623,7 +654,7 @@
 
             <main>
                 <div class="withdraw-balance-display">
-                    <p style="margin: 0;">Available Balance: <strong id="withdraw-balance-display" style="color: #F7931A;">-- sats</strong></p>
+                    <p class="withdraw-balance-line">Available Balance: <strong id="withdraw-balance-display" class="withdraw-balance-value">-- sats</strong></p>
                 </div>
 
                 <div class="form-group">
@@ -644,21 +675,21 @@
                     <input type="text" id="withdrawal-comment" placeholder="Payment description" maxlength="144">
                 </div>
 
-                <div class="payment-preview hidden" id="payment-preview" style="padding: 16px; background: rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 16px;">
-                    <h4 style="margin-bottom: 12px;">Payment Preview</h4>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <div class="payment-preview hidden" id="payment-preview">
+                    <h4 class="payment-preview-title">Payment Preview</h4>
+                    <div class="payment-preview-row">
                         <span>Recipient:</span>
                         <strong id="preview-recipient"></strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <div class="payment-preview-row">
                         <span>Amount:</span>
                         <strong id="preview-amount"></strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <div class="payment-preview-row">
                         <span>Fee:</span>
                         <strong id="preview-fee"></strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div class="payment-preview-row payment-preview-total">
                         <span>Total:</span>
                         <strong id="preview-total"></strong>
                     </div>
@@ -670,7 +701,7 @@
                 </div>
 
                 <div class="payment-status hidden" id="withdrawal-status">
-                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.08); border-radius: 8px;">
+                    <div class="payment-status-card">
                         <div id="withdrawal-status-text">Processing payment...</div>
                     </div>
                 </div>
@@ -680,7 +711,7 @@
         <!-- QR Only Interface -->
         <div id="qr-only-interface" class="hidden">
             <header>
-                <h1><img src="icons/bolt32.png" alt="" style="width:32px;height:32px;vertical-align:middle;margin-right:6px;">ZapArc</h1>
+                <h1><img src="icons/bolt32.png" alt="" class="brand-logo logo-32">ZapArc</h1>
                 <p class="mode-indicator">External Wallet Mode</p>
             </header>
             
