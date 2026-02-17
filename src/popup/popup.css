@@ -556,6 +556,7 @@ body {
   padding: 16px;
   height: 100%;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 header {
@@ -3669,53 +3670,10 @@ body.modal-open {
   box-shadow: 0 4px 12px rgba(247, 147, 26, 0.28);
 }
 
+/* Send/Deposit button icons — simple Unicode arrows */
 .wallet-btn.action-card .btn-icon {
-  width: 18px;
-  height: 18px;
-  display: inline-block;
-}
-
-.icon-send,
-.icon-deposit {
-  position: relative;
-}
-
-.icon-send::before,
-.icon-send::after,
-.icon-deposit::before,
-.icon-deposit::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.icon-send::before {
-  width: 2px;
-  height: 10px;
-  top: 4px;
-  background: currentColor;
-}
-
-.icon-send::after {
-  top: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 6px solid currentColor;
-}
-
-.icon-deposit::before {
-  width: 2px;
-  height: 10px;
-  top: 2px;
-  background: currentColor;
-}
-
-.icon-deposit::after {
-  bottom: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 6px solid currentColor;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .wallet-count-badge {
