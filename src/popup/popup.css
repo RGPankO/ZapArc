@@ -829,7 +829,7 @@ header h1 {
 }
 
 .transaction-list {
-  max-height: 120px;
+  max-height: 240px;
   overflow-y: auto;
 }
 
