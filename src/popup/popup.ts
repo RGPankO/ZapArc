@@ -589,7 +589,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
     let statusClass = 'completed';
     let statusIcon = '✓';
     let statusText = 'Completed';
-    if (tx.status === 'pending') {
+    if (tx.status === 'pending' && !(isOnchain && tx.txid)) {
         statusClass = 'pending';
         statusIcon = '⏳';
         statusText = 'Pending';
