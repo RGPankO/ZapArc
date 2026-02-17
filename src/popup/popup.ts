@@ -2220,15 +2220,30 @@ function showUnlockPrompt() {
             showSuccess('Wallet unlocked!');
             await updateBalanceDisplay();
 
-            // Show loading states
-            showBalanceLoading();
-
+            // Show cached transactions immediately, fetch fresh in background
             const transactionList = document.getElementById('transaction-list');
-            if (transactionList) {
+            let shownCached = false;
+            try {
+                const mwResult = await chrome.storage.local.get(['multiWalletData']);
+                if (mwResult.multiWalletData) {
+                    const mwd = JSON.parse(mwResult.multiWalletData);
+                    const wid = mwd.activeWalletId;
+                    if (wid) {
+                        const cacheKey = `cachedTransactions_${wid}`;
+                        const cached = await chrome.storage.local.get([cacheKey]);
+                        if (cached[cacheKey]?.length > 0 && transactionList) {
+                            console.log('💾 [Popup] Showing cached transactions on PIN unlock');
+                            storedTransactions = cached[cacheKey] as StoredTransaction[];
+                            renderTransactionList(transactionList, storedTransactions.slice(0, 5));
+                            shownCached = true;
+                        }
+                    }
+                }
+            } catch (e) { /* ignore cache errors */ }
+
+            if (!shownCached && transactionList) {
                 transactionList.innerHTML = getTransactionEmptyStateHtml('Loading transaction history...', 'Please wait a moment');
             }
-
-            showInfo('Syncing wallet data...');
 
             enableWalletControls();
             await initializeMultiWalletUI();
