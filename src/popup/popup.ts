@@ -387,8 +387,18 @@ async function updateBalanceDisplay() {
             withdrawBalanceElement.textContent = balance.toLocaleString();
         }
 
-        // Cache balance for faster loading next time
-        await chrome.storage.local.set({ cachedBalance: balance });
+        // Cache balance for faster loading next time (wallet-specific + legacy key)
+        const balanceCacheUpdate: Record<string, any> = { cachedBalance: balance };
+        const mwResult = await chrome.storage.local.get(['multiWalletData']);
+        if (mwResult.multiWalletData) {
+            try {
+                const mwd = JSON.parse(mwResult.multiWalletData);
+                if (mwd.activeWalletId) {
+                    balanceCacheUpdate[`cachedBalance_${mwd.activeWalletId}`] = balance;
+                }
+            } catch (e) { /* ignore */ }
+        }
+        await chrome.storage.local.set(balanceCacheUpdate);
 
     } catch (error) {
         console.error('❌ [Popup] Error updating balance:', error);
@@ -3298,10 +3308,49 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
         setBreezSDK(sdk);
         setIsSDKInitialized(true);
 
-        // Show loading state while fetching new wallet data
-        showTransactionsLoading();
+        // Show cached balance + transactions instantly, then refresh in background
+        const switchedWalletId = `${customEvent.detail.masterKeyId}_sub${customEvent.detail.subWalletIndex}`;
 
-        // Update balance and reload transactions
+        // Cached balance
+        try {
+            const balCacheKey = `cachedBalance_${switchedWalletId}`;
+            const balData = await chrome.storage.local.get([balCacheKey]);
+            const cachedBal = balData[balCacheKey];
+            if (cachedBal !== undefined && cachedBal !== null) {
+                console.log(`💰 [Popup] Showing cached balance for ${switchedWalletId}: ${cachedBal}`);
+                setCurrentBalance(cachedBal);
+                const balanceElement = document.getElementById('balance');
+                if (balanceElement) balanceElement.textContent = `${cachedBal.toLocaleString()} sats`;
+                const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
+                if (withdrawBalanceElement) withdrawBalanceElement.textContent = cachedBal.toLocaleString();
+            }
+        } catch (e) { /* ignore */ }
+
+        // Cached transactions
+        const txCacheKey = `cachedTransactions_${switchedWalletId}`;
+        let shownCachedTx = false;
+        try {
+            const cachedData = await chrome.storage.local.get([txCacheKey]);
+            const cached = cachedData[txCacheKey];
+            if (cached && cached.length > 0) {
+                console.log(`📦 [Popup] Showing ${cached.length} cached transactions for ${switchedWalletId}`);
+                storedTransactions = cached as StoredTransaction[];
+                const transactionList = document.getElementById('transaction-list');
+                if (transactionList) {
+                    renderTransactionList(transactionList, storedTransactions.slice(0, 5));
+                }
+                shownCachedTx = true;
+            }
+        } catch (e) {
+            console.warn('[Popup] Cache read failed:', e);
+        }
+
+        // Only show loading spinner if no cached transactions
+        if (!shownCachedTx) {
+            showTransactionsLoading();
+        }
+
+        // Update balance and reload transactions in background
         console.log('🔄 [Popup] Fetching balance and transactions...');
         await updateBalanceDisplay();
         
