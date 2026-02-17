@@ -78,8 +78,9 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
     if (!breezSDK || depositTab !== 'onchain') return;
 
     try {
-        const deposits = await breezSDK.listDeposits();
-        for (const deposit of deposits || []) {
+        const response = await breezSDK.listUnclaimedDeposits({});
+        const deposits = response?.deposits || [];
+        for (const deposit of deposits) {
             const key = `${deposit.txid}:${deposit.vout}`;
             if (claimedOnchainDeposits.has(key)) continue;
 

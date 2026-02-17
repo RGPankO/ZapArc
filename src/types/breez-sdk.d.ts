@@ -129,7 +129,7 @@ declare module '@breeztech/breez-sdk-spark' {
     sendPayment(req: SendPaymentRequest): Promise<void>;
     listPayments(req?: ListPaymentsRequest): Promise<ListPaymentsResponse>;
     claimDeposit(request: ClaimDepositRequest): Promise<ClaimDepositResponse>;
-    listDeposits(): Promise<DepositInfo[]>;
+    listUnclaimedDeposits(request: {}): Promise<{ deposits: DepositInfo[] }>;
     parseLnurl(lnurl: string): Promise<any>;
     payLnurl(req: LnUrlPayRequest): Promise<void>;
     receiveLnurlPay(): Promise<LnUrlPayData>;
@@ -389,7 +389,7 @@ declare module '@breeztech/breez-sdk-spark/web' {
     sendPayment(req: SendPaymentRequest): Promise<void>;
     listPayments(req?: ListPaymentsRequest): Promise<ListPaymentsResponse>;
     claimDeposit(request: ClaimDepositRequest): Promise<ClaimDepositResponse>;
-    listDeposits(): Promise<DepositInfo[]>;
+    listUnclaimedDeposits(request: {}): Promise<{ deposits: DepositInfo[] }>;
     parse(input: string): Promise<InputType>;
     parseLnurl(lnurl: string): Promise<any>; // Legacy, use parse() instead
     payLnurl(req: LnUrlPayRequest): Promise<void>;

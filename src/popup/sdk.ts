@@ -55,7 +55,9 @@ async function claimPendingDeposits(sdk: BreezSdk, reason: string): Promise<void
 
     isClaimingDeposits = true;
     try {
-        const deposits = await sdk.listDeposits();
+        const response = await sdk.listUnclaimedDeposits({});
+        const deposits = response?.deposits || [];
+        console.log(`🔍 [Breez-SDK] listUnclaimedDeposits (${reason}):`, JSON.stringify(deposits));
         if (!deposits?.length) {
             return;
         }
