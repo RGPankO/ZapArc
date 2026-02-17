@@ -515,20 +515,22 @@ async function loadTransactionHistory() {
 
 function isOnchainTransaction(tx: Pick<StoredTransaction, 'method' | 'txid'>): boolean {
     const method = (tx.method || '').toLowerCase();
-    return !!tx.txid || method.includes('bitcoin') || method.includes('onchain') || method.includes('btc') || method.includes('deposit');
+    return !!tx.txid || method.includes('bitcoin') || method.includes('onchain') || method.includes('btc') || method.includes('deposit') || method.includes('withdraw');
 }
 
 function getTransactionStatus(tx: StoredTransaction): { label: string; className: string } {
     const status = (tx.status || '').toLowerCase();
     if (status === 'failed' || status === 'error') return { label: 'Failed', className: 'tx-status-failed' };
-    // "complete" or "completed" means done
     if (status.includes('complete') || status.includes('success')) return { label: '', className: '' };
-    // Only show "Confirming" for explicitly pending status, not for unknown/default
-    if (status === 'pending' || status === 'confirming' || status === 'mempool') {
-        // But if confirmations > 0, it's actually confirmed
+    // SDK reports "pending" for on-chain txns even after confirmation
+    // Only show "Pending" if there's no txid (not yet broadcast)
+    if (status === 'pending') {
+        const isOnchain = isOnchainTransaction(tx);
+        if (isOnchain && tx.txid) return { label: '', className: '' }; // broadcast = good enough
         if (tx.confirmations !== undefined && tx.confirmations >= 1) return { label: '', className: '' };
-        return { label: 'Confirming', className: 'tx-status-pending' };
+        return { label: 'Pending', className: 'tx-status-pending' };
     }
+    if (status === 'confirming' || status === 'mempool') return { label: 'Confirming', className: 'tx-status-pending' };
     if (tx.confirmations !== undefined && tx.confirmations === 0) return { label: 'Confirming', className: 'tx-status-pending' };
     return { label: '', className: '' };
 }
