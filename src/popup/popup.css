@@ -1014,6 +1014,14 @@ header h1 {
   color: var(--text-secondary);
   margin-top: 2px;
 }
+.tx-status-pending {
+  color: #f59e0b;
+  font-weight: 600;
+}
+.tx-status-failed {
+  color: #ef4444;
+  font-weight: 600;
+}
 
 .transaction-date {
   font-size: 10px;

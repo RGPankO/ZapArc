@@ -520,17 +520,26 @@ function isOnchainTransaction(tx: Pick<StoredTransaction, 'method' | 'txid'>): b
     return !!tx.txid || method.includes('bitcoin') || method.includes('onchain') || method.includes('btc') || method.includes('deposit');
 }
 
+function getTransactionStatus(tx: StoredTransaction): { label: string; className: string } {
+    const status = (tx.status || '').toLowerCase();
+    if (status === 'failed' || status === 'error') return { label: 'Failed', className: 'tx-status-failed' };
+    if (status === 'pending' || status === 'confirming' || status === 'mempool') return { label: 'Confirming', className: 'tx-status-pending' };
+    if (tx.confirmations !== undefined && tx.confirmations === 0) return { label: 'Confirming', className: 'tx-status-pending' };
+    if (tx.confirmations !== undefined && tx.confirmations > 0 && tx.confirmations < 3) return { label: `${tx.confirmations}/3 conf`, className: 'tx-status-pending' };
+    return { label: '', className: '' };
+}
+
 function renderTransactionList(container: HTMLElement, transactions: StoredTransaction[]): void {
     container.innerHTML = transactions.map((tx, index) => {
         const isReceive = tx.type === 'receive';
         const isOnchain = isOnchainTransaction(tx);
         const timestamp = new Date(tx.timestamp).toLocaleString();
+        const txStatus = getTransactionStatus(tx);
 
         return `<div class="transaction-item ${isReceive ? 'receive' : 'send'}" data-tx-index="${index}">
-<div class="transaction-icon">${isOnchain ? '⛓️' : (isReceive ? '⬇️' : '⬆️')}</div>
+<div class="transaction-icon">${isOnchain ? '⛓️' : '⚡'}</div>
 <div class="transaction-details">
-<div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
-<div class="transaction-network-label">${isOnchain ? 'On-chain' : 'Lightning'}</div>
+<div class="transaction-type">${isReceive ? 'Received' : 'Sent'}${txStatus.label ? ` · <span class="${txStatus.className}">${txStatus.label}</span>` : ''}</div>
 <div class="transaction-time">${timestamp}</div>
 </div>
 <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
