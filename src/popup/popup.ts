@@ -3294,24 +3294,11 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
     });
 
     try {
-        // Disconnect existing SDK
-        if (breezSDK) {
-            console.log('🔄 [Popup] Disconnecting previous SDK...');
-            await disconnectBreezSDK();
-            setBreezSDK(null);
-            setIsSDKInitialized(false);
-        }
-        
-        // Connect with new derived mnemonic
-        console.log('🔄 [Popup] Connecting SDK with derived mnemonic...');
-        const sdk = await connectBreezSDK(customEvent.detail.mnemonic);
-        setBreezSDK(sdk);
-        setIsSDKInitialized(true);
-
-        // Show cached balance + transactions instantly, then refresh in background
+        // Show cached balance + transactions IMMEDIATELY before SDK work
         const switchedWalletId = customEvent.detail.masterKeyId;
+        let shownCachedTx = false;
 
-        // Cached balance
+        // Cached balance — show instantly
         try {
             const balCacheKey = `cachedBalance_${switchedWalletId}`;
             const balData = await chrome.storage.local.get([balCacheKey]);
@@ -3326,10 +3313,9 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
             }
         } catch (e) { /* ignore */ }
 
-        // Cached transactions
-        const txCacheKey = `cachedTransactions_${switchedWalletId}`;
-        let shownCachedTx = false;
+        // Cached transactions — show instantly
         try {
+            const txCacheKey = `cachedTransactions_${switchedWalletId}`;
             const cachedData = await chrome.storage.local.get([txCacheKey]);
             const cached = cachedData[txCacheKey];
             if (cached && cached.length > 0) {
@@ -3350,7 +3336,21 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
             showTransactionsLoading();
         }
 
-        // Update balance and reload transactions in background
+        // Disconnect existing SDK
+        if (breezSDK) {
+            console.log('🔄 [Popup] Disconnecting previous SDK...');
+            await disconnectBreezSDK();
+            setBreezSDK(null);
+            setIsSDKInitialized(false);
+        }
+        
+        // Connect with new derived mnemonic
+        console.log('🔄 [Popup] Connecting SDK with derived mnemonic...');
+        const sdk = await connectBreezSDK(customEvent.detail.mnemonic);
+        setBreezSDK(sdk);
+        setIsSDKInitialized(true);
+
+        // Background refresh — update balance and transactions from SDK
         console.log('🔄 [Popup] Fetching balance and transactions...');
         await updateBalanceDisplay();
         
