@@ -131,10 +131,14 @@ interface StoredTransaction {
     timestamp: number;
     status: string;
     description?: string;
+    method?: string;
     feeSats?: number;
+    onchainFeeSats?: number;
     paymentHash?: string;
     preimage?: string;
     bolt11?: string;
+    txid?: string;
+    confirmations?: number;
 }
 
 let storedTransactions: StoredTransaction[] = [];
@@ -442,6 +446,14 @@ async function loadTransactionHistory() {
         // Store full transaction data for detail view
         storedTransactions = sortedPayments.map((payment: any, index: number) => {
             const isReceive = payment.paymentType === 'receive';
+            const method = payment.method || payment.details?.type || undefined;
+            const confirmations =
+                payment.confirmationCount ??
+                payment.confirmations ??
+                payment.details?.confirmationCount ??
+                payment.details?.confirmations ??
+                undefined;
+
             return {
                 id: payment.id || `tx-${index}`,
                 type: isReceive ? 'receive' : 'send',
@@ -449,10 +461,14 @@ async function loadTransactionHistory() {
                 timestamp: (payment.timestamp || 0) * 1000,
                 status: payment.status || 'completed',
                 description: payment.description || undefined,
+                method,
                 feeSats: payment.fees || payment.feeSats || undefined,
+                onchainFeeSats: payment.details?.onchainFeeSats || payment.details?.feeSats || undefined,
                 paymentHash: payment.paymentHash || payment.details?.paymentHash || undefined,
                 preimage: payment.preimage || payment.details?.preimage || undefined,
                 bolt11: payment.bolt11 || payment.details?.bolt11 || undefined,
+                txid: payment.details?.txid || payment.txid || payment.details?.txHash || undefined,
+                confirmations: typeof confirmations === 'number' ? confirmations : undefined,
             } as StoredTransaction;
         });
 
@@ -484,7 +500,7 @@ async function loadTransactionHistory() {
         }
 
         // Render to UI (only first 10)
-        renderTransactionList(transactionList, storedTransactions.slice(0, 10));
+        renderTransactionList(transactionList, storedTransactions.slice(0, 5));
 
     } catch (error) {
         console.error('❌ [Popup] Error loading transactions:', error);
@@ -493,15 +509,22 @@ async function loadTransactionHistory() {
     }
 }
 
+function isOnchainTransaction(tx: Pick<StoredTransaction, 'method' | 'txid'>): boolean {
+    const method = (tx.method || '').toLowerCase();
+    return !!tx.txid || method.includes('bitcoin') || method.includes('onchain') || method.includes('btc');
+}
+
 function renderTransactionList(container: HTMLElement, transactions: StoredTransaction[]): void {
     container.innerHTML = transactions.map((tx, index) => {
         const isReceive = tx.type === 'receive';
+        const isOnchain = isOnchainTransaction(tx);
         const timestamp = new Date(tx.timestamp).toLocaleString();
 
         return `<div class="transaction-item ${isReceive ? 'receive' : 'send'}" data-tx-index="${index}">
-<div class="transaction-icon">${isReceive ? '⬇️' : '⬆️'}</div>
+<div class="transaction-icon">${isOnchain ? '⛓️' : (isReceive ? '⬇️' : '⬆️')}</div>
 <div class="transaction-details">
 <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}</div>
+<div class="transaction-network-label">${isOnchain ? 'On-chain' : 'Lightning'}</div>
 <div class="transaction-time">${timestamp}</div>
 </div>
 <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
@@ -536,6 +559,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
     if (!modal || !content || !overlay) return;
 
     const isReceive = tx.type === 'receive';
+    const isOnchain = isOnchainTransaction(tx);
     const date = new Date(tx.timestamp);
     const dateStr = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -558,7 +582,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
     let detailRows = `
         <div class="tx-detail-row">
             <span class="tx-detail-label">Type</span>
-            <span class="tx-detail-value">${isReceive ? 'Received' : 'Sent'}</span>
+            <span class="tx-detail-value">${isReceive ? 'Received' : 'Sent'} (${isOnchain ? 'On-chain' : 'Lightning'})</span>
         </div>
         <div class="tx-detail-row">
             <span class="tx-detail-label">Date</span>
@@ -588,7 +612,43 @@ function showTransactionDetail(tx: StoredTransaction): void {
         `;
     }
 
-    if (tx.paymentHash) {
+    if (isOnchain && tx.onchainFeeSats !== undefined && tx.onchainFeeSats > 0) {
+        detailRows += `
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">On-chain Fee</span>
+                <span class="tx-detail-value">${tx.onchainFeeSats.toLocaleString()} sats</span>
+            </div>
+        `;
+    }
+
+    if (isOnchain && tx.confirmations !== undefined) {
+        detailRows += `
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">Confirmations</span>
+                <span class="tx-detail-value">${tx.confirmations}</span>
+            </div>
+        `;
+    }
+
+    if (isOnchain && tx.txid) {
+        const truncatedTxid = tx.txid.slice(0, 16) + '...' + tx.txid.slice(-8);
+        const explorerUrl = `https://mempool.space/tx/${tx.txid}`;
+        detailRows += `
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">Transaction ID</span>
+                <span class="tx-detail-value">
+                    <span class="tx-detail-value-with-copy">
+                        <span>${truncatedTxid}</span>
+                        <button class="tx-copy-btn" data-copy="${tx.txid}">Copy</button>
+                    </span>
+                </span>
+            </div>
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">Explorer</span>
+                <span class="tx-detail-value"><a href="${explorerUrl}" target="_blank" rel="noopener noreferrer">View on Explorer</a></span>
+            </div>
+        `;
+    } else if (tx.paymentHash) {
         const truncatedHash = tx.paymentHash.slice(0, 16) + '...' + tx.paymentHash.slice(-8);
         detailRows += `
             <div class="tx-detail-row">
@@ -2933,6 +2993,10 @@ function setupModuleCallbacks(): void {
             await loadTransactionHistory();
             // Also notify deposit interface for immediate UI update
             await handlePaymentReceivedFromSDK();
+        },
+        onDepositClaimed: async () => {
+            await updateBalanceDisplay();
+            await loadTransactionHistory();
         }
     });
 

@@ -102,6 +102,7 @@ export function resetWithdrawForm(): void {
     const previewOnchainBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
     const sendOnchainBtn = document.getElementById('send-onchain-payment-btn') as HTMLButtonElement;
     const feeSummary = document.getElementById('onchain-network-fee');
+    const onchainValidation = document.getElementById('onchain-amount-validation');
 
     if (onchainAddressInput) onchainAddressInput.value = '';
     if (onchainAmountInput) onchainAmountInput.value = '';
@@ -119,6 +120,10 @@ export function resetWithdrawForm(): void {
     }
 
     if (feeSummary) feeSummary.textContent = '—';
+    if (onchainValidation) {
+        onchainValidation.textContent = '';
+        onchainValidation.classList.add('hidden');
+    }
     (['fast', 'medium', 'slow'] as const).forEach(speed => {
         const feeEl = document.getElementById(`speed-fee-${speed}`);
         if (feeEl) feeEl.textContent = 'Fee: —';
@@ -200,13 +205,26 @@ function validateOnchainForm(): void {
     const addressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
     const amountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
     const previewBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
+    const validationMessage = document.getElementById('onchain-amount-validation');
 
     if (!addressInput || !amountInput || !previewBtn) return;
 
     const address = addressInput.value.trim();
     const amount = parseInt(amountInput.value) || 0;
+    const minOnchainAmountSats = 10_000;
+    const isAmountTooLow = amount > 0 && amount < minOnchainAmountSats;
 
-    previewBtn.disabled = !(address.length >= 14 && amount > 0);
+    if (validationMessage) {
+        if (isAmountTooLow) {
+            validationMessage.textContent = `Minimum on-chain send is ${minOnchainAmountSats.toLocaleString()} sats.`;
+            validationMessage.classList.remove('hidden');
+        } else {
+            validationMessage.textContent = '';
+            validationMessage.classList.add('hidden');
+        }
+    }
+
+    previewBtn.disabled = !(address.length >= 14 && amount >= minOnchainAmountSats);
 }
 
 function updateSpeedSelectionUI(): void {
@@ -237,21 +255,24 @@ async function previewOnchainPayment(): Promise<void> {
 
         onchainPreparedBySpeed = {};
 
-        for (const speed of ['fast', 'medium', 'slow'] as const) {
-            try {
-                const prepared = await breezSDK.prepareSendPayment({
-                    paymentRequest: address,
-                    amountSats: amount
-                });
-                onchainPreparedBySpeed[speed] = prepared;
+        // Single prepare call — SDK returns fee quotes for all 3 speeds
+        const prepared = await breezSDK.prepareSendPayment({
+            paymentRequest: address,
+            amountSats: amount
+        });
 
-                const feeSats = prepared?.paymentMethod?.minerFeeSats ?? prepared?.fees_sats ?? prepared?.feeSats ?? 0;
-                const feeEl = document.getElementById(`speed-fee-${speed}`);
-                if (feeEl) feeEl.textContent = `Fee: ${Number(feeSats).toLocaleString()} sats`;
-            } catch {
-                const feeEl = document.getElementById(`speed-fee-${speed}`);
-                if (feeEl) feeEl.textContent = 'Fee: unavailable';
-            }
+        // Store the same prepared response for all speeds (fee selection happens at send time)
+        onchainPreparedBySpeed = { fast: prepared, medium: prepared, slow: prepared };
+
+        // Extract per-speed fees from feeQuote
+        const feeQuote = prepared?.paymentMethod?.feeQuote;
+        const speedMap = { fast: feeQuote?.speedFast, medium: feeQuote?.speedMedium, slow: feeQuote?.speedSlow } as const;
+
+        for (const speed of ['fast', 'medium', 'slow'] as const) {
+            const quote = speedMap[speed];
+            const feeSats = quote?.userFeeSat ?? 0;
+            const feeEl = document.getElementById(`speed-fee-${speed}`);
+            if (feeEl) feeEl.textContent = feeSats > 0 ? `Fee: ${feeSats.toLocaleString()} sats` : 'Fee: unavailable';
         }
 
         updateOnchainPreviewFromSelection();
@@ -273,7 +294,9 @@ function updateOnchainPreviewFromSelection(): void {
 
     if (!prepared || !previewDiv || !sendBtn) return;
 
-    const feeSats = Number(prepared?.paymentMethod?.minerFeeSats ?? prepared?.fees_sats ?? prepared?.feeSats ?? 0);
+    const feeQuote = prepared?.paymentMethod?.feeQuote;
+    const speedKey = onchainSelectedSpeed === 'fast' ? 'speedFast' : onchainSelectedSpeed === 'slow' ? 'speedSlow' : 'speedMedium';
+    const feeSats = Number(feeQuote?.[speedKey]?.userFeeSat ?? 0);
     const total = amount + feeSats;
 
     const networkFeeSummary = document.getElementById('onchain-network-fee');

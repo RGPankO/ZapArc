@@ -104,11 +104,32 @@ declare module '@breeztech/breez-sdk-spark' {
     lnurl: string;
   }
 
+  export interface ClaimDepositRequest {
+    txid: string;
+    vout: number;
+    maxFee?: any;
+  }
+
+  export interface ClaimDepositResponse {
+    [key: string]: any;
+  }
+
+  export interface DepositInfo {
+    txid: string;
+    vout: number;
+    amountSats: number;
+    refundTx?: string;
+    refundTxId?: string;
+    claimError?: any;
+  }
+
   export interface BreezSdk {
     nodeInfo(): Promise<NodeInfo>;
     receivePayment(req: ReceivePaymentRequest): Promise<ReceivePaymentResponse>;
     sendPayment(req: SendPaymentRequest): Promise<void>;
     listPayments(req?: ListPaymentsRequest): Promise<ListPaymentsResponse>;
+    claimDeposit(request: ClaimDepositRequest): Promise<ClaimDepositResponse>;
+    listDeposits(): Promise<DepositInfo[]>;
     parseLnurl(lnurl: string): Promise<any>;
     payLnurl(req: LnUrlPayRequest): Promise<void>;
     receiveLnurlPay(): Promise<LnUrlPayData>;
@@ -331,11 +352,34 @@ declare module '@breeztech/breez-sdk-spark/web' {
     payments: Payment[];
   }
 
+  export interface ClaimDepositRequest {
+    txid: string;
+    vout: number;
+    maxFee?: any;
+  }
+
+  export interface ClaimDepositResponse {
+    [key: string]: any;
+  }
+
+  export interface DepositInfo {
+    txid: string;
+    vout: number;
+    amountSats: number;
+    refundTx?: string;
+    refundTxId?: string;
+    claimError?: any;
+  }
+
   export interface EventListener {
     onEvent: (e: SdkEvent) => void;
   }
 
-  export type SdkEvent = { type: "synced" } | { type: "claimDepositsFailed" } | { type: "claimDepositsSucceeded" } | { type: "paymentSucceeded" };
+  export type SdkEvent =
+    | { type: "synced" }
+    | { type: "claimDepositsFailed"; unclaimedDeposits: DepositInfo[] }
+    | { type: "claimDepositsSucceeded"; claimedDeposits: DepositInfo[] }
+    | { type: "paymentSucceeded"; payment?: Payment };
 
   export interface BreezSdk {
     nodeInfo(): Promise<NodeInfo>;
@@ -344,6 +388,8 @@ declare module '@breeztech/breez-sdk-spark/web' {
     prepareSendPayment(req: PrepareSendPaymentRequest): Promise<PrepareResponse>;
     sendPayment(req: SendPaymentRequest): Promise<void>;
     listPayments(req?: ListPaymentsRequest): Promise<ListPaymentsResponse>;
+    claimDeposit(request: ClaimDepositRequest): Promise<ClaimDepositResponse>;
+    listDeposits(): Promise<DepositInfo[]>;
     parse(input: string): Promise<InputType>;
     parseLnurl(lnurl: string): Promise<any>; // Legacy, use parse() instead
     payLnurl(req: LnUrlPayRequest): Promise<void>;

@@ -609,12 +609,6 @@
             </header>
 
             <main>
-                <div class="deposit-hero">
-                    <div class="deposit-hero-icon">📥</div>
-                    <div class="deposit-hero-title">Deposit Funds</div>
-                    <div class="deposit-hero-subtitle">Receive Bitcoin via Lightning</div>
-                </div>
-
                 <div class="tab-container" id="deposit-tab-container">
                     <button id="deposit-tab-lightning" class="tab-btn active" type="button">⚡ Lightning</button>
                     <button id="deposit-tab-onchain" class="tab-btn" type="button">₿ On-chain</button>
@@ -671,7 +665,9 @@
                         <div id="onchain-address-loading" class="onchain-loading hidden">Generating address...</div>
                         <div id="onchain-address-display" class="onchain-address-box hidden"></div>
                         <button id="copy-onchain-address-btn" class="btn-secondary btn-full hidden">Copy Address</button>
-                        <p class="onchain-note">Send Bitcoin to this address. Funds will be available after network confirmations.</p>
+                        <div id="onchain-deposit-status" class="onchain-status hidden"></div>
+                        <p id="onchain-min-deposit-note" class="onchain-note"></p>
+                        <p id="onchain-confirmation-note" class="onchain-note">It may take 1-3 confirmations before funds appear.</p>
                     </div>
                 </div>
             </main>
@@ -748,6 +744,7 @@
                     <div class="form-group">
                         <label>Amount (sats)</label>
                         <input type="number" id="onchain-amount-input" placeholder="Amount in sats" min="1">
+                        <div id="onchain-amount-validation" class="error-message hidden"></div>
                     </div>
 
                     <div class="form-group">

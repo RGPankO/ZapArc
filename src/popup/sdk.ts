@@ -11,6 +11,7 @@ import init, {
 } from '@breeztech/breez-sdk-spark/web';
 import { BREEZ_API_KEY, breezSDK, setBreezSDK } from './state';
 import { hideBalanceLoading } from './ui-helpers';
+import { showSuccess } from './notifications';
 import * as bip39 from 'bip39';
 
 // BIP39 wordlist for sub-wallet derivation
@@ -20,10 +21,55 @@ const BIP39_WORDLIST = bip39.wordlists.english;
 export type SdkEventCallback = {
     onSync?: () => void;
     onPaymentReceived?: () => void;
+    onDepositClaimed?: () => void;
 };
 
 // Event callbacks - set by popup.ts
 let eventCallbacks: SdkEventCallback = {};
+let isClaimingDeposits = false;
+const claimedDepositKeys = new Set<string>();
+
+function getDepositKey(txid: string, vout: number): string {
+    return `${txid}:${vout}`;
+}
+
+async function claimSingleDeposit(sdk: BreezSdk, txid: string, vout: number): Promise<void> {
+    const key = getDepositKey(txid, vout);
+    if (claimedDepositKeys.has(key)) {
+        return;
+    }
+
+    try {
+        await sdk.claimDeposit({ txid, vout });
+        claimedDepositKeys.add(key);
+        console.log(`✅ [Breez-SDK] Claimed deposit ${key}`);
+    } catch (error) {
+        console.warn(`⚠️ [Breez-SDK] Failed to claim deposit ${key}:`, error);
+    }
+}
+
+async function claimPendingDeposits(sdk: BreezSdk, reason: string): Promise<void> {
+    if (isClaimingDeposits) {
+        return;
+    }
+
+    isClaimingDeposits = true;
+    try {
+        const deposits = await sdk.listDeposits();
+        if (!deposits?.length) {
+            return;
+        }
+
+        console.log(`🔄 [Breez-SDK] ${reason}: found ${deposits.length} deposits, attempting claim`);
+        for (const deposit of deposits) {
+            await claimSingleDeposit(sdk, deposit.txid, deposit.vout);
+        }
+    } catch (error) {
+        console.warn(`⚠️ [Breez-SDK] Failed to list/claim deposits (${reason}):`, error);
+    } finally {
+        isClaimingDeposits = false;
+    }
+}
 
 export function setSdkEventCallbacks(callbacks: SdkEventCallback): void {
     eventCallbacks = callbacks;
@@ -359,8 +405,8 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
             sdkConnected: !!sdk
         });
 
-        // Set up event listener for SDK events (sync, payments, etc.)
-        console.log('🔔 [Breez-SDK] Setting up event listener for sync and payment events');
+        // Set up event listener for SDK events (sync, payments, deposits)
+        console.log('🔔 [Breez-SDK] Setting up event listener for sync, payment, and deposit events');
         sdk.addEventListener({
             onEvent: (event: SdkEvent) => {
                 console.log('🔔 [Breez-SDK] Event received:', event.type);
@@ -372,14 +418,30 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                     hideBalanceLoading();
                     console.log('✅ [Breez-SDK] Hiding balance loading indicator');
 
+                    // Check for unclaimed on-chain deposits after each sync
+                    void claimPendingDeposits(sdk, 'sync event');
+
                     // Trigger callbacks
                     eventCallbacks.onSync?.();
                 } else if (event.type === 'paymentSucceeded') {
                     console.log('💰 [Breez-SDK] Payment received');
                     eventCallbacks.onPaymentReceived?.();
+                } else if (event.type === 'claimDepositsSucceeded') {
+                    console.log('✅ [Breez-SDK] Deposit claims succeeded');
+                    showSuccess('✅ Deposit claimed successfully');
+                    eventCallbacks.onDepositClaimed?.();
+                } else if (event.type === 'claimDepositsFailed') {
+                    const unclaimed = event.unclaimedDeposits || [];
+                    console.warn(`⚠️ [Breez-SDK] Deposit claim failed for ${unclaimed.length} deposits, retrying...`);
+                    for (const deposit of unclaimed) {
+                        void claimSingleDeposit(sdk, deposit.txid, deposit.vout);
+                    }
                 }
             }
         });
+
+        // Check for pending deposits right after connecting
+        void claimPendingDeposits(sdk, 'initial connection');
 
         return sdk;
     } catch (error) {

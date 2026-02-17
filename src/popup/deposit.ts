@@ -42,6 +42,8 @@ let callbacks: DepositCallbacks | null = null;
 let currentMonitoredInvoice: string | null = null;
 let depositListenersInitialized = false;
 let depositTab: 'lightning' | 'onchain' = 'lightning';
+let onchainDepositPollingInterval: ReturnType<typeof setInterval> | null = null;
+const claimedOnchainDeposits = new Set<string>();
 
 export function setDepositCallbacks(cb: DepositCallbacks): void {
     callbacks = cb;
@@ -56,6 +58,51 @@ export async function handlePaymentReceivedFromSDK(): Promise<void> {
     if (currentMonitoredInvoice) {
         await checkPaymentStatus(currentMonitoredInvoice);
     }
+}
+
+function stopOnchainDepositPolling(): void {
+    if (onchainDepositPollingInterval) {
+        clearInterval(onchainDepositPollingInterval);
+        onchainDepositPollingInterval = null;
+    }
+}
+
+function setOnchainDepositStatus(message: string): void {
+    const statusEl = document.getElementById('onchain-deposit-status');
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.classList.remove('hidden');
+}
+
+async function checkAndClaimOnchainDeposits(): Promise<void> {
+    if (!breezSDK || depositTab !== 'onchain') return;
+
+    try {
+        const deposits = await breezSDK.listDeposits();
+        for (const deposit of deposits || []) {
+            const key = `${deposit.txid}:${deposit.vout}`;
+            if (claimedOnchainDeposits.has(key)) continue;
+
+            setOnchainDepositStatus(`⏳ Deposit detected: ${deposit.amountSats.toLocaleString()} sats — claiming...`);
+            await breezSDK.claimDeposit({ txid: deposit.txid, vout: deposit.vout });
+            claimedOnchainDeposits.add(key);
+
+            setOnchainDepositStatus('✅ Deposit claimed!');
+            await callbacks?.updateBalanceDisplay();
+            await callbacks?.loadTransactionHistory();
+            showSuccess('Deposit claimed successfully!');
+        }
+    } catch (error) {
+        console.warn('[Deposit] Failed to poll/claim on-chain deposits:', error);
+    }
+}
+
+function startOnchainDepositPolling(): void {
+    stopOnchainDepositPolling();
+    void checkAndClaimOnchainDeposits();
+    onchainDepositPollingInterval = setInterval(() => {
+        void checkAndClaimOnchainDeposits();
+    }, 15000);
 }
 
 export function showDepositInterface(): void {
@@ -79,6 +126,7 @@ export function hideDepositInterface(): void {
         clearInterval(paymentMonitoringInterval);
         setPaymentMonitoringInterval(null);
     }
+    stopOnchainDepositPolling();
 
     setCurrentMonitoredInvoice(null);
 
@@ -110,6 +158,8 @@ function showDepositTab(tab: 'lightning' | 'onchain'): void {
 
     if (tab === 'onchain') {
         void generateOnchainAddress();
+    } else {
+        stopOnchainDepositPolling();
     }
 }
 
@@ -117,6 +167,8 @@ async function generateOnchainAddress(): Promise<void> {
     const loadingEl = document.getElementById('onchain-address-loading');
     const addressEl = document.getElementById('onchain-address-display');
     const copyBtn = document.getElementById('copy-onchain-address-btn') as HTMLButtonElement | null;
+    const minDepositNoteEl = document.getElementById('onchain-min-deposit-note');
+    const confNoteEl = document.getElementById('onchain-confirmation-note');
 
     if (!loadingEl || !addressEl || !copyBtn) return;
 
@@ -124,6 +176,7 @@ async function generateOnchainAddress(): Promise<void> {
     addressEl.classList.add('hidden');
     copyBtn.classList.add('hidden');
     addressEl.textContent = '';
+    setOnchainDepositStatus('Waiting for on-chain deposit...');
 
     try {
         if (!breezSDK) {
@@ -139,9 +192,21 @@ async function generateOnchainAddress(): Promise<void> {
             throw new Error('Failed to generate Bitcoin address');
         }
 
+        const minDepositSats = (response as any)?.paymentMethod?.minAmountSats || (response as any)?.minAmountSats;
+        if (minDepositNoteEl) {
+            minDepositNoteEl.textContent = minDepositSats
+                ? `Minimum recommended deposit: ${Number(minDepositSats).toLocaleString()} sats.`
+                : 'Minimum deposit depends on current network and swap conditions.';
+        }
+        if (confNoteEl) {
+            confNoteEl.textContent = 'It may take 1-3 confirmations before funds appear.';
+        }
+
         addressEl.textContent = address;
         addressEl.classList.remove('hidden');
         copyBtn.classList.remove('hidden');
+
+        startOnchainDepositPolling();
     } catch (error) {
         showError(error instanceof Error ? error.message : 'Failed to generate Bitcoin address');
     } finally {
