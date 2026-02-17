@@ -1772,7 +1772,30 @@ async function finalizeWalletSetup() {
 
         // Clear old wallet display data before connecting new wallet
         clearWalletDisplay();
-        showTransactionsLoading();
+
+        // Show cached transactions immediately while SDK connects
+        const transactionList = document.getElementById('transaction-list');
+        let shownCachedTx = false;
+        try {
+            const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+            if (multiWalletResult.multiWalletData) {
+                const mwd = JSON.parse(multiWalletResult.multiWalletData);
+                const wid = mwd.activeWalletId;
+                if (wid) {
+                    const cacheKey = `cachedTransactions_${wid}`;
+                    const cached = await chrome.storage.local.get([cacheKey]);
+                    if (cached[cacheKey]?.length > 0 && transactionList) {
+                        console.log('💾 [Popup] Showing cached transactions on unlock');
+                        storedTransactions = cached[cacheKey] as StoredTransaction[];
+                        renderTransactionList(transactionList, storedTransactions.slice(0, 5));
+                        shownCachedTx = true;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ [Popup] Cache read failed:', e);
+        }
+        if (!shownCachedTx) showTransactionsLoading();
 
         // Connect SDK
         const sdk = await connectBreezSDK(walletResponse.data.mnemonic);
