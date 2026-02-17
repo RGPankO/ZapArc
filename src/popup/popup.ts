@@ -417,10 +417,11 @@ async function loadTransactionHistory() {
 
         console.log(`📋 [Popup] Loaded ${payments.length} transactions`);
         if (payments.length > 0) {
-            console.log('🔍 [Popup] First 3 payments:', payments.slice(0, 3).map((p: any) => ({
+            console.log('🔍 [Popup] First 3 payments:', JSON.stringify(payments.slice(0, 3).map((p: any) => ({
                 id: p.id, type: p.paymentType, method: p.method, amount: p.amount, status: p.status,
-                details: p.details ? { type: p.details.type, tag: p.details.tag, txId: p.details.txId } : undefined
-            })));
+                confirmations: p.confirmationCount ?? p.confirmations ?? p.details?.confirmationCount ?? p.details?.confirmations,
+                details: p.details ? { type: p.details.type, tag: p.details.tag, txId: p.details.txId, status: p.details.status } : undefined
+            }))));
         }
 
         if (payments.length === 0) {
@@ -523,9 +524,15 @@ function isOnchainTransaction(tx: Pick<StoredTransaction, 'method' | 'txid'>): b
 function getTransactionStatus(tx: StoredTransaction): { label: string; className: string } {
     const status = (tx.status || '').toLowerCase();
     if (status === 'failed' || status === 'error') return { label: 'Failed', className: 'tx-status-failed' };
-    if (status === 'pending' || status === 'confirming' || status === 'mempool') return { label: 'Confirming', className: 'tx-status-pending' };
+    // "complete" or "completed" means done
+    if (status.includes('complete') || status.includes('success')) return { label: '', className: '' };
+    // Only show "Confirming" for explicitly pending status, not for unknown/default
+    if (status === 'pending' || status === 'confirming' || status === 'mempool') {
+        // But if confirmations > 0, it's actually confirmed
+        if (tx.confirmations !== undefined && tx.confirmations >= 1) return { label: '', className: '' };
+        return { label: 'Confirming', className: 'tx-status-pending' };
+    }
     if (tx.confirmations !== undefined && tx.confirmations === 0) return { label: 'Confirming', className: 'tx-status-pending' };
-    if (tx.confirmations !== undefined && tx.confirmations > 0 && tx.confirmations < 3) return { label: `${tx.confirmations}/3 conf`, className: 'tx-status-pending' };
     return { label: '', className: '' };
 }
 
