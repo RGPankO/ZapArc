@@ -211,20 +211,8 @@ function validateOnchainForm(): void {
 
     const address = addressInput.value.trim();
     const amount = parseInt(amountInput.value) || 0;
-    const minOnchainAmountSats = 10_000;
-    const isAmountTooLow = amount > 0 && amount < minOnchainAmountSats;
 
-    if (validationMessage) {
-        if (isAmountTooLow) {
-            validationMessage.textContent = `Minimum on-chain send is ${minOnchainAmountSats.toLocaleString()} sats.`;
-            validationMessage.classList.remove('hidden');
-        } else {
-            validationMessage.textContent = '';
-            validationMessage.classList.add('hidden');
-        }
-    }
-
-    previewBtn.disabled = !(address.length >= 14 && amount >= minOnchainAmountSats);
+    previewBtn.disabled = !(address.length >= 14 && amount > 0);
 }
 
 function updateSpeedSelectionUI(): void {
