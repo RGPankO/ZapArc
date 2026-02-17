@@ -3550,7 +3550,8 @@ body.modal-open {
 .withdraw-balance-value { color: var(--brand); }
 .payment-preview { padding: 16px; background: rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 16px; }
 .payment-preview-title { margin-bottom: 12px; }
-.payment-preview-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.payment-preview-row { display: flex; justify-content: space-between; margin-bottom: 8px; overflow: hidden; }
+.payment-preview-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; text-align: right; }
 .payment-preview-total { padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); margin-bottom: 0; }
 
 .contact-main-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
