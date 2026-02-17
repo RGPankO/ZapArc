@@ -568,7 +568,14 @@ export async function sendPayment(): Promise<void> {
         showSuccess('Payment sent successfully!');
         await callbacks?.updateBalanceDisplay();
         await callbacks?.loadTransactionHistory();
-        setTimeout(() => hideWithdrawInterface(), 2000);
+        setTimeout(() => hideWithdrawInterface(), 1500);
+        // Retry in case tx doesn't appear immediately
+        for (const delayMs of [2000, 5000]) {
+            setTimeout(async () => {
+                await callbacks?.updateBalanceDisplay();
+                await callbacks?.loadTransactionHistory();
+            }, delayMs);
+        }
     } catch (error) {
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
         if (statusText) {
@@ -624,15 +631,15 @@ async function sendOnchainPayment(): Promise<void> {
 
         showSuccess('On-chain transaction sent successfully!');
         await callbacks?.updateBalanceDisplay();
-        await callbacks?.loadTransactionHistory();
-        // On-chain txns may not appear immediately — retry after a delay
-        setTimeout(async () => {
-            await callbacks?.loadTransactionHistory();
-        }, 3000);
-        setTimeout(async () => {
-            await callbacks?.loadTransactionHistory();
-        }, 8000);
-        setTimeout(() => hideWithdrawInterface(), 2000);
+        // Return to main view first, then keep refreshing tx list
+        setTimeout(() => hideWithdrawInterface(), 1500);
+        // Retry tx list multiple times — SDK may not return the on-chain tx immediately
+        for (const delayMs of [500, 2000, 5000, 10000]) {
+            setTimeout(async () => {
+                await callbacks?.updateBalanceDisplay();
+                await callbacks?.loadTransactionHistory();
+            }, delayMs);
+        }
     } catch (error) {
         if (statusText) {
             statusText.textContent = `❌ ${error instanceof Error ? error.message : 'Transaction failed'}`;
