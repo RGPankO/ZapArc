@@ -203,17 +203,41 @@ export function validateWithdrawalForm(): void {
 
 let onchainFeeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+function isValidBitcoinAddress(address: string): boolean {
+    // Bech32 (native segwit): bc1q... (42 chars) or bc1p... (62 chars taproot)
+    if (/^bc1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{25,87}$/i.test(address)) return true;
+    // Legacy P2PKH: starts with 1, 25-34 chars
+    if (/^1[1-9A-HJ-NP-Za-km-z]{24,33}$/.test(address)) return true;
+    // P2SH: starts with 3, 25-34 chars
+    if (/^3[1-9A-HJ-NP-Za-km-z]{24,33}$/.test(address)) return true;
+    return false;
+}
+
 function validateOnchainForm(): void {
     const addressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
     const amountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
     const previewBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
+    const validationMessage = document.getElementById('onchain-amount-validation');
 
     if (!addressInput || !amountInput || !previewBtn) return;
 
     const address = addressInput.value.trim();
     const amount = parseInt(amountInput.value) || 0;
 
-    previewBtn.disabled = !(address.length >= 14 && amount > 0);
+    // Validate bitcoin address format
+    if (address.length > 0 && !isValidBitcoinAddress(address)) {
+        if (validationMessage) {
+            validationMessage.textContent = 'Invalid Bitcoin address';
+            validationMessage.classList.remove('hidden');
+        }
+        previewBtn.disabled = true;
+    } else {
+        if (validationMessage && !validationMessage.textContent?.includes('amount')) {
+            validationMessage.textContent = '';
+            validationMessage.classList.add('hidden');
+        }
+        previewBtn.disabled = !(isValidBitcoinAddress(address) && amount > 0);
+    }
 
     // Auto-fetch fees when address + amount are valid
     if (onchainFeeDebounceTimer) clearTimeout(onchainFeeDebounceTimer);
