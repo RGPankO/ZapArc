@@ -366,8 +366,8 @@ async function updateBalanceDisplay() {
             return;
         }
 
-        // Get fresh balance from SDK
-        const walletInfo = await breezSDK.getInfo({ ensureSynced: false });
+        // Get fresh balance from SDK (ensure synced for accurate total)
+        const walletInfo = await breezSDK.getInfo({ ensureSynced: true });
         const balance = walletInfo?.balanceSats || 0;
 
         console.log('💰 [Popup] Fresh balance from SDK:', balance);
