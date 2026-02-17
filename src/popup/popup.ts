@@ -446,7 +446,7 @@ async function loadTransactionHistory() {
         // Store full transaction data for detail view
         storedTransactions = sortedPayments.map((payment: any, index: number) => {
             const isReceive = payment.paymentType === 'receive';
-            const method = payment.method || payment.details?.type || undefined;
+            const method = payment.method || payment.paymentMethod?.type || payment.details?.type || undefined;
             const confirmations =
                 payment.confirmationCount ??
                 payment.confirmations ??
@@ -467,7 +467,7 @@ async function loadTransactionHistory() {
                 paymentHash: payment.paymentHash || payment.details?.paymentHash || undefined,
                 preimage: payment.preimage || payment.details?.preimage || undefined,
                 bolt11: payment.bolt11 || payment.details?.bolt11 || undefined,
-                txid: payment.details?.txid || payment.txid || payment.details?.txHash || undefined,
+                txid: payment.details?.txId || payment.details?.txid || payment.txid || payment.details?.txHash || undefined,
                 confirmations: typeof confirmations === 'number' ? confirmations : undefined,
             } as StoredTransaction;
         });
@@ -511,7 +511,7 @@ async function loadTransactionHistory() {
 
 function isOnchainTransaction(tx: Pick<StoredTransaction, 'method' | 'txid'>): boolean {
     const method = (tx.method || '').toLowerCase();
-    return !!tx.txid || method.includes('bitcoin') || method.includes('onchain') || method.includes('btc');
+    return !!tx.txid || method.includes('bitcoin') || method.includes('onchain') || method.includes('btc') || method.includes('deposit');
 }
 
 function renderTransactionList(container: HTMLElement, transactions: StoredTransaction[]): void {
