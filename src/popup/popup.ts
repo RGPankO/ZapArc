@@ -416,6 +416,12 @@ async function loadTransactionHistory() {
         const payments = response?.payments || [];
 
         console.log(`📋 [Popup] Loaded ${payments.length} transactions`);
+        if (payments.length > 0) {
+            console.log('🔍 [Popup] First 3 payments:', payments.slice(0, 3).map((p: any) => ({
+                id: p.id, type: p.paymentType, method: p.method, amount: p.amount, status: p.status,
+                details: p.details ? { type: p.details.type, tag: p.details.tag, txId: p.details.txId } : undefined
+            })));
+        }
 
         if (payments.length === 0) {
             transactionList.innerHTML = getTransactionEmptyStateHtml();

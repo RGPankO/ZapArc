@@ -625,6 +625,13 @@ async function sendOnchainPayment(): Promise<void> {
         showSuccess('On-chain transaction sent successfully!');
         await callbacks?.updateBalanceDisplay();
         await callbacks?.loadTransactionHistory();
+        // On-chain txns may not appear immediately — retry after a delay
+        setTimeout(async () => {
+            await callbacks?.loadTransactionHistory();
+        }, 3000);
+        setTimeout(async () => {
+            await callbacks?.loadTransactionHistory();
+        }, 8000);
         setTimeout(() => hideWithdrawInterface(), 2000);
     } catch (error) {
         if (statusText) {
