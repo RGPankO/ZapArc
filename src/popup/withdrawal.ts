@@ -1,10 +1,10 @@
 // Withdrawal Interface
-// Handles payment preview and sending via Lightning
+// Handles Lightning + On-chain send flows
 
 // @ts-ignore - parse function exists but TypeScript can't find it in re-exports
 import { parse as parseInput } from '@breeztech/breez-sdk-spark/web';
-import { 
-    breezSDK, 
+import {
+    breezSDK,
     currentBalance,
     preparedPayment,
     setPreparedPayment
@@ -13,68 +13,63 @@ import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { triggerPaymentNotification, extractPubkeyFromParsedInvoice } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
 
-// Callback type for withdrawal operations that need main popup functions
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
     loadTransactionHistory: () => Promise<void>;
 };
 
 let callbacks: WithdrawalCallbacks | null = null;
+let withdrawalListenersInitialized = false;
+
+let activeSendTab: 'lightning' | 'onchain' = 'lightning';
+let onchainPreparedBySpeed: Partial<Record<'fast' | 'medium' | 'slow', any>> = {};
+let onchainSelectedSpeed: 'fast' | 'medium' | 'slow' = 'medium';
 
 export function setWithdrawalCallbacks(cb: WithdrawalCallbacks): void {
     callbacks = cb;
 }
 
-// ========================================
-// Withdrawal Interface
-// ========================================
-
 export function showWithdrawalInterface(): void {
-    console.log('[Withdraw] Showing withdraw interface');
-
-    // Hide main interface
     const mainInterface = document.getElementById('main-interface');
-    if (mainInterface) {
-        mainInterface.classList.add('hidden');
-    }
-
-    // Show withdraw interface
     const withdrawInterface = document.getElementById('withdraw-interface');
-    if (withdrawInterface) {
-        withdrawInterface.classList.remove('hidden');
-    }
 
-    // Update balance display
+    mainInterface?.classList.add('hidden');
+    withdrawInterface?.classList.remove('hidden');
+
     const balanceDisplay = document.getElementById('withdraw-balance-display');
-    if (balanceDisplay) {
-        balanceDisplay.textContent = `${currentBalance.toLocaleString()}`;
-    }
+    if (balanceDisplay) balanceDisplay.textContent = `${currentBalance.toLocaleString()}`;
 
-    // Reset form
     resetWithdrawForm();
-
-    // Setup listeners
     setupWithdrawalListeners();
+    setSendTab('lightning');
 }
 
 export function hideWithdrawInterface(): void {
-    console.log('[Withdraw] Hiding withdraw interface');
-
-    // Hide withdraw interface
     const withdrawInterface = document.getElementById('withdraw-interface');
-    if (withdrawInterface) {
-        withdrawInterface.classList.add('hidden');
-    }
-
-    // Show main interface
     const mainInterface = document.getElementById('main-interface');
-    if (mainInterface) {
-        mainInterface.classList.remove('hidden');
-    }
 
-    // Reset form and state
+    withdrawInterface?.classList.add('hidden');
+    mainInterface?.classList.remove('hidden');
+
     resetWithdrawForm();
     setPreparedPayment(null);
+}
+
+function setSendTab(tab: 'lightning' | 'onchain'): void {
+    activeSendTab = tab;
+
+    const lightningBtn = document.getElementById('withdraw-tab-lightning');
+    const onchainBtn = document.getElementById('withdraw-tab-onchain');
+    const lightningContent = document.getElementById('withdraw-lightning-content');
+    const onchainContent = document.getElementById('withdraw-onchain-content');
+
+    lightningBtn?.classList.toggle('active', tab === 'lightning');
+    onchainBtn?.classList.toggle('active', tab === 'onchain');
+    lightningContent?.classList.toggle('hidden', tab !== 'lightning');
+    onchainContent?.classList.toggle('hidden', tab !== 'onchain');
+
+    const statusDiv = document.getElementById('withdrawal-status');
+    statusDiv?.classList.add('hidden');
 }
 
 export function resetWithdrawForm(): void {
@@ -84,31 +79,67 @@ export function resetWithdrawForm(): void {
     const previewDiv = document.getElementById('payment-preview');
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
     const previewBtn = document.getElementById('preview-payment-btn') as HTMLButtonElement;
-    const statusDiv = document.getElementById('withdrawal-status');
 
     if (paymentInput) paymentInput.value = '';
     if (amountInput) amountInput.value = '';
     if (commentInput) commentInput.value = '';
-    if (previewDiv) previewDiv.classList.add('hidden');
+    previewDiv?.classList.add('hidden');
+
     if (sendBtn) {
         sendBtn.classList.add('hidden');
         sendBtn.disabled = true;
+        sendBtn.textContent = 'Send Payment';
     }
-    if (previewBtn) previewBtn.disabled = true;
-    if (statusDiv) statusDiv.classList.add('hidden');
+    if (previewBtn) {
+        previewBtn.disabled = true;
+        previewBtn.textContent = 'Preview Payment';
+    }
+
+    // On-chain reset
+    const onchainAddressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
+    const onchainAmountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
+    const onchainPreview = document.getElementById('onchain-payment-preview');
+    const previewOnchainBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
+    const sendOnchainBtn = document.getElementById('send-onchain-payment-btn') as HTMLButtonElement;
+    const feeSummary = document.getElementById('onchain-network-fee');
+
+    if (onchainAddressInput) onchainAddressInput.value = '';
+    if (onchainAmountInput) onchainAmountInput.value = '';
+    onchainPreview?.classList.add('hidden');
+
+    if (previewOnchainBtn) {
+        previewOnchainBtn.disabled = true;
+        previewOnchainBtn.textContent = 'Preview On-chain Transaction';
+    }
+
+    if (sendOnchainBtn) {
+        sendOnchainBtn.classList.add('hidden');
+        sendOnchainBtn.disabled = true;
+        sendOnchainBtn.textContent = 'Send';
+    }
+
+    if (feeSummary) feeSummary.textContent = '—';
+    (['fast', 'medium', 'slow'] as const).forEach(speed => {
+        const feeEl = document.getElementById(`speed-fee-${speed}`);
+        if (feeEl) feeEl.textContent = 'Fee: —';
+    });
+
+    onchainPreparedBySpeed = {};
+    onchainSelectedSpeed = 'medium';
+    updateSpeedSelectionUI();
 }
 
 export function setupWithdrawalListeners(): void {
-    console.log('[Withdraw] Setting up listeners');
+    if (withdrawalListenersInitialized) return;
+    withdrawalListenersInitialized = true;
 
-    // Add back button listener
     const backBtn = document.getElementById('withdraw-back-btn');
-    if (backBtn && !backBtn.onclick) {
-        backBtn.onclick = () => {
-            console.log('[Withdraw] Back button clicked');
-            hideWithdrawInterface();
-        };
-    }
+    if (backBtn) backBtn.onclick = () => hideWithdrawInterface();
+
+    const lightningTabBtn = document.getElementById('withdraw-tab-lightning');
+    const onchainTabBtn = document.getElementById('withdraw-tab-onchain');
+    lightningTabBtn?.addEventListener('click', () => setSendTab('lightning'));
+    onchainTabBtn?.addEventListener('click', () => setSendTab('onchain'));
 
     const paymentInput = document.getElementById('payment-input') as HTMLTextAreaElement;
     const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
@@ -116,54 +147,153 @@ export function setupWithdrawalListeners(): void {
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
 
     const contactsBtn = document.getElementById('withdraw-contacts-btn');
-    if (contactsBtn && !contactsBtn.onclick) {
-        contactsBtn.onclick = () => {
-            openContactPicker((contact) => {
-                if (paymentInput) {
-                    paymentInput.value = contact.lightningAddress;
-                    validateWithdrawalForm();
-                }
-            });
-        };
-    }
-
-    // Input validation
-    if (paymentInput) {
-        paymentInput.addEventListener('input', validateWithdrawalForm);
-    }
-
-    if (amountInput) {
-        amountInput.addEventListener('input', validateWithdrawalForm);
-    }
-
-    // Preview payment
-    if (previewBtn) {
-        previewBtn.addEventListener('click', previewPayment);
-    }
-
-    // Send payment
-    if (sendBtn) {
-        sendBtn.addEventListener('click', () => {
-            console.log('🟢 [Withdraw] Send button CLICKED', { timestamp: new Date().toISOString() });
-            sendPayment();
+    contactsBtn?.addEventListener('click', () => {
+        openContactPicker((contact) => {
+            if (paymentInput) {
+                paymentInput.value = contact.lightningAddress;
+                validateWithdrawalForm();
+            }
         });
-        console.log('✅ [Withdraw] Send button event listener attached');
-    } else {
-        console.error('❌ [Withdraw] Send button not found - event listener NOT attached');
-    }
+    });
+
+    paymentInput?.addEventListener('input', validateWithdrawalForm);
+    amountInput?.addEventListener('input', validateWithdrawalForm);
+    previewBtn?.addEventListener('click', previewPayment);
+    sendBtn?.addEventListener('click', () => sendPayment());
+
+    const onchainAddressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
+    const onchainAmountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
+    const previewOnchainBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
+    const sendOnchainBtn = document.getElementById('send-onchain-payment-btn') as HTMLButtonElement;
+
+    onchainAddressInput?.addEventListener('input', validateOnchainForm);
+    onchainAmountInput?.addEventListener('input', validateOnchainForm);
+
+    document.querySelectorAll('#onchain-speed-cards .speed-card').forEach((card) => {
+        card.addEventListener('click', () => {
+            const speed = (card as HTMLElement).dataset.speed as 'fast' | 'medium' | 'slow';
+            if (!speed) return;
+            onchainSelectedSpeed = speed;
+            updateSpeedSelectionUI();
+            updateOnchainPreviewFromSelection();
+        });
+    });
+
+    previewOnchainBtn?.addEventListener('click', previewOnchainPayment);
+    sendOnchainBtn?.addEventListener('click', sendOnchainPayment);
 }
 
 export function validateWithdrawalForm(): void {
     const paymentInput = document.getElementById('payment-input') as HTMLTextAreaElement;
     const previewBtn = document.getElementById('preview-payment-btn') as HTMLButtonElement;
-    
+
     if (!paymentInput || !previewBtn) return;
-    
+
     const input = paymentInput.value.trim();
     const isValidInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
     const isValidAddress = input.includes('@') && input.includes('.');
-    
+
     previewBtn.disabled = !(isValidInvoice || isValidAddress);
+}
+
+function validateOnchainForm(): void {
+    const addressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
+    const amountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
+    const previewBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
+
+    if (!addressInput || !amountInput || !previewBtn) return;
+
+    const address = addressInput.value.trim();
+    const amount = parseInt(amountInput.value) || 0;
+
+    previewBtn.disabled = !(address.length >= 14 && amount > 0);
+}
+
+function updateSpeedSelectionUI(): void {
+    document.querySelectorAll('#onchain-speed-cards .speed-card').forEach((card) => {
+        const speed = (card as HTMLElement).dataset.speed;
+        card.classList.toggle('selected', speed === onchainSelectedSpeed);
+    });
+}
+
+async function previewOnchainPayment(): Promise<void> {
+    const addressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
+    const amountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
+    const previewBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
+
+    if (!addressInput || !amountInput || !previewBtn) return;
+
+    const address = addressInput.value.trim();
+    const amount = parseInt(amountInput.value) || 0;
+
+    try {
+        if (!breezSDK) {
+            showError('Wallet not connected. Please unlock wallet first.');
+            return;
+        }
+
+        previewBtn.disabled = true;
+        previewBtn.textContent = 'Preparing...';
+
+        onchainPreparedBySpeed = {};
+
+        for (const speed of ['fast', 'medium', 'slow'] as const) {
+            try {
+                const prepared = await breezSDK.prepareSendPayment({
+                    paymentRequest: address,
+                    amountSats: amount
+                });
+                onchainPreparedBySpeed[speed] = prepared;
+
+                const feeSats = prepared?.paymentMethod?.minerFeeSats ?? prepared?.fees_sats ?? prepared?.feeSats ?? 0;
+                const feeEl = document.getElementById(`speed-fee-${speed}`);
+                if (feeEl) feeEl.textContent = `Fee: ${Number(feeSats).toLocaleString()} sats`;
+            } catch {
+                const feeEl = document.getElementById(`speed-fee-${speed}`);
+                if (feeEl) feeEl.textContent = 'Fee: unavailable';
+            }
+        }
+
+        updateOnchainPreviewFromSelection();
+    } catch (error) {
+        showError(error instanceof Error ? error.message : 'Failed to preview on-chain transaction');
+    } finally {
+        previewBtn.disabled = false;
+        previewBtn.textContent = 'Preview On-chain Transaction';
+    }
+}
+
+function updateOnchainPreviewFromSelection(): void {
+    const prepared = onchainPreparedBySpeed[onchainSelectedSpeed];
+    const previewDiv = document.getElementById('onchain-payment-preview');
+    const sendBtn = document.getElementById('send-onchain-payment-btn') as HTMLButtonElement;
+
+    const address = (document.getElementById('onchain-address-input') as HTMLInputElement)?.value?.trim() || '';
+    const amount = parseInt((document.getElementById('onchain-amount-input') as HTMLInputElement)?.value || '0') || 0;
+
+    if (!prepared || !previewDiv || !sendBtn) return;
+
+    const feeSats = Number(prepared?.paymentMethod?.minerFeeSats ?? prepared?.fees_sats ?? prepared?.feeSats ?? 0);
+    const total = amount + feeSats;
+
+    const networkFeeSummary = document.getElementById('onchain-network-fee');
+    if (networkFeeSummary) networkFeeSummary.textContent = `${feeSats.toLocaleString()} sats`;
+
+    const recipientEl = document.getElementById('onchain-preview-recipient');
+    const amountEl = document.getElementById('onchain-preview-amount');
+    const feeEl = document.getElementById('onchain-preview-fee');
+    const speedEl = document.getElementById('onchain-preview-speed');
+    const totalEl = document.getElementById('onchain-preview-total');
+
+    if (recipientEl) recipientEl.textContent = address;
+    if (amountEl) amountEl.textContent = `${amount.toLocaleString()} sats`;
+    if (feeEl) feeEl.textContent = `${feeSats.toLocaleString()} sats`;
+    if (speedEl) speedEl.textContent = onchainSelectedSpeed[0].toUpperCase() + onchainSelectedSpeed.slice(1);
+    if (totalEl) totalEl.textContent = `${total.toLocaleString()} sats`;
+
+    previewDiv.classList.remove('hidden');
+    sendBtn.classList.remove('hidden');
+    sendBtn.disabled = false;
 }
 
 export async function previewPayment(): Promise<void> {
@@ -184,50 +314,35 @@ export async function previewPayment(): Promise<void> {
 
         const input = paymentInput.value.trim();
         const amount = amountInput ? parseInt(amountInput.value) || 0 : 0;
-
-        console.log('🔍 [Withdraw] Analyzing input:', { input: input.substring(0, 50) });
-
         const isInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
 
         if (isInvoice) {
-            // For BOLT11 invoices, use prepareSendPayment
-            console.log('🔍 [Withdraw] Using prepareSendPayment for BOLT11 invoice');
             const prepared = await breezSDK.prepareSendPayment({
                 paymentRequest: input,
                 amountSats: amount > 0 ? amount : undefined
             });
 
             setPreparedPayment(prepared);
-            console.log('✅ [Withdraw] Payment prepared:', prepared);
-
-            const previewData = {
+            displayPaymentPreview({
                 recipient: 'Lightning Payment',
                 amount: prepared.amountSats || amount || 0,
                 fee: prepared.paymentMethod?.lightningFeeSats || 0,
                 type: 'bolt11',
                 prepareResponse: prepared
-            };
-
-            displayPaymentPreview(previewData);
+            });
         } else {
-            // For LNURL/Lightning addresses
             let lnurlInput = input;
             if (input.includes('@') && !input.toLowerCase().startsWith('lnurl')) {
                 const [username, domain] = input.split('@');
                 lnurlInput = `https://${domain}/.well-known/lnurlp/${username}`;
-                console.log(`[Withdraw] Converted Lightning address to LNURL: ${lnurlInput}`);
             }
 
-            console.log(`[Withdraw] Parsing LNURL: ${lnurlInput}`);
             const parsed = await parseInput(lnurlInput);
-            console.log('[Withdraw] Parsed LNURL result:', parsed);
-
             if (parsed.type !== 'lnurlPay' && parsed.type !== 'lightningAddress') {
                 throw new Error(`Unsupported input type: ${parsed.type}`);
             }
 
             const payRequest = parsed.type === 'lightningAddress' ? parsed.payRequest : parsed;
-
             if (!amount || amount <= 0) {
                 throw new Error('Amount is required for Lightning addresses and LNURL payments');
             }
@@ -235,40 +350,29 @@ export async function previewPayment(): Promise<void> {
             const minSendableSats = Math.ceil((payRequest.minSendable || 0) / 1000);
             const maxSendableSats = Math.floor((payRequest.maxSendable || Number.MAX_SAFE_INTEGER) / 1000);
 
-            if (amount < minSendableSats) {
-                throw new Error(`Amount must be at least ${minSendableSats} sats`);
-            }
-            if (amount > maxSendableSats) {
-                throw new Error(`Amount cannot exceed ${maxSendableSats} sats`);
-            }
+            if (amount < minSendableSats) throw new Error(`Amount must be at least ${minSendableSats} sats`);
+            if (amount > maxSendableSats) throw new Error(`Amount cannot exceed ${maxSendableSats} sats`);
 
             const commentInput = document.getElementById('withdrawal-comment') as HTMLInputElement;
             const comment = commentInput?.value?.trim() || undefined;
 
-            console.log('[Withdraw] Preparing LNURL payment with prepareLnurlPay');
             const prepareResponse = await breezSDK.prepareLnurlPay({
                 amountSats: amount,
-                payRequest: payRequest,
-                comment: comment,
+                payRequest,
+                comment,
                 validateSuccessActionUrl: true
             });
 
-            console.log('[Withdraw] LNURL payment prepared:', prepareResponse);
-
             setPreparedPayment(prepareResponse);
-
-            const previewData = {
+            displayPaymentPreview({
                 recipient: input,
-                amount: amount,
+                amount,
                 fee: prepareResponse.feeSats,
                 type: 'lnurl',
-                prepareResponse: prepareResponse
-            };
-
-            displayPaymentPreview(previewData);
+                prepareResponse
+            });
         }
     } catch (error) {
-        console.error('❌ [Withdraw] Payment preview error:', error);
         showError(error instanceof Error ? error.message : 'Failed to preview payment');
     } finally {
         previewBtn.disabled = false;
@@ -279,46 +383,33 @@ export async function previewPayment(): Promise<void> {
 export function displayPaymentPreview(previewData: any): void {
     const previewDiv = document.getElementById('payment-preview');
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
-    
     if (!previewDiv || !sendBtn) return;
-    
+
     const recipientEl = document.getElementById('preview-recipient');
     const amountEl = document.getElementById('preview-amount');
     const feeEl = document.getElementById('preview-fee');
     const totalEl = document.getElementById('preview-total');
-    
+
     if (recipientEl) recipientEl.textContent = previewData.recipient || 'Lightning Payment';
     if (amountEl) amountEl.textContent = `${previewData.amount.toLocaleString()} sats`;
     if (feeEl) feeEl.textContent = `${previewData.fee.toLocaleString()} sats`;
     if (totalEl) totalEl.textContent = `${(previewData.amount + previewData.fee).toLocaleString()} sats`;
-    
+
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
     sendBtn.disabled = false;
 }
 
 export async function sendPayment(): Promise<void> {
-    console.log('🔵 [Withdraw] sendPayment() ENTRY');
-
     const paymentInput = document.getElementById('payment-input') as HTMLTextAreaElement;
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
     const statusDiv = document.getElementById('withdrawal-status');
     const statusText = document.getElementById('withdrawal-status-text');
 
-    if (!paymentInput || !sendBtn) {
-        console.error('❌ [Withdraw] Missing required elements');
-        return;
-    }
+    if (!paymentInput || !sendBtn) return;
 
-    // Confirm payment
-    console.log('🔵 [Withdraw] Showing confirmation dialog...');
     const confirmed = await showConfirmDialog('Confirm Payment', 'Are you sure you want to send this payment? This action cannot be undone.');
-    console.log('🔍 [Withdraw] Dialog result:', { confirmed });
-
-    if (!confirmed) {
-        console.log('🔍 [Withdraw] Payment cancelled by user');
-        return;
-    }
+    if (!confirmed) return;
 
     try {
         if (!breezSDK) {
@@ -329,7 +420,7 @@ export async function sendPayment(): Promise<void> {
         sendBtn.disabled = true;
         sendBtn.textContent = 'Sending...';
 
-        if (statusDiv) statusDiv.classList.remove('hidden');
+        statusDiv?.classList.remove('hidden');
         if (statusText) statusText.textContent = 'Processing payment...';
 
         if (!preparedPayment) {
@@ -337,109 +428,49 @@ export async function sendPayment(): Promise<void> {
             return;
         }
 
-        console.log('🔵 [Withdraw] Sending payment via SDK...');
-
-        // Check payment type
         const isLnurlPayment = preparedPayment && 'feeSats' in preparedPayment && !('paymentMethod' in preparedPayment);
 
         if (isLnurlPayment) {
-            console.log('🔵 [Withdraw] Executing LNURL payment');
-            const result = await breezSDK.lnurlPay({
-                prepareResponse: preparedPayment
-            });
+            const result = await breezSDK.lnurlPay({ prepareResponse: preparedPayment });
 
-            console.log('✅ [Withdraw] LNURL payment sent successfully', result);
-
-            if (result.successAction) {
-                console.log('🎉 [Withdraw] Success action:', result.successAction);
-            }
-
-            // Trigger push notification for LNURL/Lightning Address payment
             try {
                 let recipientPubkey: string | undefined;
-                
-                // 1. Best option: destinationPubkey from payment result (matches mobile app registration)
-                if (result.payment?.details?.destinationPubkey) {
-                    recipientPubkey = result.payment.details.destinationPubkey;
-                }
-                
-                // 2. Fallback: Try invoiceDetails
+                if (result.payment?.details?.destinationPubkey) recipientPubkey = result.payment.details.destinationPubkey;
                 if (!recipientPubkey && preparedPayment.invoiceDetails) {
                     const invoiceDetails = preparedPayment.invoiceDetails as Record<string, unknown>;
-                    const destPubkey = invoiceDetails.payeePubkey || 
-                                       invoiceDetails.destination || 
-                                       invoiceDetails.nodeId ||
-                                       invoiceDetails.destinationPubkey;
-                    if (destPubkey && typeof destPubkey === 'string') {
-                        recipientPubkey = destPubkey;
-                    }
+                    const destPubkey = invoiceDetails.payeePubkey || invoiceDetails.destination || invoiceDetails.nodeId || invoiceDetails.destinationPubkey;
+                    if (destPubkey && typeof destPubkey === 'string') recipientPubkey = destPubkey;
                 }
-                
-                // 3. Fallback: nostrPubkey (for future NIP-57 support)
-                if (!recipientPubkey && preparedPayment.payRequest?.nostrPubkey) {
-                    recipientPubkey = preparedPayment.payRequest.nostrPubkey;
-                }
-                
+                if (!recipientPubkey && preparedPayment.payRequest?.nostrPubkey) recipientPubkey = preparedPayment.payRequest.nostrPubkey;
+
                 if (recipientPubkey) {
                     const amountEl = document.getElementById('preview-amount');
                     const amountText = amountEl?.textContent || '0';
                     const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
-                    
-                    triggerPaymentNotification({ pubKey: recipientPubkey }, amount)
-                        .catch(e => console.warn('[Withdraw] LNURL notification failed:', e));
+                    triggerPaymentNotification({ pubKey: recipientPubkey }, amount).catch(() => {});
                 }
-            } catch (notifError) {
-                console.warn('[Withdraw] Failed to trigger LNURL notification:', notifError);
-            }
+            } catch {}
         } else {
-            console.log('🔵 [Withdraw] Executing BOLT11 payment');
-            await breezSDK.sendPayment({
-                prepareResponse: preparedPayment
-            });
-
-            console.log('✅ [Withdraw] Payment sent successfully');
+            await breezSDK.sendPayment({ prepareResponse: preparedPayment });
         }
 
-        // Clear prepared payment
         setPreparedPayment(null);
 
-        // Trigger push notification to recipient (async, don't await)
-        console.log('🔔 [Withdraw] Starting notification trigger...');
         try {
             const input = paymentInput.value.trim();
             const isInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
-            console.log('🔔 [Withdraw] isInvoice:', isInvoice, 'breezSDK:', !!breezSDK);
-            
             if (isInvoice && breezSDK) {
-                // Parse the invoice to extract destination pubkey
-                console.log('🔔 [Withdraw] Parsing invoice...');
                 const parsed = await parseInput(input);
-                console.log('🔔 [Withdraw] Parsed result:', parsed?.type);
                 const destPubkey = extractPubkeyFromParsedInvoice(parsed);
-                console.log('🔔 [Withdraw] Destination pubkey:', destPubkey ? destPubkey.substring(0, 20) + '...' : 'NOT FOUND');
-                
                 if (destPubkey) {
-                    // Get amount from preview
                     const amountEl = document.getElementById('preview-amount');
                     const amountText = amountEl?.textContent || '0';
                     const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
-                    console.log('🔔 [Withdraw] Sending notification for amount:', amount);
-                    
-                    // Fire and forget - don't block UI
-                    triggerPaymentNotification({ pubKey: destPubkey }, amount)
-                        .then(res => console.log('🔔 [Withdraw] Notification result:', res))
-                        .catch(e => console.warn('🔔 [Withdraw] Notification failed:', e));
-                } else {
-                    console.warn('🔔 [Withdraw] No destination pubkey found - skipping notification');
+                    triggerPaymentNotification({ pubKey: destPubkey }, amount).catch(() => {});
                 }
-            } else {
-                console.log('🔔 [Withdraw] Not a BOLT11 invoice or no SDK - skipping notification');
             }
-        } catch (notifError) {
-            console.warn('🔔 [Withdraw] Failed to trigger notification:', notifError);
-        }
+        } catch {}
 
-        // Cleanup stale dialogs
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
 
         if (statusText) {
@@ -448,21 +479,11 @@ export async function sendPayment(): Promise<void> {
         }
 
         showSuccess('Payment sent successfully!');
-
-        // Refresh balance and transactions
         await callbacks?.updateBalanceDisplay();
         await callbacks?.loadTransactionHistory();
-
-        // Auto-close interface after 2 seconds
-        setTimeout(() => {
-            hideWithdrawInterface();
-        }, 2000);
-
+        setTimeout(() => hideWithdrawInterface(), 2000);
     } catch (error) {
-        console.error('❌ [Popup] Send payment error:', error);
-
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
-
         if (statusText) {
             statusText.textContent = `❌ ${error instanceof Error ? error.message : 'Payment failed'}`;
             statusText.className = 'status-indicator error';
@@ -471,7 +492,61 @@ export async function sendPayment(): Promise<void> {
     } finally {
         sendBtn.disabled = false;
         sendBtn.textContent = 'Send Payment';
-
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
+    }
+}
+
+async function sendOnchainPayment(): Promise<void> {
+    const sendBtn = document.getElementById('send-onchain-payment-btn') as HTMLButtonElement;
+    const statusDiv = document.getElementById('withdrawal-status');
+    const statusText = document.getElementById('withdrawal-status-text');
+
+    const prepared = onchainPreparedBySpeed[onchainSelectedSpeed];
+    if (!prepared) {
+        showError('Please preview the on-chain transaction first');
+        return;
+    }
+
+    const confirmed = await showConfirmDialog('Confirm On-chain Transaction', 'Are you sure you want to send this on-chain transaction?');
+    if (!confirmed) return;
+
+    try {
+        if (!breezSDK) {
+            showError('Wallet not connected. Please unlock wallet first.');
+            return;
+        }
+
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending...';
+
+        statusDiv?.classList.remove('hidden');
+        if (statusText) statusText.textContent = 'Broadcasting on-chain transaction...';
+
+        await breezSDK.sendPayment({
+            prepareResponse: prepared,
+            options: {
+                type: 'bitcoinAddress',
+                confirmationSpeed: onchainSelectedSpeed
+            }
+        });
+
+        if (statusText) {
+            statusText.textContent = '✅ On-chain transaction sent successfully!';
+            statusText.className = 'status-indicator success';
+        }
+
+        showSuccess('On-chain transaction sent successfully!');
+        await callbacks?.updateBalanceDisplay();
+        await callbacks?.loadTransactionHistory();
+        setTimeout(() => hideWithdrawInterface(), 2000);
+    } catch (error) {
+        if (statusText) {
+            statusText.textContent = `❌ ${error instanceof Error ? error.message : 'Transaction failed'}`;
+            statusText.className = 'status-indicator error';
+        }
+        showError(error instanceof Error ? error.message : 'Failed to send on-chain transaction');
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
     }
 }

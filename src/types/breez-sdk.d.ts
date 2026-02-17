@@ -23,8 +23,13 @@ declare module '@breeztech/breez-sdk-spark' {
   }
 
   export interface ReceivePaymentRequest {
-    amountSats: number;
-    description: string;
+    amountSats?: number;
+    description?: string;
+    paymentMethod?: {
+      type: 'bolt11Invoice' | 'bitcoinAddress';
+      description?: string;
+      amountSats?: number;
+    };
   }
 
   export interface ReceivePaymentResponse {
@@ -139,11 +144,15 @@ declare module '@breeztech/breez-sdk-spark/web' {
   }
 
   export interface ReceivePaymentRequest {
-    paymentMethod: {
-      type: 'bolt11Invoice';
-      description: string;
-      amountSats: number;
-    };
+    paymentMethod?:
+      | {
+          type: 'bolt11Invoice';
+          description: string;
+          amountSats: number;
+        }
+      | {
+          type: 'bitcoinAddress';
+        };
   }
 
   export interface ReceivePaymentResponse {

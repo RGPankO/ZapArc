@@ -1,225 +1,250 @@
 // Deposit Interface
-// Handles invoice generation, QR display, and payment monitoring
+// Handles Lightning invoice generation + on-chain address generation
 
 import * as QRCode from 'qrcode';
-import { 
-    breezSDK, 
-    paymentMonitoringInterval, 
+import {
+    breezSDK,
+    paymentMonitoringInterval,
     setPaymentMonitoringInterval,
     invoiceExpiryTime,
     setInvoiceExpiryTime
 } from './state';
 import { showError, showSuccess } from './notifications';
 
-// Callback type for deposit operations that need main popup functions
+function updateDepositEstimate(amount: number): void {
+    const row = document.getElementById('deposit-estimate-row');
+    const valueEl = document.getElementById('deposit-estimate-value');
+    const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
+    if (generateBtn) generateBtn.disabled = !amount || amount <= 0;
+    if (!row || !valueEl) return;
+    if (!amount || amount <= 0) {
+        row.classList.add('hidden');
+        return;
+    }
+    // Rough estimate: 1 BTC ≈ $100,000 (placeholder, could be dynamic)
+    const btcAmount = amount / 100_000_000;
+    const usdEstimate = btcAmount * 100_000;
+    if (usdEstimate >= 0.01) {
+        valueEl.textContent = `≈ $${usdEstimate.toFixed(2)} USD`;
+        row.classList.remove('hidden');
+    } else {
+        row.classList.add('hidden');
+    }
+}
+
 export type DepositCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
     loadTransactionHistory: () => Promise<void>;
-    onPaymentReceived?: () => Promise<void>; // Optional callback for when payment is received
+    onPaymentReceived?: () => Promise<void>;
 };
 
 let callbacks: DepositCallbacks | null = null;
+let currentMonitoredInvoice: string | null = null;
+let depositListenersInitialized = false;
+let depositTab: 'lightning' | 'onchain' = 'lightning';
 
 export function setDepositCallbacks(cb: DepositCallbacks): void {
     callbacks = cb;
 }
 
-// Track current invoice being monitored
-let currentMonitoredInvoice: string | null = null;
-
 export function setCurrentMonitoredInvoice(invoice: string | null): void {
     currentMonitoredInvoice = invoice;
 }
 
-// Export function to handle payment received event from SDK
 export async function handlePaymentReceivedFromSDK(): Promise<void> {
     console.log('[Deposit] Payment received event from SDK - checking immediately');
-    // If we're monitoring an invoice, check it immediately instead of waiting for next poll
     if (currentMonitoredInvoice) {
         await checkPaymentStatus(currentMonitoredInvoice);
     }
 }
-// ========================================
-// Deposit Interface
-// ========================================
 
 export function showDepositInterface(): void {
-    console.log('[Deposit] Showing deposit interface');
-
-    // Hide main interface
     const mainInterface = document.getElementById('main-interface');
-    if (mainInterface) {
-        mainInterface.classList.add('hidden');
-    }
-
-    // Show deposit interface
     const depositInterface = document.getElementById('deposit-interface');
-    if (depositInterface) {
-        depositInterface.classList.remove('hidden');
-    }
 
-    // Reset to amount step
+    mainInterface?.classList.add('hidden');
+    depositInterface?.classList.remove('hidden');
+
+    showDepositTab('lightning');
     showDepositStep('deposit-amount-step');
 
-    // Reset amount input
     const amountInput = document.getElementById('deposit-amount') as HTMLInputElement;
-    if (amountInput) {
-        amountInput.value = '';
-    }
+    if (amountInput) amountInput.value = '';
 
-    // Setup listeners
     setupDepositListeners();
 }
 
 export function hideDepositInterface(): void {
-    console.log('[Deposit] Hiding deposit interface');
-
-    // Stop payment monitoring if active
     if (paymentMonitoringInterval) {
         clearInterval(paymentMonitoringInterval);
         setPaymentMonitoringInterval(null);
     }
-    
-    // Clear monitored invoice
+
     setCurrentMonitoredInvoice(null);
 
-    // Hide deposit interface
     const depositInterface = document.getElementById('deposit-interface');
-    if (depositInterface) {
-        depositInterface.classList.add('hidden');
-    }
-
-    // Show main interface
     const mainInterface = document.getElementById('main-interface');
-    if (mainInterface) {
-        mainInterface.classList.remove('hidden');
-    }
 
-    // Reset form
+    depositInterface?.classList.add('hidden');
+    mainInterface?.classList.remove('hidden');
+
     const amountInput = document.getElementById('deposit-amount') as HTMLInputElement;
     if (amountInput) amountInput.value = '';
 
-    // Reset to amount step
     showDepositStep('deposit-amount-step');
+    showDepositTab('lightning');
+}
+
+function showDepositTab(tab: 'lightning' | 'onchain'): void {
+    depositTab = tab;
+
+    const lightningBtn = document.getElementById('deposit-tab-lightning');
+    const onchainBtn = document.getElementById('deposit-tab-onchain');
+    const lightningContent = document.getElementById('deposit-lightning-content');
+    const onchainContent = document.getElementById('deposit-onchain-content');
+
+    lightningBtn?.classList.toggle('active', tab === 'lightning');
+    onchainBtn?.classList.toggle('active', tab === 'onchain');
+    lightningContent?.classList.toggle('hidden', tab !== 'lightning');
+    onchainContent?.classList.toggle('hidden', tab !== 'onchain');
+
+    if (tab === 'onchain') {
+        void generateOnchainAddress();
+    }
+}
+
+async function generateOnchainAddress(): Promise<void> {
+    const loadingEl = document.getElementById('onchain-address-loading');
+    const addressEl = document.getElementById('onchain-address-display');
+    const copyBtn = document.getElementById('copy-onchain-address-btn') as HTMLButtonElement | null;
+
+    if (!loadingEl || !addressEl || !copyBtn) return;
+
+    loadingEl.classList.remove('hidden');
+    addressEl.classList.add('hidden');
+    copyBtn.classList.add('hidden');
+    addressEl.textContent = '';
+
+    try {
+        if (!breezSDK) {
+            throw new Error('Wallet not connected. Please unlock your wallet first.');
+        }
+
+        const response = await breezSDK.receivePayment({
+            paymentMethod: { type: 'bitcoinAddress' }
+        } as any);
+
+        const address = (response as any)?.paymentRequest || (response as any)?.bitcoinAddress || (response as any)?.address;
+        if (!address) {
+            throw new Error('Failed to generate Bitcoin address');
+        }
+
+        addressEl.textContent = address;
+        addressEl.classList.remove('hidden');
+        copyBtn.classList.remove('hidden');
+    } catch (error) {
+        showError(error instanceof Error ? error.message : 'Failed to generate Bitcoin address');
+    } finally {
+        loadingEl.classList.add('hidden');
+    }
 }
 
 export function setupDepositListeners(): void {
-    console.log('[Deposit] Setting up listeners');
+    if (depositListenersInitialized) return;
+    depositListenersInitialized = true;
 
-    // Add back button listener
     const backBtn = document.getElementById('deposit-back-btn');
-    if (backBtn && !backBtn.onclick) {
-        backBtn.onclick = () => {
-            console.log('[Deposit] Back button clicked');
-            hideDepositInterface();
-        };
-    }
+    if (backBtn) backBtn.onclick = () => hideDepositInterface();
+
+    const tabLightning = document.getElementById('deposit-tab-lightning');
+    const tabOnchain = document.getElementById('deposit-tab-onchain');
+    tabLightning?.addEventListener('click', () => showDepositTab('lightning'));
+    tabOnchain?.addEventListener('click', () => showDepositTab('onchain'));
 
     const depositAmount = document.getElementById('deposit-amount') as HTMLInputElement;
     const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
     const copyBtn = document.getElementById('copy-invoice-btn');
     const newInvoiceBtn = document.getElementById('new-invoice-btn');
 
-    // Amount input validation
-    if (depositAmount) {
-        depositAmount.addEventListener('input', () => {
-            const amount = parseInt(depositAmount.value);
-            if (generateBtn) {
-                generateBtn.disabled = !amount || amount <= 0;
-            }
-        });
-    }
-
-    // Quick amount buttons
     document.querySelectorAll('.quick-amount-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const amount = (e.target as HTMLElement).dataset.amount;
+            const target = e.target as HTMLElement;
+            const amount = target.dataset.amount;
             if (depositAmount && amount) {
                 depositAmount.value = amount;
-                if (generateBtn) {
-                    generateBtn.disabled = false;
-                }
+                if (generateBtn) generateBtn.disabled = false;
+                // Update selected state
+                document.querySelectorAll('.quick-amount-btn').forEach(b => b.classList.remove('selected'));
+                target.classList.add('selected');
+                // Update estimate
+                updateDepositEstimate(parseInt(amount));
             }
         });
     });
 
-    // Generate invoice
-    if (generateBtn) {
-        generateBtn.addEventListener('click', async () => {
+    if (depositAmount) {
+        depositAmount.addEventListener('input', () => {
             const amount = parseInt(depositAmount.value);
-            if (amount > 0) {
-                await generateDepositInvoice(amount);
-            }
+            // Clear quick amount selection
+            document.querySelectorAll('.quick-amount-btn').forEach(b => b.classList.remove('selected'));
+            updateDepositEstimate(amount);
         });
     }
 
-    // Copy invoice
-    if (copyBtn) {
-        copyBtn.addEventListener('click', () => {
-            const invoiceText = document.getElementById('invoice-text') as HTMLTextAreaElement;
-            if (invoiceText) {
-                navigator.clipboard.writeText(invoiceText.value);
-                showSuccess('Invoice copied to clipboard!');
-            }
-        });
-    }
+    generateBtn?.addEventListener('click', async () => {
+        const amount = parseInt(depositAmount.value);
+        if (amount > 0) await generateDepositInvoice(amount);
+    });
 
-    // New invoice
-    if (newInvoiceBtn) {
-        newInvoiceBtn.addEventListener('click', () => {
-            showDepositStep('deposit-amount-step');
-        });
-    }
+    copyBtn?.addEventListener('click', () => {
+        const invoiceText = document.getElementById('invoice-text') as HTMLTextAreaElement;
+        if (invoiceText) {
+            navigator.clipboard.writeText(invoiceText.value);
+            showSuccess('Invoice copied to clipboard!');
+        }
+    });
+
+    newInvoiceBtn?.addEventListener('click', () => showDepositStep('deposit-amount-step'));
+
+    const onchainCopyBtn = document.getElementById('copy-onchain-address-btn');
+    onchainCopyBtn?.addEventListener('click', async () => {
+        const address = document.getElementById('onchain-address-display')?.textContent?.trim();
+        if (!address) return;
+        await navigator.clipboard.writeText(address);
+        showSuccess('Bitcoin address copied to clipboard!');
+    });
 }
 
 export async function generateDepositInvoice(amount: number): Promise<void> {
+    const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
+
     try {
-        const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
         if (generateBtn) {
             generateBtn.disabled = true;
             generateBtn.textContent = 'Generating...';
         }
 
-        // Check if SDK is connected
         if (!breezSDK) {
             showError('Wallet not connected. Please unlock your wallet first.');
             return;
         }
 
-        // Generate invoice directly using Breez SDK in popup context
         const description = `Deposit ${amount.toLocaleString()} sats to ZapArc Wallet`;
-
-        console.log('🔵 [Popup] Generating invoice via Breez SDK...', {
-            amount,
-            description
-        });
-
-        // Use Breez SDK's receivePayment method with bolt11Invoice type
         const response = await breezSDK.receivePayment({
             paymentMethod: {
                 type: 'bolt11Invoice',
-                description: description,
+                description,
                 amountSats: amount
             }
         });
 
         const invoice = response.paymentRequest;
-
-        console.log('✅ [Popup] Invoice generated successfully', {
-            invoiceLength: invoice.length,
-            invoicePrefix: invoice.substring(0, 20),
-            feeSats: response.feeSats
-        });
-
         await displayInvoice(invoice, amount);
         showDepositStep('deposit-invoice-step');
         startPaymentMonitoring(invoice);
-
     } catch (error) {
-        console.error('❌ [Popup] Invoice generation error:', error);
         showError(error instanceof Error ? error.message : 'Failed to generate invoice');
     } finally {
-        const generateBtn = document.getElementById('generate-invoice-btn') as HTMLButtonElement;
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.textContent = 'Generate Invoice';
@@ -228,29 +253,19 @@ export async function generateDepositInvoice(amount: number): Promise<void> {
 }
 
 export async function displayInvoice(invoice: string, amount: number): Promise<void> {
-    // Display amount
     const amountDisplay = document.getElementById('invoice-amount-display');
-    if (amountDisplay) {
-        amountDisplay.textContent = amount.toLocaleString();
-    }
-    
-    // Display invoice text
+    if (amountDisplay) amountDisplay.textContent = amount.toLocaleString();
+
     const invoiceText = document.getElementById('invoice-text') as HTMLTextAreaElement;
-    if (invoiceText) {
-        invoiceText.value = invoice;
-    }
-    
-    // Generate QR code
+    if (invoiceText) invoiceText.value = invoice;
+
     const qrCanvas = document.getElementById('deposit-qr-canvas') as HTMLCanvasElement;
     if (qrCanvas) {
         try {
             await QRCode.toCanvas(qrCanvas, invoice, {
                 width: 200,
                 margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
+                color: { dark: '#000000', light: '#FFFFFF' }
             });
         } catch (error) {
             console.error('QR code generation error:', error);
@@ -263,54 +278,32 @@ export function showDepositStep(stepId: string): void {
     const steps = ['deposit-amount-step', 'deposit-invoice-step'];
     steps.forEach(id => {
         const element = document.getElementById(id);
-        if (element) {
-            element.classList.toggle('hidden', id !== stepId);
-        }
+        if (element) element.classList.toggle('hidden', id !== stepId);
     });
 }
 
-// ========================================
-// Payment Monitoring
-// ========================================
-
 export function startPaymentMonitoring(invoice: string): void {
-    // Track the invoice we're monitoring
     setCurrentMonitoredInvoice(invoice);
-    
-    // Set expiry time (15 minutes from now)
     setInvoiceExpiryTime(Date.now() + (15 * 60 * 1000));
-    
-    // Clear any existing interval
-    if (paymentMonitoringInterval) {
-        clearInterval(paymentMonitoringInterval);
-    }
-    
-    // Start monitoring
+
+    if (paymentMonitoringInterval) clearInterval(paymentMonitoringInterval);
+
     const interval = setInterval(async () => {
         await checkPaymentStatus(invoice);
         updateInvoiceTimer();
     }, 2000);
+
     setPaymentMonitoringInterval(interval);
-    
-    // Initial check
-    checkPaymentStatus(invoice);
+    void checkPaymentStatus(invoice);
 }
 
 export async function checkPaymentStatus(invoice: string): Promise<void> {
     try {
-        if (!breezSDK) {
-            console.warn('SDK not connected during payment check');
-            return;
-        }
-
-        console.log('🔍 [Popup] Checking payment status...');
+        if (!breezSDK) return;
 
         const response = await breezSDK.listPayments({});
         const payments = response?.payments || [];
 
-        console.log(`🔍 [Popup] Found ${payments.length} payments`);
-
-        // Find payment matching this invoice
         const matchingPayment = payments.find((p: any) => {
             if (p.paymentType !== 'receive') return false;
             const paymentInvoice = p.details?.bolt11 || p.details?.invoice || '';
@@ -318,42 +311,34 @@ export async function checkPaymentStatus(invoice: string): Promise<void> {
         });
 
         if (matchingPayment) {
-            console.log('✅ [Popup] Payment received!', matchingPayment);
-
             const amountSats = matchingPayment.amount || matchingPayment.amountSats || 0;
             showSuccess(`Received ${amountSats.toLocaleString()} sats!`);
 
-            // Stop monitoring
             if (paymentMonitoringInterval) {
                 clearInterval(paymentMonitoringInterval);
                 setPaymentMonitoringInterval(null);
             }
 
-            // Refresh balance and transactions
             await callbacks?.updateBalanceDisplay();
             await callbacks?.loadTransactionHistory();
-
-            // Close deposit interface
             hideDepositInterface();
         }
     } catch (error) {
-        console.error('❌ [Popup] Payment status check error:', error);
+        console.error('Payment status check error:', error);
     }
 }
 
 export function updateInvoiceTimer(): void {
     const timerElement = document.getElementById('invoice-timer');
     if (!timerElement) return;
-    
+
     const remaining = Math.max(0, invoiceExpiryTime - Date.now());
     const minutes = Math.floor(remaining / 60000);
     const seconds = Math.floor((remaining % 60000) / 1000);
-    
+
     timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    
-    if (remaining <= 0) {
-        handlePaymentExpired();
-    }
+
+    if (remaining <= 0) handlePaymentExpired();
 }
 
 export function handlePaymentReceived(): void {
@@ -361,27 +346,20 @@ export function handlePaymentReceived(): void {
         clearInterval(paymentMonitoringInterval);
         setPaymentMonitoringInterval(null);
     }
-    
+
     const statusIndicator = document.querySelector('.status-indicator');
     if (statusIndicator) {
         statusIndicator.textContent = '✅ Payment received!';
         statusIndicator.className = 'status-indicator success';
     }
-    
-    const timerElement = document.getElementById('invoice-timer');
-    if (timerElement) {
-        timerElement.textContent = 'Completed';
-    }
 
-    // Refresh wallet data
+    const timerElement = document.getElementById('invoice-timer');
+    if (timerElement) timerElement.textContent = 'Completed';
+
     callbacks?.updateBalanceDisplay();
-    
     showSuccess('Deposit received successfully!');
-    
-    // Auto-close interface after 3 seconds
-    setTimeout(() => {
-        hideDepositInterface();
-    }, 3000);
+
+    setTimeout(() => hideDepositInterface(), 3000);
 }
 
 export function handlePaymentExpired(): void {
@@ -389,7 +367,7 @@ export function handlePaymentExpired(): void {
         clearInterval(paymentMonitoringInterval);
         setPaymentMonitoringInterval(null);
     }
-    
+
     const statusIndicator = document.querySelector('.status-indicator');
     if (statusIndicator) {
         statusIndicator.textContent = '⏰ Invoice expired';

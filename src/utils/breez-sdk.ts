@@ -142,6 +142,26 @@ export class BreezSDKWrapper {
   }
 
   /**
+   * Generate an on-chain Bitcoin receive address
+   */
+  async receiveOnchain(): Promise<string> {
+    this.ensureConnected();
+
+    try {
+      const response = await this.sdk.receivePayment({
+        paymentMethod: {
+          type: 'bitcoinAddress'
+        }
+      });
+
+      return response?.paymentRequest || response?.bitcoinAddress || response?.address || '';
+    } catch (error) {
+      console.error('Failed to generate on-chain receive address:', error);
+      throw new Error(`On-chain address generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Send Lightning payment using bolt11 invoice
    */
   async sendPayment(request: PaymentRequest): Promise<boolean> {

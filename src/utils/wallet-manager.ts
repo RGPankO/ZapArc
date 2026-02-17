@@ -399,6 +399,22 @@ export class WalletManager {
   }
 
   /**
+   * Generate on-chain Bitcoin receive address
+   */
+  async receiveOnchain(): Promise<string> {
+    this.ensureWalletReady();
+
+    try {
+      const address = await this.breezSDK.receiveOnchain();
+      await this.storage.updateActivity();
+      return address;
+    } catch (error) {
+      console.error('On-chain address generation failed:', error);
+      throw new Error(`On-chain address generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Check if wallet has sufficient balance for payment
    */
   async hasSufficientBalance(amount: number): Promise<boolean> {
