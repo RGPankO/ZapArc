@@ -14,7 +14,7 @@
             gap: 80px; padding: 60px; overflow: hidden;
         }
         .popup-frame {
-            width: 350px; height: 500px;
+            width: 350px; height: 520px;
             background: linear-gradient(180deg, #1a1a2e, #16213e, #0f3460);
             border-radius: 20px;
             box-shadow: 0 25px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1);
@@ -22,72 +22,92 @@
             padding: 16px; overflow: hidden;
         }
 
-        /* Header row: Back + Title */
-        .deposit-header {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 20px;
-        }
         .back-btn {
             background: rgba(255,255,255,0.1);
             border: 1px solid rgba(255,255,255,0.15);
             border-radius: 8px; padding: 6px 12px;
             color: #FFF; font-size: 13px; cursor: pointer;
+            align-self: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .deposit-hero {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .deposit-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
         }
         .deposit-title {
-            font-size: 18px; font-weight: 600; color: #FFF;
+            font-size: 18px; font-weight: 700; color: #FFF;
+            margin-bottom: 4px;
+        }
+        .deposit-subtitle {
+            font-size: 13px; color: rgba(255,255,255,0.5);
         }
 
-        /* Main card */
-        .deposit-card {
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 16px;
-            padding: 20px;
-        }
-        .deposit-card p {
-            color: rgba(255,255,255,0.7);
-            font-size: 14px;
-            margin-bottom: 14px;
+        .form-label {
+            font-size: 12px; color: rgba(255,255,255,0.5);
+            margin-bottom: 8px;
         }
 
-        /* Input */
-        .amount-input {
-            width: 100%;
+        .amount-row {
+            display: flex; align-items: center;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
             padding: 12px 14px;
-            background: #16213e;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            color: rgba(255,255,255,0.3);
-            font-size: 14px;
-            margin-bottom: 14px;
-            outline: none;
+            margin-bottom: 12px;
+        }
+        .amount-value {
+            flex: 1; font-size: 22px; font-weight: 700; color: #FFF;
+        }
+        .amount-unit {
+            font-size: 14px; color: rgba(255,255,255,0.35); font-weight: 500;
         }
 
-        /* Quick amounts */
         .quick-amounts {
             display: flex; gap: 8px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         .quick-btn {
             flex: 1; padding: 8px 0;
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 20px;
+            color: #FFF; font-size: 12px; font-weight: 600;
+            cursor: pointer; text-align: center;
+        }
+        .quick-btn.selected {
+            background: rgba(247, 147, 26, 0.2);
+            border-color: #F7931A;
+            color: #F7931A;
+        }
+
+        .estimate-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255,255,255,0.04);
             border-radius: 8px;
-            color: #FFF; font-size: 13px; font-weight: 500;
+            padding: 10px 12px;
+            margin-bottom: 16px;
+        }
+        .estimate-label {
+            font-size: 12px; color: rgba(255,255,255,0.4);
+        }
+        .estimate-value {
+            font-size: 13px; color: rgba(255,255,255,0.7); font-weight: 500;
+        }
+
+        .generate-btn {
+            width: 100%; padding: 14px;
+            background: #F7931A;
+            border: none; border-radius: 12px;
+            color: #1a1a2e;
+            font-size: 15px; font-weight: 700;
             cursor: pointer; text-align: center;
         }
 
-        /* Generate Invoice button (disabled state) */
-        .generate-btn {
-            width: 100%; padding: 12px;
-            background: rgba(255,255,255,0.2);
-            border: none; border-radius: 12px;
-            color: rgba(255,255,255,0.4);
-            font-size: 14px; font-weight: 500;
-            cursor: not-allowed;
-        }
-
-        /* Marketing */
         .marketing { max-width: 400px; color: #FFF; }
         .marketing h1 { font-size: 42px; font-weight: 700; margin-bottom: 20px; line-height: 1.2; }
         .marketing h1 span { color: #F7931A; }
@@ -96,22 +116,33 @@
 </head>
 <body>
     <div class="popup-frame">
-        <div class="deposit-header">
-            <button class="back-btn">← Back</button>
+        <button class="back-btn">← Back</button>
+
+        <div class="deposit-hero">
+            <div class="deposit-icon">📥</div>
             <div class="deposit-title">Deposit Funds</div>
+            <div class="deposit-subtitle">Receive Bitcoin via Lightning</div>
         </div>
 
-        <div class="deposit-card">
-            <p>Enter the amount you want to deposit:</p>
-            <div class="amount-input">Amount in sats</div>
-            <div class="quick-amounts">
-                <div class="quick-btn">10K</div>
-                <div class="quick-btn">50K</div>
-                <div class="quick-btn">100K</div>
-                <div class="quick-btn">500K</div>
-            </div>
-            <button class="generate-btn">Generate Invoice</button>
+        <div class="form-label">Amount to receive</div>
+        <div class="amount-row">
+            <div class="amount-value">50,000</div>
+            <div class="amount-unit">sats</div>
         </div>
+
+        <div class="quick-amounts">
+            <div class="quick-btn">10K</div>
+            <div class="quick-btn selected">50K</div>
+            <div class="quick-btn">100K</div>
+            <div class="quick-btn">500K</div>
+        </div>
+
+        <div class="estimate-row">
+            <div class="estimate-label">Estimated value</div>
+            <div class="estimate-value">≈ $50.00 USD</div>
+        </div>
+
+        <button class="generate-btn">⚡ Generate Invoice</button>
     </div>
 
     <div class="marketing">
