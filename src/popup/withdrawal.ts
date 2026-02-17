@@ -201,11 +201,12 @@ export function validateWithdrawalForm(): void {
     previewBtn.disabled = !(isValidInvoice || isValidAddress);
 }
 
+let onchainFeeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 function validateOnchainForm(): void {
     const addressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
     const amountInput = document.getElementById('onchain-amount-input') as HTMLInputElement;
     const previewBtn = document.getElementById('preview-onchain-payment-btn') as HTMLButtonElement;
-    const validationMessage = document.getElementById('onchain-amount-validation');
 
     if (!addressInput || !amountInput || !previewBtn) return;
 
@@ -213,6 +214,57 @@ function validateOnchainForm(): void {
     const amount = parseInt(amountInput.value) || 0;
 
     previewBtn.disabled = !(address.length >= 14 && amount > 0);
+
+    // Auto-fetch fees when address + amount are valid
+    if (onchainFeeDebounceTimer) clearTimeout(onchainFeeDebounceTimer);
+    if (address.length >= 14 && amount > 0) {
+        onchainFeeDebounceTimer = setTimeout(() => autoFetchOnchainFees(address, amount), 800);
+    } else {
+        // Clear fees when inputs are incomplete
+        (['fast', 'medium', 'slow'] as const).forEach(speed => {
+            const feeEl = document.getElementById(`speed-fee-${speed}`);
+            if (feeEl) feeEl.textContent = 'Fee: —';
+        });
+        const feeSummary = document.getElementById('onchain-network-fee');
+        if (feeSummary) feeSummary.textContent = '—';
+    }
+}
+
+async function autoFetchOnchainFees(address: string, amount: number): Promise<void> {
+    if (!breezSDK) return;
+
+    // Show loading state
+    (['fast', 'medium', 'slow'] as const).forEach(speed => {
+        const feeEl = document.getElementById(`speed-fee-${speed}`);
+        if (feeEl) feeEl.textContent = 'Fee: ...';
+    });
+
+    try {
+        const prepared = await breezSDK.prepareSendPayment({
+            paymentRequest: address,
+            amountSats: amount
+        });
+
+        onchainPreparedBySpeed = { fast: prepared, medium: prepared, slow: prepared };
+
+        const feeQuote = prepared?.paymentMethod?.feeQuote;
+        const speedMap = { fast: feeQuote?.speedFast, medium: feeQuote?.speedMedium, slow: feeQuote?.speedSlow } as const;
+
+        for (const speed of ['fast', 'medium', 'slow'] as const) {
+            const quote = speedMap[speed];
+            const feeSats = quote?.userFeeSat ?? 0;
+            const feeEl = document.getElementById(`speed-fee-${speed}`);
+            if (feeEl) feeEl.textContent = feeSats > 0 ? `Fee: ${feeSats.toLocaleString()} sats` : 'Fee: unavailable';
+        }
+
+        updateOnchainPreviewFromSelection();
+    } catch (error) {
+        console.error('Auto-fee estimation failed:', error);
+        (['fast', 'medium', 'slow'] as const).forEach(speed => {
+            const feeEl = document.getElementById(`speed-fee-${speed}`);
+            if (feeEl) feeEl.textContent = 'Fee: —';
+        });
+    }
 }
 
 function updateSpeedSelectionUI(): void {
