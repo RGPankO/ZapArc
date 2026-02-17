@@ -3309,7 +3309,7 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
         setIsSDKInitialized(true);
 
         // Show cached balance + transactions instantly, then refresh in background
-        const switchedWalletId = `${customEvent.detail.masterKeyId}_sub${customEvent.detail.subWalletIndex}`;
+        const switchedWalletId = customEvent.detail.masterKeyId;
 
         // Cached balance
         try {
