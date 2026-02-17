@@ -1296,18 +1296,6 @@ header h1 {
   width: 100%;
 }
 
-.unlock-container h2 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  color: var(--text-primary);
-}
-
-.unlock-container p {
-  margin: 0 0 24px 0;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
 .pin-input-container {
   display: flex;
   flex-direction: column;
@@ -3523,12 +3511,15 @@ body.modal-open {
 .settings-seed-overlay { position: fixed; inset: 0; z-index: 10020; background: rgba(0,0,0,.75); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .settings-seed-modal { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--border-light); border-radius: 14px; overflow: hidden; }
 
-.unlock-container { border: 1px solid var(--border-light); border-radius: 16px; background: rgba(255,255,255,0.06); padding: 20px 16px; box-shadow: 0 8px 26px rgba(0,0,0,0.35); }
-.unlock-logo-wrap { margin-bottom: 8px; }
-.unlock-container h2 { margin-bottom: 6px; }
-.pin-input-container input { font-size: 24px; letter-spacing: 4px; font-weight: 700; padding: 14px; }
-.unlock-forgot-link, .unlock-wallet-link { display: block; margin-top: 10px; text-align: center; font-size: 12px; color: var(--text-secondary); text-decoration: underline; background: none; border: none; width: 100%; cursor: pointer; }
-.unlock-forgot-link:hover, .unlock-wallet-link:hover { color: var(--text-primary); }
+/* Unlock screen — minimal & clean */
+.unlock-container { padding: 0 24px; }
+.unlock-logo { width: 40px; height: 40px; margin-bottom: 16px; opacity: 0.9; }
+.unlock-label { margin: 0 0 20px; font-size: 14px; color: var(--text-secondary); }
+.pin-input-container input { font-size: 18px; letter-spacing: 6px; font-weight: 600; padding: 12px; text-align: center; }
+.unlock-links { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; }
+.unlock-link { font-size: 11px; color: var(--text-secondary); text-decoration: none; background: none; border: none; cursor: pointer; padding: 0; }
+.unlock-link:hover { color: var(--text-primary); }
+.unlock-link-sep { color: rgba(255,255,255,0.2); font-size: 11px; }
 
 .transaction-list { min-height: 130px; display: flex; flex-direction: column; justify-content: center; }
 .no-transactions { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 110px; }

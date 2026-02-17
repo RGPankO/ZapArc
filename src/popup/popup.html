@@ -557,18 +557,18 @@
         <!-- Unlock Interface -->
         <div id="unlock-interface" class="hidden">
             <div class="unlock-container">
-                <div class="unlock-logo-wrap">
-                    <img src="icons/bolt32.png" alt="ZapArc" class="brand-logo logo-32">
-                </div>
-                <h2>Wallet Locked</h2>
-                <p>Enter your PIN to unlock your wallet</p>
+                <img src="icons/bolt32.png" alt="" class="unlock-logo">
+                <p class="unlock-label">Enter PIN to unlock</p>
                 <div class="pin-input-container">
-                    <input type="password" id="unlock-pin" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+                    <input type="password" id="unlock-pin" placeholder="······" maxlength="6" inputmode="numeric" pattern="[0-9]*">
                     <button id="unlock-btn" class="btn-primary">Unlock</button>
                 </div>
                 <div id="unlock-error" class="error-message hidden"></div>
-                <a href="#" id="forgot-pin-link" class="unlock-forgot-link">Forgot PIN?</a>
-                <button id="show-wallet-selector-btn" class="unlock-wallet-link" type="button">Show all wallets</button>
+                <div class="unlock-links">
+                    <a href="#" id="forgot-pin-link" class="unlock-link">Forgot PIN?</a>
+                    <span class="unlock-link-sep">·</span>
+                    <button id="show-wallet-selector-btn" class="unlock-link" type="button">Switch wallet</button>
+                </div>
             </div>
         </div>
 
