@@ -20,6 +20,7 @@ import {
     setSelectedWords,
     userPin,
     setUserPin,
+    clearSensitiveWizardState,
     sessionPin,
     setSessionPin,
     isAddingWallet,
@@ -858,6 +859,15 @@ function formatLockoutDuration(remainingMs: number): string {
     }
 
     return `${seconds}s`;
+}
+
+function clearSensitiveState(clearSession: boolean = false): void {
+    clearSensitiveWizardState();
+
+    if (clearSession) {
+        setSessionPin(null);
+        chrome.storage.session.remove('walletSessionPin').catch(() => undefined);
+    }
 }
 
 // ========================================
@@ -1726,15 +1736,7 @@ async function handlePinConfirm() {
         console.log(`[Wizard] Setting newly created wallet ${masterKeyId} as active`);
         setActiveMasterKeyId(masterKeyId);
         setActiveSubWalletIndex(0);
-
-        // Update storage with active wallet
-        const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
-        if (multiWalletResult.multiWalletData) {
-            const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
-            multiWalletData.activeWalletId = masterKeyId;
-            multiWalletData.activeSubWalletIndex = 0;
-            await chrome.storage.local.set({ multiWalletData: JSON.stringify(multiWalletData) });
-        }
+        await ExtensionMessaging.setActiveHierarchicalWallet(masterKeyId, 0);
 
         // Mark wallet for discovery BEFORE finalizing setup
         // This ensures the UI shows the loading spinner when it renders
@@ -1754,6 +1756,7 @@ async function handlePinConfirm() {
         
     } catch (error) {
         console.error('[Wizard] Error saving wallet:', error);
+        clearSensitiveState();
         const errorMessage = error instanceof Error ? error.message : 'Failed to create wallet';
         showError(errorMessage);
         if (pinContinueBtn) {
@@ -1838,9 +1841,11 @@ async function finalizeWalletSetup() {
 
         // Start auto-lock alarm
         await chrome.runtime.sendMessage({ type: 'START_AUTO_LOCK_ALARM' });
+        clearSensitiveState();
 
     } catch (error) {
         console.error('[Wizard] Error finalizing setup:', error);
+        clearSensitiveState();
         showError('Failed to open wallet');
         if (completeSetupBtn) {
             completeSetupBtn.disabled = false;
@@ -2076,6 +2081,10 @@ function checkImportComplete() {
         }
 
         allWords.push(word);
+    }
+
+    if (allValid && !bip39.validateMnemonic(allWords.join(' '))) {
+        allValid = false;
     }
 
     const importConfirmBtn = document.getElementById('import-confirm-btn') as HTMLButtonElement;
@@ -2591,8 +2600,7 @@ async function lockWallet() {
 
     // Clear sensitive data
     setCurrentBalance(0);
-    setSessionPin(null);
-    await chrome.storage.session.remove('walletSessionPin');
+    clearSensitiveState(true);
 
     // Show unlock screen
     showUnlockPrompt();
@@ -3281,7 +3289,6 @@ let lastWalletSwitchTime = 0;
  */
 window.addEventListener('hierarchical-wallet-switched', async (event: Event) => {
     const customEvent = event as CustomEvent<{
-        mnemonic: string;
         masterKeyId: string;
         subWalletIndex: number;
         masterKeyNickname: string;
@@ -3344,9 +3351,24 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
             setIsSDKInitialized(false);
         }
         
-        // Connect with new derived mnemonic
+        // Connect with derived mnemonic fetched from background
+        const pin = sessionPin;
+        if (!pin) {
+            throw new Error('Session expired. Please unlock again.');
+        }
+
+        const mnemonicResponse = await ExtensionMessaging.getHierarchicalWalletMnemonic(
+            customEvent.detail.masterKeyId,
+            customEvent.detail.subWalletIndex,
+            pin
+        );
+
+        if (!mnemonicResponse.success || !mnemonicResponse.data) {
+            throw new Error(mnemonicResponse.error || 'Failed to retrieve wallet mnemonic');
+        }
+
         console.log('🔄 [Popup] Connecting SDK with derived mnemonic...');
-        const sdk = await connectBreezSDK(customEvent.detail.mnemonic);
+        const sdk = await connectBreezSDK(mnemonicResponse.data);
         setBreezSDK(sdk);
         setIsSDKInitialized(true);
 

@@ -709,7 +709,6 @@ async function handleHierarchicalWalletSwitch(masterKeyId: string, subWalletInde
             // Dispatch custom event for popup.ts to handle SDK reconnection
             const event = new CustomEvent('hierarchical-wallet-switched', {
                 detail: {
-                    mnemonic: response.data.mnemonic,
                     masterKeyId: masterKeyId,
                     subWalletIndex: subWalletIndex,
                     masterKeyNickname: response.data.masterKeyNickname,

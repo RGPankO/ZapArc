@@ -1090,9 +1090,14 @@ export class WalletManager {
   ): Promise<{ masterKeyId: string; discoveredCount: number }> {
     console.log('WalletManager: Importing wallet...');
 
+    const normalizedMnemonic = mnemonic.trim().toLowerCase().split(/\s+/).join(' ');
+    if (!bip39.validateMnemonic(normalizedMnemonic)) {
+      throw new Error('Invalid mnemonic phrase. Please check and try again.');
+    }
+
     // Step 1: Add the master key
     onProgress?.('Creating master wallet...');
-    const masterKeyId = await this.addMasterKey(mnemonic, nickname, pin, false);
+    const masterKeyId = await this.addMasterKey(normalizedMnemonic, nickname, pin, false);
     console.log(`WalletManager: Master key created: ${masterKeyId}`);
 
     // NOTE: Sub-wallet discovery is disabled because Breez SDK WASM requires DOM access

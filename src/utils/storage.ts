@@ -18,6 +18,7 @@ import {
 } from '../types';
 
 import { deriveSubWalletMnemonic } from './mnemonic-derivation';
+import * as bip39 from 'bip39';
 
 /**
  * Generate a UUID v4 string
@@ -27,8 +28,26 @@ export function generateUUID(): string {
 }
 
 export class ChromeStorageManager {
+  // TODO(security): migrate legacy static salt usage to per-wallet random salts for all encryption paths.
+  // Keep current value for backward compatibility with existing encrypted wallets.
   private static readonly SALT = 'lightning-tipping-salt';
   private static readonly ITERATIONS = 100000;
+  private static _storageMutex: Promise<void> = Promise.resolve();
+
+  private static async withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
+    let release!: () => void;
+    const next = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const prev = ChromeStorageManager._storageMutex;
+    ChromeStorageManager._storageMutex = next;
+    await prev;
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
 
   /**
    * Encrypt and save wallet data using user PIN
@@ -662,7 +681,8 @@ export class ChromeStorageManager {
         new Uint8Array(encryptedData.data)
       );
 
-      return new TextDecoder().decode(decrypted);
+      const mnemonic = new TextDecoder().decode(decrypted);
+      return this.ensureValidBip39Mnemonic(mnemonic);
     } catch (error) {
       console.error('❌ [Storage] Mnemonic decryption failed', error);
       throw new Error('Failed to decrypt wallet mnemonic');
@@ -674,6 +694,18 @@ export class ChromeStorageManager {
    */
   private normalizeMnemonicForComparison(mnemonic: string): string {
     return mnemonic.trim().toLowerCase().split(/\s+/).join(' ');
+  }
+
+  private async withStorageLock<T>(fn: () => Promise<T>): Promise<T> {
+    return ChromeStorageManager.withStorageLock(fn);
+  }
+
+  private ensureValidBip39Mnemonic(mnemonic: string): string {
+    const normalized = this.normalizeMnemonicForComparison(mnemonic);
+    if (!bip39.validateMnemonic(normalized)) {
+      throw new Error('Invalid mnemonic phrase');
+    }
+    return normalized;
   }
 
   /**
@@ -783,9 +815,11 @@ export class ChromeStorageManager {
       };
 
       // Save to storage
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(multiWalletData),
-        walletVersion: 1
+      await this.withStorageLock(async () => {
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(multiWalletData),
+          walletVersion: 1
+        });
       });
 
       console.log('✅ [Storage] SAVE_WALLETS SUCCESS', {
@@ -866,29 +900,31 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] SET_ACTIVE_WALLET', { id });
 
     try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
+      await this.withStorageLock(async () => {
+        const result = await chrome.storage.local.get(['multiWalletData']);
 
-      if (!result.multiWalletData) {
-        throw new Error('No multi-wallet data found');
-      }
+        if (!result.multiWalletData) {
+          throw new Error('No multi-wallet data found');
+        }
 
-      const multiWalletData: MultiWalletStorage = JSON.parse(result.multiWalletData);
+        const multiWalletData: MultiWalletStorage = JSON.parse(result.multiWalletData);
 
-      // Validate wallet ID exists
-      const wallet = multiWalletData.wallets.find(w => w.metadata.id === id);
-      if (!wallet) {
-        throw new Error(`Wallet with ID ${id} not found`);
-      }
+        // Validate wallet ID exists
+        const wallet = multiWalletData.wallets.find(w => w.metadata.id === id);
+        if (!wallet) {
+          throw new Error(`Wallet with ID ${id} not found`);
+        }
 
-      // Update active wallet ID and lastUsedAt
-      multiWalletData.activeWalletId = id;
-      wallet.metadata.lastUsedAt = Date.now();
+        // Update active wallet ID and lastUsedAt
+        multiWalletData.activeWalletId = id;
+        wallet.metadata.lastUsedAt = Date.now();
 
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(multiWalletData)
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(multiWalletData)
+        });
+
+        console.log('✅ [Storage] SET_ACTIVE_WALLET SUCCESS', { id });
       });
-
-      console.log('✅ [Storage] SET_ACTIVE_WALLET SUCCESS', { id });
     } catch (error) {
       console.error('❌ [Storage] SET_ACTIVE_WALLET FAILED', error);
       throw error;
@@ -903,52 +939,56 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] ADD_WALLET', { nickname });
 
     try {
-      // Load existing wallets or initialize empty array
-      const result = await chrome.storage.local.get(['multiWalletData', 'walletVersion']);
+      const normalizedMnemonic = this.ensureValidBip39Mnemonic(wallet.mnemonic);
 
-      // Each wallet can have its own PIN - no need to verify against existing wallets
-      console.log('✅ [Storage] ADD_WALLET - Adding wallet with its own PIN');
+      return await this.withStorageLock(async () => {
+        // Load existing wallets or initialize empty array
+        const result = await chrome.storage.local.get(['multiWalletData', 'walletVersion']);
 
-      // Generate new wallet entry
-      const walletId = generateUUID();
-      const encryptedMnemonic = await this.encryptMnemonic(wallet.mnemonic, pin);
+        // Each wallet can have its own PIN - no need to verify against existing wallets
+        console.log('✅ [Storage] ADD_WALLET - Adding wallet with its own PIN');
 
-      const newWallet: EncryptedWalletEntry = {
-        metadata: {
-          id: walletId,
-          nickname,
-          createdAt: Date.now(),
-          lastUsedAt: Date.now()
-        },
-        encryptedMnemonic
-      };
+        // Generate new wallet entry
+        const walletId = generateUUID();
+        const encryptedMnemonic = await this.encryptMnemonic(normalizedMnemonic, pin);
 
-      let multiWalletData: MultiWalletStorage;
-
-      if (result.multiWalletData) {
-        multiWalletData = JSON.parse(result.multiWalletData);
-        multiWalletData.wallets.push(newWallet);
-        multiWalletData.walletOrder.push(walletId);
-      } else {
-        // First wallet in multi-wallet structure
-        multiWalletData = {
-          wallets: [newWallet],
-          activeWalletId: walletId,
-          walletOrder: [walletId],
-          version: 1
+        const newWallet: EncryptedWalletEntry = {
+          metadata: {
+            id: walletId,
+            nickname,
+            createdAt: Date.now(),
+            lastUsedAt: Date.now()
+          },
+          encryptedMnemonic
         };
-      }
 
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(multiWalletData),
-        walletVersion: 1
+        let multiWalletData: MultiWalletStorage;
+
+        if (result.multiWalletData) {
+          multiWalletData = JSON.parse(result.multiWalletData);
+          multiWalletData.wallets.push(newWallet);
+          multiWalletData.walletOrder.push(walletId);
+        } else {
+          // First wallet in multi-wallet structure
+          multiWalletData = {
+            wallets: [newWallet],
+            activeWalletId: walletId,
+            walletOrder: [walletId],
+            version: 1
+          };
+        }
+
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(multiWalletData),
+          walletVersion: 1
+        });
+
+        // Verify post-storage round-trip
+        await this.verifyStoredMnemonicRoundTrip(walletId, normalizedMnemonic, pin);
+
+        console.log('✅ [Storage] ADD_WALLET SUCCESS', { walletId, nickname });
+        return walletId;
       });
-
-      // Verify post-storage round-trip
-      await this.verifyStoredMnemonicRoundTrip(walletId, wallet.mnemonic, pin);
-
-      console.log('✅ [Storage] ADD_WALLET SUCCESS', { walletId, nickname });
-      return walletId;
     } catch (error) {
       console.error('❌ [Storage] ADD_WALLET FAILED', error);
       throw error;
@@ -963,42 +1003,44 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] REMOVE_WALLET', { id });
 
     try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
+      await this.withStorageLock(async () => {
+        const result = await chrome.storage.local.get(['multiWalletData']);
 
-      if (!result.multiWalletData) {
-        throw new Error('No multi-wallet data found');
-      }
+        if (!result.multiWalletData) {
+          throw new Error('No multi-wallet data found');
+        }
 
-      const multiWalletData: MultiWalletStorage = JSON.parse(result.multiWalletData);
+        const multiWalletData: MultiWalletStorage = JSON.parse(result.multiWalletData);
 
-      // Prevent removing the last wallet
-      if (multiWalletData.wallets.length === 1) {
-        throw new Error('Cannot remove the last wallet. Use deleteAllWallets() instead.');
-      }
+        // Prevent removing the last wallet
+        if (multiWalletData.wallets.length === 1) {
+          throw new Error('Cannot remove the last wallet. Use deleteAllWallets() instead.');
+        }
 
-      // Find and remove the wallet
-      const walletIndex = multiWalletData.wallets.findIndex(w => w.metadata.id === id);
-      if (walletIndex === -1) {
-        throw new Error(`Wallet with ID ${id} not found`);
-      }
+        // Find and remove the wallet
+        const walletIndex = multiWalletData.wallets.findIndex(w => w.metadata.id === id);
+        if (walletIndex === -1) {
+          throw new Error(`Wallet with ID ${id} not found`);
+        }
 
-      multiWalletData.wallets.splice(walletIndex, 1);
-      multiWalletData.walletOrder = multiWalletData.walletOrder.filter(wId => wId !== id);
+        multiWalletData.wallets.splice(walletIndex, 1);
+        multiWalletData.walletOrder = multiWalletData.walletOrder.filter(wId => wId !== id);
 
-      // If removing active wallet, switch to first remaining wallet
-      if (multiWalletData.activeWalletId === id) {
-        multiWalletData.activeWalletId = multiWalletData.wallets[0].metadata.id;
-        multiWalletData.wallets[0].metadata.lastUsedAt = Date.now();
-        console.log('⚠️ [Storage] Removed active wallet, switched to', {
-          newActiveId: multiWalletData.activeWalletId
+        // If removing active wallet, switch to first remaining wallet
+        if (multiWalletData.activeWalletId === id) {
+          multiWalletData.activeWalletId = multiWalletData.wallets[0].metadata.id;
+          multiWalletData.wallets[0].metadata.lastUsedAt = Date.now();
+          console.log('⚠️ [Storage] Removed active wallet, switched to', {
+            newActiveId: multiWalletData.activeWalletId
+          });
+        }
+
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(multiWalletData)
         });
-      }
 
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(multiWalletData)
+        console.log('✅ [Storage] REMOVE_WALLET SUCCESS', { id });
       });
-
-      console.log('✅ [Storage] REMOVE_WALLET SUCCESS', { id });
     } catch (error) {
       console.error('❌ [Storage] REMOVE_WALLET FAILED', error);
       throw error;
@@ -1456,10 +1498,12 @@ export class ChromeStorageManager {
   ): Promise<string> {
     console.log('🔵 [Storage] ADD_MASTER_KEY', { nickname });
 
+    const normalizedMnemonic = this.ensureValidBip39Mnemonic(mnemonic);
+
     // addMasterKey now delegates to addWallet for consistency
     // Sub-wallets are added separately via addSubWallet
     const walletData: WalletData = {
-      mnemonic,
+      mnemonic: normalizedMnemonic,
       balance: 0,
       transactions: []
     };
@@ -1467,7 +1511,7 @@ export class ChromeStorageManager {
     const walletId = await this.addWallet(walletData, nickname, pin);
 
     // Explicit verification for master key storage path
-    await this.verifyStoredMnemonicRoundTrip(walletId, mnemonic, pin);
+    await this.verifyStoredMnemonicRoundTrip(walletId, normalizedMnemonic, pin);
 
     return walletId;
   }
@@ -1480,6 +1524,7 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] ADD_SUB_WALLET', { masterKeyId, nickname });
 
     try {
+      return await this.withStorageLock(async () => {
       const result = await chrome.storage.local.get(['multiWalletData']);
       
       if (!result.multiWalletData) {
@@ -1538,6 +1583,7 @@ export class ChromeStorageManager {
 
       console.log('✅ [Storage] ADD_SUB_WALLET SUCCESS', { masterKeyId, index: nextIndex, nickname });
       return nextIndex;
+      });
     } catch (error) {
       console.error('❌ [Storage] ADD_SUB_WALLET FAILED', error);
       throw error;
@@ -1551,6 +1597,7 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] REMOVE_MASTER_KEY', { masterKeyId });
 
     try {
+      await this.withStorageLock(async () => {
       const result = await chrome.storage.local.get(['multiWalletData']);
 
       if (!result.multiWalletData) {
@@ -1586,6 +1633,7 @@ export class ChromeStorageManager {
       });
 
       console.log('✅ [Storage] REMOVE_MASTER_KEY SUCCESS', { masterKeyId });
+      });
     } catch (error) {
       console.error('❌ [Storage] REMOVE_MASTER_KEY FAILED', error);
       throw error;
@@ -1652,6 +1700,7 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] SET_ACTIVE_HIERARCHICAL_WALLET', { masterKeyId, subWalletIndex });
 
     try {
+      await this.withStorageLock(async () => {
       const result = await chrome.storage.local.get(['multiWalletData']);
 
       if (!result.multiWalletData) {
@@ -1690,6 +1739,7 @@ export class ChromeStorageManager {
       });
 
       console.log('✅ [Storage] SET_ACTIVE_HIERARCHICAL_WALLET SUCCESS', { masterKeyId, subWalletIndex });
+      });
     } catch (error) {
       console.error('❌ [Storage] SET_ACTIVE_HIERARCHICAL_WALLET FAILED', error);
       throw error;
@@ -1847,26 +1897,28 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] RENAME_MASTER_KEY', { masterKeyId, newNickname });
 
     try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
+      await this.withStorageLock(async () => {
+        const result = await chrome.storage.local.get(['multiWalletData']);
 
-      if (!result.multiWalletData) {
-        throw new Error('No wallet data found');
-      }
+        if (!result.multiWalletData) {
+          throw new Error('No wallet data found');
+        }
 
-      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
-      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+        const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+        const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
 
-      if (!wallet) {
-        throw new Error(`Wallet ${masterKeyId} not found`);
-      }
+        if (!wallet) {
+          throw new Error(`Wallet ${masterKeyId} not found`);
+        }
 
-      wallet.metadata.nickname = newNickname;
+        wallet.metadata.nickname = newNickname;
 
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(data)
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(data)
+        });
+
+        console.log('✅ [Storage] RENAME_MASTER_KEY SUCCESS');
       });
-
-      console.log('✅ [Storage] RENAME_MASTER_KEY SUCCESS');
     } catch (error) {
       console.error('❌ [Storage] RENAME_MASTER_KEY FAILED', error);
       throw error;
@@ -1880,35 +1932,37 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] RENAME_SUB_WALLET', { masterKeyId, subWalletIndex, newNickname });
 
     try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
+      await this.withStorageLock(async () => {
+        const result = await chrome.storage.local.get(['multiWalletData']);
 
-      if (!result.multiWalletData) {
-        throw new Error('No wallet data found');
-      }
+        if (!result.multiWalletData) {
+          throw new Error('No wallet data found');
+        }
 
-      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
-      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+        const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+        const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
 
-      if (!wallet) {
-        throw new Error(`Wallet ${masterKeyId} not found`);
-      }
+        if (!wallet) {
+          throw new Error(`Wallet ${masterKeyId} not found`);
+        }
 
-      if (!wallet.subWallets) {
-        throw new Error('Wallet has no sub-wallets');
-      }
+        if (!wallet.subWallets) {
+          throw new Error('Wallet has no sub-wallets');
+        }
 
-      const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
-      if (!subWallet) {
-        throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
-      }
+        const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
+        if (!subWallet) {
+          throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+        }
 
-      subWallet.nickname = newNickname;
+        subWallet.nickname = newNickname;
 
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(data)
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(data)
+        });
+
+        console.log('✅ [Storage] RENAME_SUB_WALLET SUCCESS');
       });
-
-      console.log('✅ [Storage] RENAME_SUB_WALLET SUCCESS');
     } catch (error) {
       console.error('❌ [Storage] RENAME_SUB_WALLET FAILED', error);
       throw error;
@@ -1923,35 +1977,37 @@ export class ChromeStorageManager {
     console.log('🔵 [Storage] UPDATE_SUB_WALLET_ACTIVITY', { masterKeyId, subWalletIndex, hasActivity });
 
     try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
+      await this.withStorageLock(async () => {
+        const result = await chrome.storage.local.get(['multiWalletData']);
 
-      if (!result.multiWalletData) {
-        throw new Error('No wallet data found');
-      }
+        if (!result.multiWalletData) {
+          throw new Error('No wallet data found');
+        }
 
-      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
-      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+        const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+        const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
 
-      if (!wallet) {
-        throw new Error(`Wallet ${masterKeyId} not found`);
-      }
+        if (!wallet) {
+          throw new Error(`Wallet ${masterKeyId} not found`);
+        }
 
-      if (!wallet.subWallets) {
-        throw new Error('Wallet has no sub-wallets');
-      }
+        if (!wallet.subWallets) {
+          throw new Error('Wallet has no sub-wallets');
+        }
 
-      const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
-      if (!subWallet) {
-        throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
-      }
+        const subWallet = wallet.subWallets.find(sw => sw.index === subWalletIndex);
+        if (!subWallet) {
+          throw new Error(`Sub-wallet with index ${subWalletIndex} not found`);
+        }
 
-      subWallet.hasActivity = hasActivity;
+        subWallet.hasActivity = hasActivity;
 
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(data)
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(data)
+        });
+
+        console.log('✅ [Storage] UPDATE_SUB_WALLET_ACTIVITY SUCCESS');
       });
-
-      console.log('✅ [Storage] UPDATE_SUB_WALLET_ACTIVITY SUCCESS');
     } catch (error) {
       console.error('❌ [Storage] UPDATE_SUB_WALLET_ACTIVITY FAILED', error);
       throw error;
@@ -1963,20 +2019,22 @@ export class ChromeStorageManager {
    */
   async toggleMasterKeyExpanded(masterKeyId: string): Promise<void> {
     try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
+      await this.withStorageLock(async () => {
+        const result = await chrome.storage.local.get(['multiWalletData']);
 
-      if (!result.multiWalletData) return;
+        if (!result.multiWalletData) return;
 
-      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
-      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
+        const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+        const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
 
-      if (wallet) {
-        wallet.isExpanded = !wallet.isExpanded;
+        if (wallet) {
+          wallet.isExpanded = !wallet.isExpanded;
 
-        await chrome.storage.local.set({
-          multiWalletData: JSON.stringify(data)
-        });
-      }
+          await chrome.storage.local.set({
+            multiWalletData: JSON.stringify(data)
+          });
+        }
+      });
     } catch (error) {
       console.error('❌ [Storage] TOGGLE_MASTER_KEY_EXPANDED FAILED', error);
     }
@@ -1999,51 +2057,53 @@ export class ChromeStorageManager {
     });
 
     try {
-      const result = await chrome.storage.local.get(['multiWalletData']);
+      await this.withStorageLock(async () => {
+        const result = await chrome.storage.local.get(['multiWalletData']);
 
-      if (!result.multiWalletData) {
-        throw new Error('No wallet data found');
-      }
-
-      const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
-      const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
-
-      if (!wallet) {
-        throw new Error(`Wallet ${masterKeyId} not found`);
-      }
-
-      // Initialize subWallets array if it doesn't exist
-      if (!wallet.subWallets) {
-        wallet.subWallets = [];
-      }
-
-      const now = Date.now();
-
-      // Add each discovered sub-wallet if it doesn't already exist
-      for (const sw of subWallets) {
-        const exists = wallet.subWallets.some(existing => existing.index === sw.index);
-        if (!exists) {
-          wallet.subWallets.push({
-            index: sw.index,
-            nickname: sw.nickname,
-            createdAt: now,
-            lastUsedAt: now
-          });
-          console.log(`[Storage] Added discovered sub-wallet: index=${sw.index}, name="${sw.nickname}"`);
-        } else {
-          console.log(`[Storage] Sub-wallet index ${sw.index} already exists, skipping`);
+        if (!result.multiWalletData) {
+          throw new Error('No wallet data found');
         }
-      }
 
-      // Sort sub-wallets by index
-      wallet.subWallets.sort((a, b) => a.index - b.index);
+        const data: MultiWalletStorage = JSON.parse(result.multiWalletData);
+        const wallet = data.wallets.find(w => w.metadata.id === masterKeyId);
 
-      await chrome.storage.local.set({
-        multiWalletData: JSON.stringify(data)
-      });
+        if (!wallet) {
+          throw new Error(`Wallet ${masterKeyId} not found`);
+        }
 
-      console.log('✅ [Storage] ADD_DISCOVERED_SUB_WALLETS SUCCESS', {
-        totalSubWallets: wallet.subWallets.length
+        // Initialize subWallets array if it doesn't exist
+        if (!wallet.subWallets) {
+          wallet.subWallets = [];
+        }
+
+        const now = Date.now();
+
+        // Add each discovered sub-wallet if it doesn't already exist
+        for (const sw of subWallets) {
+          const exists = wallet.subWallets.some(existing => existing.index === sw.index);
+          if (!exists) {
+            wallet.subWallets.push({
+              index: sw.index,
+              nickname: sw.nickname,
+              createdAt: now,
+              lastUsedAt: now
+            });
+            console.log(`[Storage] Added discovered sub-wallet: index=${sw.index}, name="${sw.nickname}"`);
+          } else {
+            console.log(`[Storage] Sub-wallet index ${sw.index} already exists, skipping`);
+          }
+        }
+
+        // Sort sub-wallets by index
+        wallet.subWallets.sort((a, b) => a.index - b.index);
+
+        await chrome.storage.local.set({
+          multiWalletData: JSON.stringify(data)
+        });
+
+        console.log('✅ [Storage] ADD_DISCOVERED_SUB_WALLETS SUCCESS', {
+          totalSubWallets: wallet.subWallets.length
+        });
       });
     } catch (error) {
       console.error('❌ [Storage] ADD_DISCOVERED_SUB_WALLETS FAILED', error);

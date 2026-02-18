@@ -183,6 +183,13 @@ export function setSessionPin(pin: string | null): void {
     sessionPin = pin;
 }
 
+export function clearSensitiveWizardState(): void {
+    generatedMnemonic = '';
+    mnemonicWords = [];
+    selectedWords = [];
+    userPin = '';
+}
+
 export function setEventListenersSetup(setup: boolean): void {
     eventListenersSetup = setup;
 }

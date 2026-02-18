@@ -421,11 +421,28 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
 
       case 'GET_MASTER_MNEMONIC':
         try {
+          const lockout = await storageManager.checkPinLockout();
+          if (lockout.locked) {
+            sendResponse({
+              success: false,
+              error: `Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.`
+            });
+            break;
+          }
+
           const masterMnemonic = await storageManager.getMasterKeyMnemonic(message.masterKeyId, message.pin);
+          await storageManager.resetPinAttempts();
           sendResponse({ success: true, data: { mnemonic: masterMnemonic } });
         } catch (error) {
+          await storageManager.recordFailedPin();
+          const updatedLockout = await storageManager.checkPinLockout();
           console.error('[Background] GET_MASTER_MNEMONIC failed:', error);
-          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to get mnemonic' });
+          sendResponse({
+            success: false,
+            error: updatedLockout.locked
+              ? `Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`
+              : (error instanceof Error ? error.message : 'Failed to get mnemonic')
+          });
         }
         break;
 
@@ -972,18 +989,32 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           }
           console.log('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC');
 
+          const lockout = await storageManager.checkPinLockout();
+          if (lockout.locked) {
+            sendResponse({
+              success: false,
+              error: `Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.`
+            });
+            break;
+          }
+
           const mnemonic = await walletManager.getHierarchicalWalletMnemonic(
             masterKeyId,
             subWalletIndex,
             pin
           );
 
+          await storageManager.resetPinAttempts();
           sendResponse({ success: true, data: mnemonic });
         } catch (error) {
+          await storageManager.recordFailedPin();
+          const updatedLockout = await storageManager.checkPinLockout();
           console.error('[Background] GET_HIERARCHICAL_WALLET_MNEMONIC - Failed:', error);
           sendResponse({
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to get wallet mnemonic'
+            error: updatedLockout.locked
+              ? `Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`
+              : (error instanceof Error ? error.message : 'Failed to get wallet mnemonic')
           });
         }
         break;
@@ -1130,14 +1161,32 @@ async function handleMessage(message: any, sender: any, sendResponse: (response:
           }
           console.log('[Background] VERIFY_ARCHIVED_WALLET_PIN', { masterKeyId });
 
+          const lockout = await storageManager.checkPinLockout();
+          if (lockout.locked) {
+            sendResponse({
+              success: false,
+              error: `Too many failed attempts. Try again in ${formatLockoutDuration(lockout.remainingMs || 0)}.`
+            });
+            break;
+          }
+
           const isValid = await storageManager.verifyArchivedWalletPin(masterKeyId, pin);
+          if (!isValid) {
+            await storageManager.recordFailedPin();
+          } else {
+            await storageManager.resetPinAttempts();
+          }
           console.log('[Background] VERIFY_ARCHIVED_WALLET_PIN - Result:', isValid);
           sendResponse({ success: true, data: isValid });
         } catch (error) {
+          await storageManager.recordFailedPin();
+          const updatedLockout = await storageManager.checkPinLockout();
           console.error('[Background] VERIFY_ARCHIVED_WALLET_PIN - Failed:', error);
           sendResponse({
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to verify PIN'
+            error: updatedLockout.locked
+              ? `Too many failed attempts. Try again in ${formatLockoutDuration(updatedLockout.remainingMs || 0)}.`
+              : (error instanceof Error ? error.message : 'Failed to verify PIN')
           });
         }
         break;
