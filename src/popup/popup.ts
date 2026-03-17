@@ -438,6 +438,24 @@ async function loadTransactionHistory() {
             return;
         }
 
+        // Show cached transactions instantly while SDK fetches fresh data
+        try {
+            const mwResult = await chrome.storage.local.get(['multiWalletData']);
+            if (mwResult.multiWalletData) {
+                const mwd = JSON.parse(mwResult.multiWalletData);
+                const wid = mwd.activeWalletId;
+                if (wid) {
+                    const txCacheKey = `cachedTransactions_${wid}`;
+                    const cachedData = await chrome.storage.local.get([txCacheKey]);
+                    const cached = cachedData[txCacheKey];
+                    if (cached && cached.length > 0 && storedTransactions.length === 0) {
+                        storedTransactions = cached as StoredTransaction[];
+                        renderTransactionList(transactionList, storedTransactions.slice(0, 5));
+                    }
+                }
+            }
+        } catch (e) { /* ignore cache errors */ }
+
         // Get payments from SDK
         const response = await breezSDK.listPayments({});
         const payments = response?.payments || [];

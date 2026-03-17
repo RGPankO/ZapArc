@@ -35,7 +35,7 @@ import {
 import type { MasterKeyMetadata, SubWalletEntry } from '../types';
 import { connectBreezSDK, discoverSubWalletsInPopup } from './sdk';
 import { showError, showSuccess, showInfo, showNotification } from './notifications';
-import { clearWalletDisplay } from './ui-helpers';
+import { clearWalletDisplay, showTransactionsLoading } from './ui-helpers';
 
 // Track which wallets are currently being discovered
 const walletsBeingDiscovered = new Set<string>();
@@ -869,6 +869,7 @@ export async function handleWalletSwitch(walletId: string): Promise<void> {
 
         // Clear old wallet data BEFORE connecting to new wallet
         clearWalletDisplay();
+        showTransactionsLoading();
 
         // Connect new SDK and store in state
         console.log('[Multi-Wallet] Connecting to new wallet SDK');
