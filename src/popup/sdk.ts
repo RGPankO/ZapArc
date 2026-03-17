@@ -170,7 +170,7 @@ export async function checkWalletHasTransactions(
         
         tempSdk = await connect({
             config: config,
-            mnemonic: mnemonic,
+            seed: { type: 'mnemonic', mnemonic: mnemonic },
             storageDir: storageDir
         });
 
@@ -200,7 +200,7 @@ export async function checkWalletHasTransactions(
                     // Check balance
                     const info = await tempSdk.getInfo({ ensureSynced: false });
                     const currentBalance = info.balanceSats || 0;
-                    const hasNodeId = !!info.id;
+                    const hasNodeId = !!info.identityPubkey;
 
                     if (currentBalance > 0) {
                          console.log('[Popup-SDK] Fast track: Found balance before sync complete');
@@ -257,7 +257,7 @@ export async function checkWalletHasTransactions(
             
             console.log('[Popup-SDK] Wallet info:', {
                 balance: balanceSats,
-                nodeId: info.id?.substring(0, 16) + '...'
+                nodeId: info.identityPubkey?.substring(0, 16) + '...'
             });
 
             if (balanceSats > 0) {
@@ -392,12 +392,12 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
         // Connect request
         const connectRequest: ConnectRequest = {
             config: config,
-            mnemonic: mnemonic,
+            seed: { type: 'mnemonic', mnemonic: mnemonic },
             storageDir: 'breez-sdk-tipmaster'  // IndexedDB database name
         };
         console.log('🔍 [Popup-SDK] ConnectRequest prepared', {
             storageDir: connectRequest.storageDir,
-            hasMnemonic: !!connectRequest.mnemonic
+            hasSeed: !!connectRequest.seed
         });
 
         console.log('🔍 [Popup-SDK] Calling Breez SDK connect()...');
@@ -428,16 +428,20 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
                 } else if (event.type === 'paymentSucceeded') {
                     console.log('💰 [Breez-SDK] Payment received');
                     eventCallbacks.onPaymentReceived?.();
-                } else if (event.type === 'claimDepositsSucceeded') {
+                } else if (event.type === 'claimedDeposits') {
                     console.log('✅ [Breez-SDK] Deposit claims succeeded');
                     showSuccess('✅ Deposit claimed successfully');
                     eventCallbacks.onDepositClaimed?.();
-                } else if (event.type === 'claimDepositsFailed') {
+                } else if (event.type === 'unclaimedDeposits') {
                     const unclaimed = event.unclaimedDeposits || [];
-                    console.warn(`⚠️ [Breez-SDK] Deposit claim failed for ${unclaimed.length} deposits, retrying...`);
+                    console.warn(`⚠️ [Breez-SDK] ${unclaimed.length} unclaimed deposits found, claiming...`);
                     for (const deposit of unclaimed) {
                         void claimSingleDeposit(sdk, deposit.txid, deposit.vout);
                     }
+                } else if (event.type === 'paymentFailed') {
+                    console.warn('❌ [Breez-SDK] Payment failed:', (event as any).payment?.id);
+                } else if (event.type === 'paymentPending') {
+                    console.log('⏳ [Breez-SDK] Payment pending:', (event as any).payment?.id);
                 }
             }
         });

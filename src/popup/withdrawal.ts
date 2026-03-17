@@ -1,14 +1,14 @@
 // Withdrawal Interface
 // Handles Lightning + On-chain send flows
 
-// @ts-ignore - parse function exists but TypeScript can't find it in re-exports
-import { parse as parseInput } from '@breeztech/breez-sdk-spark/web';
+// parse is now a method on the SDK instance, not a standalone export
 import {
     breezSDK,
     currentBalance,
     preparedPayment,
     setPreparedPayment
 } from './state';
+import { isExistingContact, openContactModalWithAddress } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { triggerPaymentNotification, extractPubkeyFromParsedInvoice } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
@@ -266,12 +266,12 @@ async function autoFetchOnchainFees(address: string, amount: number): Promise<vo
     try {
         const prepared = await breezSDK.prepareSendPayment({
             paymentRequest: address,
-            amountSats: amount
+            amount: BigInt(amount)
         });
 
         onchainPreparedBySpeed = { fast: prepared, medium: prepared, slow: prepared };
 
-        const feeQuote = prepared?.paymentMethod?.feeQuote;
+        const feeQuote = (prepared?.paymentMethod as any)?.feeQuote;
         const speedMap = { fast: feeQuote?.speedFast, medium: feeQuote?.speedMedium, slow: feeQuote?.speedSlow } as const;
 
         for (const speed of ['fast', 'medium', 'slow'] as const) {
@@ -322,14 +322,14 @@ async function previewOnchainPayment(): Promise<void> {
         // Single prepare call — SDK returns fee quotes for all 3 speeds
         const prepared = await breezSDK.prepareSendPayment({
             paymentRequest: address,
-            amountSats: amount
+            amount: BigInt(amount)
         });
 
         // Store the same prepared response for all speeds (fee selection happens at send time)
         onchainPreparedBySpeed = { fast: prepared, medium: prepared, slow: prepared };
 
         // Extract per-speed fees from feeQuote
-        const feeQuote = prepared?.paymentMethod?.feeQuote;
+        const feeQuote = (prepared?.paymentMethod as any)?.feeQuote;
         const speedMap = { fast: feeQuote?.speedFast, medium: feeQuote?.speedMedium, slow: feeQuote?.speedSlow } as const;
 
         for (const speed of ['fast', 'medium', 'slow'] as const) {
@@ -358,7 +358,7 @@ function updateOnchainPreviewFromSelection(): void {
 
     if (!prepared || !previewDiv || !sendBtn) return;
 
-    const feeQuote = prepared?.paymentMethod?.feeQuote;
+    const feeQuote = (prepared?.paymentMethod as any)?.feeQuote;
     const speedKey = onchainSelectedSpeed === 'fast' ? 'speedFast' : onchainSelectedSpeed === 'slow' ? 'speedSlow' : 'speedMedium';
     const feeSats = Number(feeQuote?.[speedKey]?.userFeeSat ?? 0);
     const total = amount + feeSats;
@@ -406,14 +406,17 @@ export async function previewPayment(): Promise<void> {
         if (isInvoice) {
             const prepared = await breezSDK.prepareSendPayment({
                 paymentRequest: input,
-                amountSats: amount > 0 ? amount : undefined
+                amount: amount > 0 ? BigInt(amount) : undefined
             });
 
             setPreparedPayment(prepared);
+            const prepFee = prepared.paymentMethod?.type === 'bolt11Invoice' 
+                ? Number(prepared.paymentMethod.lightningFeeSats || 0) 
+                : 0;
             displayPaymentPreview({
                 recipient: 'Lightning Payment',
-                amount: prepared.amountSats || amount || 0,
-                fee: prepared.paymentMethod?.lightningFeeSats || 0,
+                amount: Number(prepared.amount || 0) || amount || 0,
+                fee: prepFee,
                 type: 'bolt11',
                 prepareResponse: prepared
             });
@@ -424,7 +427,7 @@ export async function previewPayment(): Promise<void> {
                 lnurlInput = `https://${domain}/.well-known/lnurlp/${username}`;
             }
 
-            const parsed = await parseInput(lnurlInput);
+            const parsed = await breezSDK.parse(lnurlInput);
             if (parsed.type !== 'lnurlPay' && parsed.type !== 'lightningAddress') {
                 throw new Error(`Unsupported input type: ${parsed.type}`);
             }
@@ -515,10 +518,22 @@ export async function sendPayment(): Promise<void> {
             return;
         }
 
-        const isLnurlPayment = preparedPayment && 'feeSats' in preparedPayment && !('paymentMethod' in preparedPayment);
+        const isLnurlPayment = preparedPayment && 'feeSats' in preparedPayment && 'payRequest' in preparedPayment;
+        let result: any;
+        let sendResult: any;
 
         if (isLnurlPayment) {
-            const result = await breezSDK.lnurlPay({ prepareResponse: preparedPayment });
+            result = await breezSDK.lnurlPay({ prepareResponse: preparedPayment });
+
+            // Validate payment actually succeeded
+            console.log('📤 [Withdrawal] lnurlPay response:', JSON.stringify(result, (_, v) => typeof v === 'bigint' ? v.toString() : v).slice(0, 500));
+            const lnurlPaymentStatus = result?.payment?.status;
+            if (lnurlPaymentStatus) {
+                const statusStr = typeof lnurlPaymentStatus === 'string' ? lnurlPaymentStatus : (lnurlPaymentStatus as any)?.tag || '';
+                if (/fail|error/i.test(statusStr)) {
+                    throw new Error(`Payment failed: ${statusStr}`);
+                }
+            }
 
             try {
                 let recipientPubkey: string | undefined;
@@ -538,7 +553,17 @@ export async function sendPayment(): Promise<void> {
                 }
             } catch {}
         } else {
-            await breezSDK.sendPayment({ prepareResponse: preparedPayment });
+            sendResult = await breezSDK.sendPayment({ prepareResponse: preparedPayment });
+
+            // Validate payment actually succeeded
+            console.log('📤 [Withdrawal] sendPayment response:', JSON.stringify(sendResult, (_, v) => typeof v === 'bigint' ? v.toString() : v).slice(0, 500));
+            const sendPaymentStatus = sendResult?.payment?.status;
+            if (sendPaymentStatus) {
+                const statusStr = typeof sendPaymentStatus === 'string' ? sendPaymentStatus : sendPaymentStatus?.tag || '';
+                if (/fail|error/i.test(statusStr)) {
+                    throw new Error(`Payment failed: ${statusStr}`);
+                }
+            }
         }
 
         setPreparedPayment(null);
@@ -547,7 +572,7 @@ export async function sendPayment(): Promise<void> {
             const input = paymentInput.value.trim();
             const isInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
             if (isInvoice && breezSDK) {
-                const parsed = await parseInput(input);
+                const parsed = await breezSDK.parse(input);
                 const destPubkey = extractPubkeyFromParsedInvoice(parsed);
                 if (destPubkey) {
                     const amountEl = document.getElementById('preview-amount');
@@ -560,15 +585,56 @@ export async function sendPayment(): Promise<void> {
 
         document.querySelectorAll('.confirm-dialog-overlay').forEach(el => el.remove());
 
-        if (statusText) {
-            statusText.textContent = '✅ Payment sent successfully!';
-            statusText.className = 'status-indicator success';
-        }
+        // Check if the payment is still pending (may not have actually settled)
+        const finalStatus = isLnurlPayment
+            ? result?.payment?.status
+            : sendResult?.payment?.status;
+        const isPending = typeof finalStatus === 'string' && finalStatus === 'pending';
 
-        showSuccess('Payment sent successfully!');
+        if (isPending) {
+            if (statusText) {
+                statusText.textContent = '⏳ Payment is processing. Check transaction history for final status.';
+                statusText.className = 'status-indicator warning';
+            }
+            showSuccess('Payment submitted — check history for confirmation.');
+        } else {
+            if (statusText) {
+                statusText.textContent = '✅ Payment sent successfully!';
+                statusText.className = 'status-indicator success';
+            }
+            showSuccess('Payment sent successfully!');
+        }
         await callbacks?.updateBalanceDisplay();
         await callbacks?.loadTransactionHistory();
-        setTimeout(() => hideWithdrawInterface(), 1500);
+
+        // Offer to save recipient as contact (only for LNURL/lightning address payments)
+        const recipientInput = document.getElementById('payment-input') as HTMLTextAreaElement;
+        const recipientAddress = recipientInput?.value?.trim() || '';
+        if (recipientAddress.includes('@') && !isPending) {
+            try {
+                const alreadySaved = await isExistingContact(recipientAddress);
+                if (!alreadySaved) {
+                    setTimeout(() => {
+                        if (statusText) {
+                            statusText.innerHTML = `✅ Payment sent! <a href="#" id="save-contact-link" style="color: var(--brand, #FFC107); text-decoration: underline; cursor: pointer;">Save as contact?</a>`;
+                            document.getElementById('save-contact-link')?.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                openContactModalWithAddress(recipientAddress);
+                            });
+                        }
+                    }, 100);
+                    // Don't auto-hide, let user see the save prompt
+                    setTimeout(() => hideWithdrawInterface(), 5000);
+                } else {
+                    setTimeout(() => hideWithdrawInterface(), 1500);
+                }
+            } catch {
+                setTimeout(() => hideWithdrawInterface(), 1500);
+            }
+        } else {
+            setTimeout(() => hideWithdrawInterface(), 1500);
+        }
+
         // Retry in case tx doesn't appear immediately
         for (const delayMs of [2000, 5000]) {
             setTimeout(async () => {

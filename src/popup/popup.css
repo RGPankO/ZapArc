@@ -831,6 +831,8 @@ header h1 {
 .transaction-list {
   max-height: 180px;
   overflow-y: auto;
+  margin: 0 -8px;
+  padding: 0 0;
 }
 
 .no-transactions {
@@ -959,9 +961,10 @@ header h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border-subtle);
-  gap: 12px;
+  border-radius: 6px;
+  gap: 8px;
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -983,7 +986,7 @@ header h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 10px;
+  margin-right: 6px;
 }
 
 .transaction-item.receive .transaction-icon {
@@ -1026,6 +1029,51 @@ header h1 {
 .transaction-date {
   font-size: 10px;
   color: var(--text-secondary);
+}
+
+.home-ln-address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 0 0 12px 0;
+}
+
+.home-ln-address.hidden {
+  display: none;
+}
+
+.home-ln-address-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.home-ln-address-text {
+  flex: 1;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--brand, #FFC107);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-ln-address-copy {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.home-ln-address-copy:hover {
+  opacity: 1;
 }
 
 .transaction-amount {

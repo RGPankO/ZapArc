@@ -75,7 +75,7 @@ async function checkSubWalletActivity(
     // Connect with unique storage directory to avoid conflicts
     const connectRequest: ConnectRequest = {
       config: config,
-      mnemonic: mnemonic,
+      seed: { type: 'mnemonic', mnemonic: mnemonic },
       storageDir: storagePrefix
     };
 

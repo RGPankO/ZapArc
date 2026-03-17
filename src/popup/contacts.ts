@@ -94,6 +94,21 @@ export function hideContactsInterface(): void {
   if (mainInterface) mainInterface.classList.remove('hidden');
 }
 
+/**
+ * Check if a lightning address is already saved as a contact
+ */
+export async function isExistingContact(lightningAddress: string): Promise<boolean> {
+  await loadContacts();
+  return cachedContacts.some(c => c.lightningAddress.toLowerCase() === lightningAddress.toLowerCase());
+}
+
+/**
+ * Open the contact modal pre-filled with a lightning address (for "Save as Contact" after payment)
+ */
+export function openContactModalWithAddress(lightningAddress: string): void {
+  openContactModal({ lightningAddress, name: '', id: '', createdAt: 0, updatedAt: 0 } as Contact);
+}
+
 export async function openContactPicker(onSelect: (contact: Contact) => void): Promise<void> {
   pickerCallback = onSelect;
   await loadContacts();
@@ -279,7 +294,7 @@ function renderContactPickerList(): void {
   });
 }
 
-function openContactModal(contact?: Contact): void {
+export function openContactModal(contact?: Contact): void {
   currentEditId = contact?.id || null;
 
   const title = document.getElementById('contact-modal-title');

@@ -19,7 +19,7 @@ export interface WalletStatus {
 export interface WalletSetupOptions {
   mnemonic?: string;
   pin: string;
-  network?: 'mainnet' | 'testnet';
+  network?: 'mainnet' | 'regtest';
   apiKey?: string;
 }
 

@@ -377,7 +377,7 @@ export async function checkPaymentStatus(invoice: string): Promise<void> {
         });
 
         if (matchingPayment) {
-            const amountSats = matchingPayment.amount || matchingPayment.amountSats || 0;
+            const amountSats = Number(matchingPayment.amount || 0);
             showSuccess(`Received ${amountSats.toLocaleString()} sats!`);
 
             if (paymentMonitoringInterval) {

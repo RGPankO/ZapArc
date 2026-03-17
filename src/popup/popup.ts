@@ -196,6 +196,19 @@ function validateLightningAddressUsername(username: string): { isValid: boolean;
     return { isValid: true, normalized };
 }
 
+function renderHomeLightningAddress(): void {
+    const container = document.getElementById('home-ln-address');
+    const textEl = document.getElementById('home-ln-address-text');
+    if (!container || !textEl) return;
+
+    if (currentLightningAddressInfo?.lightningAddress) {
+        textEl.textContent = currentLightningAddressInfo.lightningAddress;
+        container.classList.remove('hidden');
+    } else {
+        container.classList.add('hidden');
+    }
+}
+
 function renderLightningAddressUI(): void {
     const section = document.getElementById('lightning-address-section');
     const unregistered = document.getElementById('lightning-address-unregistered');
@@ -219,6 +232,9 @@ function renderLightningAddressUI(): void {
         unregistered.classList.remove('hidden');
         addressValue.textContent = '';
     }
+
+    // Also update home screen LN address display
+    renderHomeLightningAddress();
 }
 
 function setLightningAddressStatus(message: string): void {
@@ -429,7 +445,7 @@ async function loadTransactionHistory() {
         console.log(`📋 [Popup] Loaded ${payments.length} transactions`);
         if (payments.length > 0) {
             console.log('🔍 [Popup] Raw first payment keys:', Object.keys(payments[0]));
-            console.log('🔍 [Popup] Raw first payment:', JSON.stringify(payments[0]));
+            console.log('🔍 [Popup] Raw first payment:', JSON.stringify(payments[0], (_, v) => typeof v === 'bigint' ? v.toString() : v));
         }
 
         if (payments.length === 0) {
@@ -472,12 +488,12 @@ async function loadTransactionHistory() {
             return {
                 id: payment.id || `tx-${index}`,
                 type: isReceive ? 'receive' : 'send',
-                amount: payment.amount || payment.amountSats || 0,
+                amount: Number(payment.amount ?? payment.amountSats ?? 0),
                 timestamp: (payment.timestamp || 0) * 1000,
                 status: payment.status || 'completed',
                 description: payment.description || undefined,
                 method,
-                feeSats: payment.fees || payment.feeSats || undefined,
+                feeSats: Number(payment.fees ?? payment.feeSats ?? 0) || undefined,
                 onchainFeeSats: payment.details?.onchainFeeSats || payment.details?.feeSats || undefined,
                 paymentHash: payment.paymentHash || payment.details?.paymentHash || undefined,
                 preimage: payment.preimage || payment.details?.preimage || undefined,
@@ -2218,6 +2234,9 @@ function showUnlockPrompt() {
                 await breezSDK.disconnect();
                 setBreezSDK(null);
             }
+            // Clear stale Lightning Address from previous wallet
+            currentLightningAddressInfo = null;
+            renderLightningAddressUI();
 
             // Connect SDK
             const sdk = await connectBreezSDK(walletResponse.data.mnemonic);
@@ -2812,6 +2831,17 @@ function setupEventListeners() {
         });
     }
 
+    const homeLnCopyBtn = document.getElementById('home-ln-address-copy');
+    if (homeLnCopyBtn) {
+        homeLnCopyBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const address = currentLightningAddressInfo?.lightningAddress;
+            if (address) {
+                await copyToClipboard(address);
+            }
+        });
+    }
+
     const lightningAddressUnregisterBtn = document.getElementById('lightning-address-unregister-btn');
     if (lightningAddressUnregisterBtn) {
         lightningAddressUnregisterBtn.addEventListener('click', () => {
@@ -3343,13 +3373,16 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
             showTransactionsLoading();
         }
 
-        // Disconnect existing SDK
+        // Disconnect existing SDK and clear stale state
         if (breezSDK) {
             console.log('🔄 [Popup] Disconnecting previous SDK...');
             await disconnectBreezSDK();
             setBreezSDK(null);
             setIsSDKInitialized(false);
         }
+        // Clear Lightning Address immediately so old wallet's address doesn't linger
+        currentLightningAddressInfo = null;
+        renderLightningAddressUI();
         
         // Connect with derived mnemonic fetched from background
         const pin = sessionPin;

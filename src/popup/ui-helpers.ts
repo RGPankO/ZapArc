@@ -43,4 +43,13 @@ export function clearWalletDisplay(): void {
         transactionList.style.opacity = '1';
         transactionList.innerHTML = '';
     }
+
+    // Clear Lightning Address display
+    const homeLnAddress = document.getElementById('home-ln-address');
+    if (homeLnAddress) homeLnAddress.classList.add('hidden');
+
+    const settingsRegistered = document.getElementById('lightning-address-registered');
+    const settingsUnregistered = document.getElementById('lightning-address-unregistered');
+    if (settingsRegistered) settingsRegistered.classList.add('hidden');
+    if (settingsUnregistered) settingsUnregistered.classList.add('hidden');
 }

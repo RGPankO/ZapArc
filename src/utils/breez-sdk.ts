@@ -5,7 +5,7 @@ import { Transaction, LightningAddressInfo } from '../types';
 import * as bip39 from 'bip39';
 
 export interface BreezConfig {
-  network: 'mainnet' | 'testnet';
+  network: 'mainnet' | 'regtest';
   apiKey?: string;
 }
 
@@ -86,10 +86,10 @@ export class BreezSDKWrapper {
       // Generate mnemonic if not provided
       const walletMnemonic = mnemonic || bip39.generateMnemonic();
 
-      // Connect to Breez SDK - mnemonic is a direct string parameter
+      // Connect to Breez SDK
       this.sdk = await connect({
         config: breezConfig,
-        mnemonic: walletMnemonic,  // Direct string parameter, not seed object
+        seed: { type: 'mnemonic', mnemonic: walletMnemonic },
         storageDir: 'breez_lightning_data'
       });
 
@@ -115,8 +115,8 @@ export class BreezSDKWrapper {
     this.ensureConnected();
 
     try {
-      const nodeInfo = await this.sdk.nodeInfo();
-      return nodeInfo.channelsBalanceSats || 0;
+      const info = await this.sdk.getInfo({ ensureSynced: false });
+      return info.balanceSats || 0;
     } catch (error) {
       console.error('Failed to get balance:', error);
       throw new Error(`Balance retrieval failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -131,10 +131,13 @@ export class BreezSDKWrapper {
 
     try {
       const response = await this.sdk.receivePayment({
-        amountSats: request.amountSats,
-        description: request.description
+        paymentMethod: {
+          type: 'bolt11Invoice',
+          description: request.description || '',
+          amountSats: request.amountSats
+        }
       });
-      return response.bolt11;
+      return response.paymentRequest;
     } catch (error) {
       console.error('Failed to generate invoice:', error);
       throw new Error(`Invoice generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -154,7 +157,7 @@ export class BreezSDKWrapper {
         }
       });
 
-      return response?.paymentRequest || response?.bitcoinAddress || response?.address || '';
+      return (response as any)?.paymentRequest || '';
     } catch (error) {
       console.error('Failed to generate on-chain receive address:', error);
       throw new Error(`On-chain address generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -168,7 +171,8 @@ export class BreezSDKWrapper {
     this.ensureConnected();
 
     try {
-      await this.sdk.sendPayment({ bolt11: request.bolt11 });
+      const prepared = await this.sdk.prepareSendPayment({ paymentRequest: request.bolt11 });
+      await this.sdk.sendPayment({ prepareResponse: prepared });
       return true;
     } catch (error) {
       console.error('Failed to send payment:', error);
@@ -183,13 +187,13 @@ export class BreezSDKWrapper {
     this.ensureConnected();
 
     try {
-      const payments = await this.sdk.listPayments();
-      return payments.map((payment: any) => ({
+      const response = await this.sdk.listPayments({});
+      return (response.payments || []).map((payment: any) => ({
         id: payment.id,
-        type: payment.paymentType === 'sent' ? 'send' : 'receive',
-        amount: payment.amountSats,
+        type: payment.paymentType === 'send' ? 'send' : 'receive',
+        amount: Number(payment.amount || 0),
         description: payment.description || '',
-        timestamp: payment.paymentTime,
+        timestamp: payment.timestamp || 0,
         status: this.mapPaymentStatus(payment.status)
       }));
     } catch (error) {
@@ -205,7 +209,7 @@ export class BreezSDKWrapper {
     this.ensureConnected();
 
     try {
-      return await this.sdk.parseLnurl(lnurl);
+      return await this.sdk.parse(lnurl);
     } catch (error) {
       console.error('Failed to parse LNURL:', error);
       throw new Error(`LNURL parsing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -377,8 +381,8 @@ export class BreezSDKWrapper {
     this.ensureConnected();
 
     try {
-      const lnurlData = await this.sdk.receiveLnurlPay();
-      return lnurlData.lnurl;
+      const addressInfo = await this.sdk.getLightningAddress();
+      return addressInfo?.lnurl?.bech32 || addressInfo?.lightningAddress || '';
     } catch (error) {
       console.error('Failed to generate receive LNURL:', error);
       throw new Error(`LNURL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -392,7 +396,7 @@ export class BreezSDKWrapper {
     this.ensureConnected();
 
     try {
-      return await this.sdk.nodeInfo();
+      return await this.sdk.getInfo({ ensureSynced: false });
     } catch (error) {
       console.error('Failed to get node info:', error);
       throw new Error(`Node info retrieval failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -453,7 +457,7 @@ export class BreezSDKWrapper {
       // Use a timeout to prevent hanging
       const connectPromise = connect({
         config: breezConfig,
-        mnemonic: mnemonic,
+        seed: { type: 'mnemonic', mnemonic: mnemonic },
         storageDir: `breez_discovery_${Date.now()}`
       });
       
@@ -473,16 +477,16 @@ export class BreezSDKWrapper {
       try {
         // Get node info to check balance - this syncs with LSP
         // Use timeout to prevent hanging
-        const nodeInfoPromise = tempSdk.nodeInfo();
-        const nodeInfoTimeout = new Promise((_, reject) => 
+        const infoPromise = tempSdk.getInfo({ ensureSynced: false });
+        const infoTimeout = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Node info timeout')), 3000)
         );
         
-        const nodeInfo = await Promise.race([nodeInfoPromise, nodeInfoTimeout]) as any;
-        balanceSats = nodeInfo.channelsBalanceSats || 0;
+        const info = await Promise.race([infoPromise, infoTimeout]) as any;
+        balanceSats = info.balanceSats || 0;
 
-        console.log('[BreezSDK] checkWalletHasTransactions - Node info:', {
-          channelsBalance: nodeInfo.channelsBalanceSats,
+        console.log('[BreezSDK] checkWalletHasTransactions - Info:', {
+          balance: info.balanceSats,
           totalBalance: balanceSats
         });
 
@@ -497,8 +501,8 @@ export class BreezSDKWrapper {
 
       // Also check payments (may be empty for fresh storage, but worth checking)
       try {
-        const payments = await tempSdk.listPayments();
-        transactionCount = payments.length;
+        const paymentsResponse = await tempSdk.listPayments({});
+        transactionCount = (paymentsResponse.payments || []).length;
         if (transactionCount > 0) {
           hasActivity = true;
         }
