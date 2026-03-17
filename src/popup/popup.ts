@@ -165,6 +165,12 @@ async function getActiveWalletId(): Promise<string | null> {
     }
 }
 
+/** Get wallet cache key that includes sub-wallet index to avoid cross-wallet cache hits */
+function walletCacheKey(prefix: string, walletId: string, subIndex?: number): string {
+    const idx = subIndex ?? 0;
+    return idx > 0 ? `${prefix}_${walletId}_sub${idx}` : `${prefix}_${walletId}`;
+}
+
 function validateLightningAddressUsername(username: string): { isValid: boolean; error?: string; normalized: string } {
     const normalized = username.trim().toLowerCase();
 
@@ -411,7 +417,8 @@ async function updateBalanceDisplay() {
             try {
                 const mwd = JSON.parse(mwResult.multiWalletData);
                 if (mwd.activeWalletId) {
-                    balanceCacheUpdate[`cachedBalance_${mwd.activeWalletId}`] = balance;
+                    const subIdx = mwd.activeSubWalletIndex || 0;
+                    balanceCacheUpdate[walletCacheKey('cachedBalance', mwd.activeWalletId, subIdx)] = balance;
                 }
             } catch (e) { /* ignore */ }
         }
@@ -444,8 +451,9 @@ async function loadTransactionHistory() {
             if (mwResult.multiWalletData) {
                 const mwd = JSON.parse(mwResult.multiWalletData);
                 const wid = mwd.activeWalletId;
+                const subIdx = mwd.activeSubWalletIndex || 0;
                 if (wid) {
-                    const txCacheKey = `cachedTransactions_${wid}`;
+                    const txCacheKey = walletCacheKey('cachedTransactions', wid, subIdx);
                     const cachedData = await chrome.storage.local.get([txCacheKey]);
                     const cached = cachedData[txCacheKey];
                     if (cached && cached.length > 0 && storedTransactions.length === 0) {
@@ -476,8 +484,9 @@ async function loadTransactionHistory() {
                 try {
                     const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
                     const activeWalletId = multiWalletData.activeWalletId;
+                    const activeSubWalletIndex = multiWalletData.activeSubWalletIndex || 0;
                     if (activeWalletId) {
-                        const cacheCheckedKey = `cachedTransactionsChecked_${activeWalletId}`;
+                        const cacheCheckedKey = walletCacheKey('cachedTransactionsChecked', activeWalletId, activeSubWalletIndex);
                         await chrome.storage.local.set({ [cacheCheckedKey]: true });
                     }
                 } catch (e) {
@@ -537,7 +546,7 @@ async function loadTransactionHistory() {
         }
 
         if (activeWalletId) {
-            const cacheKey = `cachedTransactions_${activeWalletId}`;
+            const cacheKey = walletCacheKey('cachedTransactions', activeWalletId, activeSubWalletIndex);
             await chrome.storage.local.set({ [cacheKey]: storedTransactions.slice(0, 10) });
 
             if (activeSubWalletIndex > 0) {
@@ -1828,8 +1837,9 @@ async function finalizeWalletSetup() {
             if (multiWalletResult.multiWalletData) {
                 const mwd = JSON.parse(multiWalletResult.multiWalletData);
                 const wid = mwd.activeWalletId;
+                const subIdx = mwd.activeSubWalletIndex || 0;
                 if (wid) {
-                    const cacheKey = `cachedTransactions_${wid}`;
+                    const cacheKey = walletCacheKey('cachedTransactions', wid, subIdx);
                     const cached = await chrome.storage.local.get([cacheKey]);
                     if (cached[cacheKey]?.length > 0 && transactionList) {
                         console.log('💾 [Popup] Showing cached transactions on unlock');
@@ -2284,8 +2294,9 @@ function showUnlockPrompt() {
                 if (mwResult.multiWalletData) {
                     const mwd = JSON.parse(mwResult.multiWalletData);
                     const wid = mwd.activeWalletId;
+                    const subIdx = mwd.activeSubWalletIndex || 0;
                     if (wid) {
-                        const cacheKey = `cachedTransactions_${wid}`;
+                        const cacheKey = walletCacheKey('cachedTransactions', wid, subIdx);
                         const cached = await chrome.storage.local.get([cacheKey]);
                         if (cached[cacheKey]?.length > 0 && transactionList) {
                             console.log('💾 [Popup] Showing cached transactions on PIN unlock');
@@ -3238,6 +3249,7 @@ async function initializePopup() {
                         // Get active wallet ID from multi-wallet data structure
                         const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
                         let activeWalletId = null;
+                        let activeSubWalletIndex = 0;
 
                         console.log('🔍 [Popup] multiWalletResult:', !!multiWalletResult.multiWalletData);
 
@@ -3245,6 +3257,7 @@ async function initializePopup() {
                             try {
                                 const multiWalletData = JSON.parse(multiWalletResult.multiWalletData);
                                 activeWalletId = multiWalletData.activeWalletId;
+                                activeSubWalletIndex = multiWalletData.activeSubWalletIndex || 0;
                                 console.log('🔍 [Popup] Active wallet ID from multiWalletData:', activeWalletId);
                             } catch (e) {
                                 console.error('⚠️ [Popup] Failed to parse multiWalletData:', e);
@@ -3258,8 +3271,8 @@ async function initializePopup() {
                         let cacheWasChecked = false;
 
                         if (activeWalletId) {
-                            const cacheKey = `cachedTransactions_${activeWalletId}`;
-                            const cacheCheckedKey = `cachedTransactionsChecked_${activeWalletId}`;
+                            const cacheKey = walletCacheKey('cachedTransactions', activeWalletId, activeSubWalletIndex);
+                            const cacheCheckedKey = walletCacheKey('cachedTransactionsChecked', activeWalletId, activeSubWalletIndex);
                             const cachedTxData = await chrome.storage.local.get([cacheKey, cacheCheckedKey]);
                             cachedTransactions = cachedTxData[cacheKey];
                             cacheWasChecked = cachedTxData[cacheCheckedKey] === true;
@@ -3355,7 +3368,7 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
 
         // Cached balance — show instantly
         try {
-            const balCacheKey = `cachedBalance_${switchedWalletId}`;
+            const balCacheKey = walletCacheKey('cachedBalance', switchedWalletId, customEvent.detail.subWalletIndex);
             const balData = await chrome.storage.local.get([balCacheKey]);
             const cachedBal = balData[balCacheKey];
             if (cachedBal !== undefined && cachedBal !== null) {
@@ -3370,7 +3383,7 @@ window.addEventListener('hierarchical-wallet-switched', async (event: Event) => 
 
         // Cached transactions — show instantly
         try {
-            const txCacheKey = `cachedTransactions_${switchedWalletId}`;
+            const txCacheKey = walletCacheKey('cachedTransactions', switchedWalletId, customEvent.detail.subWalletIndex);
             const cachedData = await chrome.storage.local.get([txCacheKey]);
             const cached = cachedData[txCacheKey];
             if (cached && cached.length > 0) {
