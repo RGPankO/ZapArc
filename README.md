@@ -1,107 +1,88 @@
-# Lightning Tipping Extension (Tipmaster)
+# ZapArc — Self-Custodial Bitcoin Wallet
 
-A non-custodial Bitcoin tipping browser extension powered by the Lightning Network and Breez SDK Spark.
+ZapArc is a self-custodial Bitcoin wallet extension with Lightning and on-chain support, powered by Breez SDK. It runs as a Chrome/Chromium MV3 extension and focuses on simple wallet management, fast Lightning payments, and optional tipping utilities.
 
-## Features
+## Highlights
 
-- **Non-Custodial Wallet** - Control your own Lightning funds with BIP39 mnemonic backup
-- **Universal Tip Detection** - Automatically detects tip requests on any website
-- **Standardized Format** - `[lntip:lnurl:<address>:<amount1>:<amount2>:<amount3>]`
-- **Floating Action Menu** - Quick access to deposit, withdraw, and copy tip strings
-- **Domain Management** - Whitelist/blacklist domains for automatic tip appending
-- **LNURL Blocking** - Block unwanted tip requests from specific addresses
-- **QR Code Generation** - Pay with external wallets via QR codes
-- **Platform Detection** - Smart posting detection for Facebook, Twitter, Reddit
+- **Self-custodial**: BIP39 seed phrase, encrypted wallet storage, PIN unlock.
+- **Lightning + on-chain**: Unified wallet experience with Lightning payments (Breez SDK).
+- **Multi-wallet**: Create/import multiple wallets and switch between them.
+- **Extension UI**: Popup wallet dashboard plus a dedicated settings page.
+- **Tipping utilities (optional)**: Tip request detection and helper UI on supported pages.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-npm install
-
-# Development build with watch
-npm run dev
-
-# Production build
+npm ci
 npm run build
-
-# Type check
-npm run type-check
 ```
 
 Load the extension:
+
 1. Open `chrome://extensions/`
-2. Enable "Developer mode"
-3. Click "Load unpacked" and select the `dist/` folder
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select the `dist/` folder
+
+Development watch build:
+
+```bash
+npm run dev
+```
+
+Type checking:
+
+```bash
+npm run type-check
+```
 
 ## Project Structure
 
 ```
 src/
-├── background/        # Service worker
-├── content/           # Content scripts (page injection)
-├── popup/             # Extension popup UI
-├── settings/          # Settings page
-├── types/             # TypeScript definitions
-└── utils/             # Shared utilities
-    ├── breez-sdk.ts       # Breez SDK integration
-    ├── wallet-manager.ts  # Wallet state management
-    ├── payment-processor.ts
-    ├── lnurl.ts
-    ├── floating-menu.ts
-    ├── tipping-ui.ts
-    └── ...
+├── background/        # Service worker (storage + alarms)
+├── content/           # Page integration / tip detection
+├── popup/             # Wallet UI (Breez SDK lives here)
+├── settings/          # Settings UI
+├── types/             # Shared TypeScript types
+└── utils/             # Wallet, LNURL, storage, messaging, UI helpers
 ```
 
-## Tip Format
+## Architecture Notes
 
-Standard format for embedding tip requests:
+- **Breez SDK runs only in the popup**. MV3 service workers cannot run WASM, so all SDK calls (connect, balance, pay, list payments) are in `src/popup/`.
+- **Background is storage-only**: encrypted wallet metadata, settings, and alarms live in the service worker.
+
+## Wallet & Network Support
+
+- **Lightning**: Powered by Breez SDK Spark.
+- **On-chain**: Wallet metadata and flows are set up for on-chain support alongside Lightning.
+
+## Tipping Format (Optional Feature)
+
+If enabled, the extension recognizes a standardized tip string:
 
 ```
 [lntip:lnurl:lnurl1dp68gurn...:100:500:1000]
 ```
 
-- `lnurl1dp68gurn...` - Your LNURL-pay address
-- `100:500:1000` - Suggested tip amounts in sats
+Also supports metadata:
 
-Also supports HTML metadata:
 ```html
 <meta name="lntip" content="lnurl:...:100:500:1000">
 ```
 
-## Testing
+## Testing Notes
 
-Use `test.html` to test tip detection functionality locally.
+- Manual testing via `test.html` for tip detection.
+- Extension flows are best validated by loading the unpacked build and exercising wallet create/import, send/receive, and rename/switch paths.
 
-## Development Resources
+## Resources
 
-- `.claude/docs/ARCHITECTURE_GUIDE.md` - Project architecture details
-- `.kiro/specs/lightning-tipping-extension/` - Kiro specification documents
-- `BREEZ_SDK_SETUP.md` - Breez SDK configuration notes
-- `CURRENT_FUNCTIONALITY_GUIDE.md` - Current feature status
-
-## Current Status
-
-**Working:**
-- Wallet setup with PIN encryption
-- Tip detection and parsing
-- QR code generation
-- Floating menu and tipping UI
-- Domain/LNURL management
-
-**In Progress:**
-- Multi-wallet support
-- Lightning address/LNURL-pay integration
-- Full Breez SDK connectivity
-
-## Tech Stack
-
-- TypeScript
-- Webpack
-- Chrome Extension APIs (Manifest V3)
-- Breez SDK Spark
-- LNURL protocol
+- `BREEZ_SDK_SETUP.md` — Breez SDK notes
+- `CURRENT_FUNCTIONALITY_GUIDE.md` — Current features and status
+- `debug_instructions.md` — Debugging tips
 
 ## License
 
-Private - All rights reserved
+Private — All rights reserved.
