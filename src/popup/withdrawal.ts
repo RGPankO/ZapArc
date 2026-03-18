@@ -592,6 +592,17 @@ export async function sendPayment(): Promise<void> {
         const isPending = typeof finalStatus === 'string' && finalStatus === 'pending';
 
         if (isPending) {
+            const pendingPayment = isLnurlPayment ? result?.payment : sendResult?.payment;
+            const pendingLog = {
+                id: pendingPayment?.id,
+                status: pendingPayment?.status,
+                amountSats: Number(pendingPayment?.amount ?? 0),
+                feesSats: Number(pendingPayment?.fees ?? 0),
+                method: pendingPayment?.method,
+                timestamp: pendingPayment?.timestamp,
+            };
+            console.warn('⏳ [Withdrawal] Payment returned as pending:\n' + JSON.stringify(pendingLog, null, 2));
+
             if (statusText) {
                 statusText.textContent = '⏳ Payment is processing. Check transaction history for final status.';
                 statusText.className = 'status-indicator warning';

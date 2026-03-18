@@ -474,6 +474,25 @@ async function loadTransactionHistory() {
             console.log('🔍 [Popup] Raw first payment:', JSON.stringify(payments[0], (_, v) => typeof v === 'bigint' ? v.toString() : v));
         }
 
+        // Debug helper for Breez support: log all payments with IDs/status/age
+        const supportDump = payments.slice(0, 100).map((p: any) => {
+            const tsSec = Number(p?.timestamp || 0);
+            const ageSec = tsSec > 0 ? Math.max(0, Math.floor(Date.now() / 1000) - tsSec) : -1;
+            return {
+                id: p?.id,
+                paymentType: p?.paymentType,
+                status: p?.status,
+                amountSats: Number(p?.amount ?? 0),
+                feesSats: Number(p?.fees ?? 0),
+                method: p?.method,
+                timestamp: tsSec,
+                ageSec,
+            };
+        });
+
+        console.warn(`🧾 [Support] Full payment dump count: ${supportDump.length}/${payments.length}`);
+        console.warn('🧾 [Support] Payment debug dump:\n' + JSON.stringify(supportDump, null, 2));
+
         if (payments.length === 0) {
             transactionList.innerHTML = getTransactionEmptyStateHtml();
             storedTransactions = [];
