@@ -3919,3 +3919,68 @@ body.modal-open {
 /* Hide deposit header title — hero shows it */
 /* deposit header h1 now visible (hero section removed) */
 
+/* Confirm dialog (dark theme) */
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-overlay);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-dialog-card {
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  max-width: 350px;
+  width: 90%;
+}
+
+.confirm-dialog-title {
+  margin: 0 0 10px 0;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.confirm-dialog-message {
+  margin: 0 0 16px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.confirm-dialog-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.confirm-dialog-btn-cancel {
+  border: 1px solid var(--border-medium);
+  background: var(--container-bg);
+  color: var(--text-primary);
+}
+
+.confirm-dialog-btn-confirm {
+  border: none;
+  background: var(--brand);
+  color: #fff;
+}
+
+.confirm-dialog-btn-confirm:hover {
+  background: var(--brand-hover);
+}
+

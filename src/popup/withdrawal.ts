@@ -10,7 +10,7 @@ import {
 } from './state';
 import { isExistingContact, openContactModalWithAddress } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
-import { triggerPaymentNotification, extractPubkeyFromParsedInvoice } from '../utils/notification-trigger';
+import { triggerPaymentNotification } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
 
 export type WithdrawalCallbacks = {
@@ -536,20 +536,14 @@ export async function sendPayment(): Promise<void> {
             }
 
             try {
-                let recipientPubkey: string | undefined;
-                if (result.payment?.details?.destinationPubkey) recipientPubkey = result.payment.details.destinationPubkey;
-                if (!recipientPubkey && preparedPayment.invoiceDetails) {
-                    const invoiceDetails = preparedPayment.invoiceDetails as Record<string, unknown>;
-                    const destPubkey = invoiceDetails.payeePubkey || invoiceDetails.destination || invoiceDetails.nodeId || invoiceDetails.destinationPubkey;
-                    if (destPubkey && typeof destPubkey === 'string') recipientPubkey = destPubkey;
-                }
-                if (!recipientPubkey && preparedPayment.payRequest?.nostrPubkey) recipientPubkey = preparedPayment.payRequest.nostrPubkey;
-
-                if (recipientPubkey) {
+                const inputValue = paymentInput.value.trim().toLowerCase();
+                if (inputValue.includes('@')) {
                     const amountEl = document.getElementById('preview-amount');
                     const amountText = amountEl?.textContent || '0';
                     const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
-                    triggerPaymentNotification({ pubKey: recipientPubkey }, amount).catch(() => {});
+                    triggerPaymentNotification({ lightningAddress: inputValue }, amount).catch(() => {});
+                } else {
+                    console.log('🔔 [Notification] Skipping push trigger (no lightning address identifier)');
                 }
             } catch {}
         } else {
@@ -569,17 +563,13 @@ export async function sendPayment(): Promise<void> {
         setPreparedPayment(null);
 
         try {
-            const input = paymentInput.value.trim();
-            const isInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
-            if (isInvoice && breezSDK) {
-                const parsed = await breezSDK.parse(input);
-                const destPubkey = extractPubkeyFromParsedInvoice(parsed);
-                if (destPubkey) {
-                    const amountEl = document.getElementById('preview-amount');
-                    const amountText = amountEl?.textContent || '0';
-                    const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
-                    triggerPaymentNotification({ pubKey: destPubkey }, amount).catch(() => {});
-                }
+            const input = paymentInput.value.trim().toLowerCase();
+            // Only trigger remote notifications by unique identifier (lightning address), not pubkey/invoice destination.
+            if (input.includes('@')) {
+                const amountEl = document.getElementById('preview-amount');
+                const amountText = amountEl?.textContent || '0';
+                const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
+                triggerPaymentNotification({ lightningAddress: input }, amount).catch(() => {});
             }
         } catch {}
 

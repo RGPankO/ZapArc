@@ -133,17 +133,16 @@ export function showConfirmDialog(title: string, message: string): Promise<boole
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.className = 'confirm-dialog-overlay';
-        overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; display: flex; align-items: center; justify-content: center;';
 
         const dialog = document.createElement('div');
-        dialog.style.cssText = 'background: white; padding: 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 350px; width: 90%;';
+        dialog.className = 'confirm-dialog-card';
 
         dialog.innerHTML = `
-            <h3 style="margin: 0 0 12px 0; color: #333;">${title}</h3>
-            <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">${message}</p>
-            <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                <button id="confirm-dialog-no" style="padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
-                <button id="confirm-dialog-yes" style="padding: 8px 16px; border: none; background: #f7931a; color: white; border-radius: 4px; cursor: pointer;">Confirm</button>
+            <h3 class="confirm-dialog-title">${title}</h3>
+            <p class="confirm-dialog-message">${message}</p>
+            <div class="confirm-dialog-actions">
+                <button id="confirm-dialog-no" class="confirm-dialog-btn confirm-dialog-btn-cancel">Cancel</button>
+                <button id="confirm-dialog-yes" class="confirm-dialog-btn confirm-dialog-btn-confirm">Confirm</button>
             </div>
         `;
 

@@ -13,13 +13,13 @@ interface NotificationResponse {
 }
 
 interface RecipientInfo {
-  pubKey?: string;
+  lightningAddress?: string;
   pushToken?: string;
 }
 
 /**
  * Triggers a push notification to the recipient after a successful payment
- * @param recipient - Object containing either pubKey (node ID) or direct pushToken
+ * @param recipient - Object containing either lightningAddress or direct pushToken
  * @param amountSats - Amount in satoshis that was sent
  */
 export async function triggerPaymentNotification(
@@ -28,13 +28,13 @@ export async function triggerPaymentNotification(
 ): Promise<NotificationResponse> {
   try {
     // Only attempt if we have recipient info
-    if (!recipient.pubKey && !recipient.pushToken) {
+    if (!recipient.lightningAddress && !recipient.pushToken) {
       console.log('🔔 [Notification] No recipient info available, skipping notification');
       return { success: false, error: 'No recipient info' };
     }
 
     console.log('🔔 [Notification] Triggering push notification for payment:', {
-      recipientPubKey: recipient.pubKey ? `${recipient.pubKey.substring(0, 16)}...` : undefined,
+      recipientLightningAddress: recipient.lightningAddress,
       amount: amountSats
     });
 
@@ -44,7 +44,7 @@ export async function triggerPaymentNotification(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        recipientPubKey: recipient.pubKey,
+        recipientLightningAddress: recipient.lightningAddress,
         expoPushToken: recipient.pushToken,
         amount: amountSats,
       }),

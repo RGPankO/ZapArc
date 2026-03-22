@@ -4,14 +4,18 @@
 import init, {
     connect,
     defaultConfig,
+    initLogging,
+    getSparkStatus,
     type BreezSdk,
     type Config,
     type ConnectRequest,
-    type SdkEvent
+    type SdkEvent,
+    type LogEntry,
+    type ServiceStatus
 } from '@breeztech/breez-sdk-spark/web';
 import { BREEZ_API_KEY, breezSDK, setBreezSDK } from './state';
 import { hideBalanceLoading } from './ui-helpers';
-import { showSuccess } from './notifications';
+import { showSuccess, showInfo } from './notifications';
 import * as bip39 from 'bip39';
 
 // BIP39 wordlist for sub-wallet derivation
@@ -28,6 +32,51 @@ export type SdkEventCallback = {
 let eventCallbacks: SdkEventCallback = {};
 let isClaimingDeposits = false;
 const claimedDepositKeys = new Set<string>();
+let breezLoggingInitialized = false;
+let lastSparkStatusAlert: { status: ServiceStatus; at: number } | null = null;
+const SPARK_ALERT_COOLDOWN_MS = 10 * 60 * 1000;
+
+class JsLogger {
+    log = (l: LogEntry): void => {
+        console.log(`[BreezSDK ${l.level}] ${l.line}`);
+    };
+}
+
+async function ensureBreezLogging(): Promise<void> {
+    if (breezLoggingInitialized) return;
+    try {
+        const logger = new JsLogger();
+        await initLogging(logger);
+        breezLoggingInitialized = true;
+        console.log('✅ [Popup-SDK] Breez SDK logging initialized');
+    } catch (error) {
+        console.warn('⚠️ [Popup-SDK] Failed to initialize Breez SDK logging:', error);
+    }
+}
+
+async function checkSparkStatusAndWarn(): Promise<void> {
+    try {
+        const spark = await getSparkStatus();
+        const status = spark?.status as ServiceStatus;
+        const lastUpdated = spark?.lastUpdated;
+
+        console.log('📡 [Popup-SDK] Spark status:', { status, lastUpdated });
+
+        if (status && status !== 'operational') {
+            const now = Date.now();
+            const shouldAlert = !lastSparkStatusAlert ||
+                lastSparkStatusAlert.status !== status ||
+                (now - lastSparkStatusAlert.at) > SPARK_ALERT_COOLDOWN_MS;
+
+            if (shouldAlert) {
+                showInfo(`⚠️ Spark network status: ${status}. Some payments may be delayed or fail.`);
+                lastSparkStatusAlert = { status, at: now };
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ [Popup-SDK] Spark status check failed:', error);
+    }
+}
 
 function getDepositKey(txid: string, vout: number): string {
     return `${txid}:${vout}`;
@@ -158,6 +207,7 @@ export async function checkWalletHasTransactions(
     try {
         // Initialize WASM
         await init();
+        await ensureBreezLogging();
 
         // Create config
         const config: Config = defaultConfig('mainnet');
@@ -415,6 +465,7 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
 
                 if (event.type === 'synced') {
                     console.log('✅ [Breez-SDK] Wallet synced with Lightning Network');
+                    void checkSparkStatusAndWarn();
 
                     // Hide loading indicators now that sync is complete
                     hideBalanceLoading();
@@ -448,6 +499,7 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
 
         // Check for pending deposits right after connecting
         void claimPendingDeposits(sdk, 'initial connection');
+        void checkSparkStatusAndWarn();
 
         return sdk;
     } catch (error) {
