@@ -20,6 +20,14 @@ import type {
 initializeApp();
 const db = getFirestore();
 
+const PUBKEY_FALLBACK_MAX_AGE_DAYS = 30;
+
+function parseIsoDate(value: unknown): Date | null {
+  if (typeof value !== 'string') return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /**
  * Formats the push notification message
  */
@@ -196,19 +204,53 @@ export const sendTransactionNotification = onRequest(
       }
 
       if (recipientPubKey) {
-        const userDoc = await db.collection('users').doc(recipientPubKey).get();
-        if (userDoc.exists) {
-          const userData = userDoc.data();
-          if (userData?.expoPushToken) {
-            tokenInfos.push({
-              token: userData.expoPushToken,
-              walletNickname: userData.walletNickname
-            });
-          } else {
-            console.log(`⚠️ User ${recipientPubKey} found but no token.`);
-          }
+        // Pubkey fallback is potentially unsafe for Spark (shared/ambiguous identities).
+        // Only use it when no stronger identifier (lightning address or direct token) is available.
+        if (recipientLightningAddress || directToken) {
+          console.log('ℹ️ Skipping recipientPubKey lookup because stronger identifier is available');
         } else {
-          console.log(`⚠️ User ${recipientPubKey} not found in registry.`);
+          const userDoc = await db.collection('users').doc(recipientPubKey).get();
+          if (userDoc.exists) {
+            const userData = userDoc.data() ?? {};
+            const token = userData?.expoPushToken as string | undefined;
+            if (token) {
+              // Safety check #1: token should not be shared by multiple identifiers
+              const sharedTokenSnap = await db.collection('users')
+                .where('expoPushToken', '==', token)
+                .limit(3)
+                .get();
+
+              if (sharedTokenSnap.size > 1) {
+                console.warn('⚠️ Skipping pubkey notification due to ambiguous token mapping', {
+                  recipientPubKey,
+                  tokenPrefix: token.substring(0, 20),
+                  matchingDocs: sharedTokenSnap.size,
+                });
+              } else {
+                // Safety check #2: mapping should be fresh enough
+                const updatedAt = parseIsoDate(userData?.updatedAt);
+                const isFresh = updatedAt
+                  ? (Date.now() - updatedAt.getTime()) <= PUBKEY_FALLBACK_MAX_AGE_DAYS * 24 * 60 * 60 * 1000
+                  : false;
+
+                if (!isFresh) {
+                  console.warn('⚠️ Skipping pubkey notification due to stale mapping', {
+                    recipientPubKey,
+                    updatedAt: userData?.updatedAt,
+                  });
+                } else {
+                  tokenInfos.push({
+                    token,
+                    walletNickname: userData.walletNickname,
+                  });
+                }
+              }
+            } else {
+              console.log(`⚠️ User ${recipientPubKey} found but no token.`);
+            }
+          } else {
+            console.log(`⚠️ User ${recipientPubKey} not found in registry.`);
+          }
         }
       }
 
@@ -238,7 +280,7 @@ export const sendTransactionNotification = onRequest(
       if (tokenInfos.length === 0) {
          response.status(404).json({
           success: false,
-          error: 'No valid recipient token found. Provide expoPushToken or specify valid recipientPubKey.',
+          error: 'No valid recipient token found. Provide expoPushToken or recipientLightningAddress (pubKey fallback is safety-restricted).',
         } satisfies TransactionNotificationResponse);
         return;
       }
