@@ -126,6 +126,11 @@ export function setSdkEventCallbacks(callbacks: SdkEventCallback): void {
     eventCallbacks = callbacks;
 }
 
+/** Public helper so popup can proactively check/claim on-chain deposits */
+export async function claimPendingDepositsNow(sdk: BreezSdk, reason = 'manual check'): Promise<void> {
+    await claimPendingDeposits(sdk, reason);
+}
+
 /**
  * Derive a sub-wallet mnemonic from a master mnemonic
  * Uses deterministic word modification on the 11th word
@@ -212,6 +217,8 @@ export async function checkWalletHasTransactions(
         // Create config
         const config: Config = defaultConfig('mainnet');
         config.apiKey = BREEZ_API_KEY;
+        // Avoid stuck deposits when required claim fee temporarily exceeds strict defaults
+        config.maxDepositClaimFee = { type: 'networkRecommended', leewaySatPerVbyte: 2 };
 
         // Use a unique storage dir to avoid conflicts
         const storageDir = `breez-discovery-${Date.now()}`;
@@ -433,6 +440,8 @@ export async function connectBreezSDK(mnemonic: string): Promise<BreezSdk> {
         const config: Config = defaultConfig('mainnet');
         config.apiKey = BREEZ_API_KEY;
         config.syncIntervalSecs = 60;
+        // Avoid stuck deposits when required claim fee temporarily exceeds strict defaults
+        config.maxDepositClaimFee = { type: 'networkRecommended', leewaySatPerVbyte: 2 };
         console.log('🔍 [Popup-SDK] Config created', {
             network: 'mainnet',
             hasApiKey: !!config.apiKey,

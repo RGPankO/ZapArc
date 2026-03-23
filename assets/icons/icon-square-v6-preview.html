@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#050510;overflow:hidden;">
+<canvas id="c" width="512" height="512" style="display:block;"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 512;
+
+// --- Production-like background ---
+const bg = ctx.createRadialGradient(256, 200, 50, 256, 300, 400);
+bg.addColorStop(0, '#1a1a4a');
+bg.addColorStop(0.6, '#0d0d2b');
+bg.addColorStop(1, '#050510');
+ctx.fillStyle = bg;
+ctx.fillRect(-2, -2, W + 4, W + 4);
+
+for (let i = 0; i < 4; i++) {
+  const r = 90 + i * 45;
+  const alpha = 0.25 - i * 0.05;
+  ctx.strokeStyle = `rgba(88, 86, 214, ${alpha})`;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(256, 256, r, -Math.PI * 0.7 - i * 0.1, Math.PI * 0.2 + i * 0.1);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(256, 256, r, Math.PI * 0.3 - i * 0.1, Math.PI * 1.2 + i * 0.1);
+  ctx.stroke();
+}
+
+// Subtle glow (reduced vs earlier variants)
+const glow = ctx.createRadialGradient(256, 230, 20, 256, 260, 200);
+glow.addColorStop(0, 'rgba(247, 147, 26, 0.30)');
+glow.addColorStop(0.45, 'rgba(66, 122, 255, 0.12)');
+glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+ctx.fillStyle = glow;
+ctx.fillRect(-2, -2, W + 4, W + 4);
+
+// --- Same shape family, ~11% bulkier ---
+ctx.beginPath();
+ctx.moveTo(296, 60);
+ctx.lineTo(188, 238);
+ctx.lineTo(273, 226);
+ctx.lineTo(215, 452);
+ctx.lineTo(326, 262);
+ctx.lineTo(244, 278);
+ctx.closePath();
+
+// Production-like gradient but BTC orange anchored
+const boltGrad = ctx.createLinearGradient(220, 60, 286, 452);
+boltGrad.addColorStop(0, '#FFD27C');
+boltGrad.addColorStop(0.28, '#F7931A'); // Bitcoin orange anchor
+boltGrad.addColorStop(0.62, '#007AFF');
+boltGrad.addColorStop(1, '#7B61FF');
+ctx.fillStyle = boltGrad;
+
+// Keep edge crisp: lower blur than before
+ctx.shadowColor = '#007AFF';
+ctx.shadowBlur = 14;
+ctx.fill();
+ctx.shadowBlur = 0;
+
+// Thin non-white edge for contrast (no thick white border)
+ctx.strokeStyle = 'rgba(225, 232, 255, 0.35)';
+ctx.lineWidth = 1.2;
+ctx.stroke();
+
+// Highlight
+ctx.beginPath();
+ctx.moveTo(296, 60);
+ctx.lineTo(188, 238);
+ctx.lineTo(273, 226);
+ctx.lineTo(246, 310);
+ctx.lineTo(244, 278);
+ctx.closePath();
+const highlight = ctx.createLinearGradient(198, 60, 286, 310);
+highlight.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+highlight.addColorStop(0.65, 'rgba(255, 255, 255, 0.04)');
+highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+ctx.fillStyle = highlight;
+ctx.fill();
+</script>
+</body>
+</html>

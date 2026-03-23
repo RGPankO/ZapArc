@@ -13,3 +13,12 @@ These icons will be used for:
 
 The icons should represent the Lightning Network tipping functionality, 
 possibly incorporating lightning bolt and Bitcoin symbols.
+
+## Source of truth (important)
+
+Use HTML canvas files in this folder as the canonical source:
+- `icon-square.html` / `icon-square-v6-preview.html` for extension/store icon style (with background)
+- `bolt-transparent-current.html` for in-wallet icon style (transparent, no background)
+
+Do **not** hand-edit PNG pixels.
+Regenerate PNGs from the HTML source whenever icon changes are needed.

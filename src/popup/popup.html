@@ -208,7 +208,7 @@
         <div id="onboarding-wizard" class="hidden">
             <div class="wizard-step" id="welcome-step">
                 <div class="wizard-header">
-                    <h2><img src="icons/bolt32.png" alt="" class="brand-logo logo-32">Welcome to ZapArc</h2>
+                    <h2><img src="icons/bolt.png" alt="" class="brand-logo logo-32">Welcome to ZapArc</h2>
                     <p>Set up your Lightning wallet to send and receive Bitcoin</p>
                 </div>
                 <div class="wizard-content">
@@ -218,7 +218,7 @@
                             <span>Non-custodial wallet - you control your keys</span>
                         </div>
                         <div class="feature-item">
-                            <span class="feature-icon"><img src="icons/bolt24.png" alt="⚡" class="brand-logo logo-20"></span>
+                            <span class="feature-icon"><img src="icons/bolt.png" alt="⚡" class="brand-logo logo-20"></span>
                             <span>Instant Lightning Network payments</span>
                         </div>
                         <div class="feature-item">
@@ -392,7 +392,7 @@
         <!-- Main Wallet Interface -->
         <div id="main-interface" class="hidden">
             <header>
-                <h1><img src="icons/bolt32.png" alt="" class="brand-logo logo-28">ZapArc</h1>
+                <h1><img src="icons/bolt.png" alt="" class="brand-logo logo-28">ZapArc</h1>
                 <div class="header-actions">
                     <button id="contacts-btn" class="header-icon-btn" title="Contacts" aria-label="Contacts">📇</button>
                     <button id="refresh-btn" class="refresh-btn" title="Refresh Balance" aria-label="Refresh Balance">🔄</button>
@@ -559,7 +559,7 @@
         <!-- Unlock Interface -->
         <div id="unlock-interface" class="hidden">
             <div class="unlock-container">
-                <img src="icons/bolt32.png" alt="" class="unlock-logo">
+                <img src="icons/bolt.png" alt="" class="unlock-logo">
                 <p class="unlock-label">Enter PIN to unlock</p>
                 <div class="pin-input-container">
                     <input type="password" id="unlock-pin" placeholder="······" maxlength="6" inputmode="numeric" pattern="[0-9]*">
@@ -669,6 +669,9 @@
                     <div class="deposit-step">
                         <p class="section-intro">Generate a Bitcoin on-chain receive address:</p>
                         <div id="onchain-address-loading" class="onchain-loading hidden">Generating address...</div>
+                        <div id="onchain-qr-container" class="qr-container hidden">
+                            <canvas id="onchain-qr-canvas"></canvas>
+                        </div>
                         <div id="onchain-address-display" class="onchain-address-box hidden"></div>
                         <button id="copy-onchain-address-btn" class="btn-secondary btn-full hidden">Copy Address</button>
                         <div id="onchain-deposit-status" class="onchain-status hidden"></div>
@@ -823,7 +826,7 @@
         <!-- QR Only Interface -->
         <div id="qr-only-interface" class="hidden">
             <header>
-                <h1><img src="icons/bolt32.png" alt="" class="brand-logo logo-32">ZapArc</h1>
+                <h1><img src="icons/bolt.png" alt="" class="brand-logo logo-32">ZapArc</h1>
                 <p class="mode-indicator">External Wallet Mode</p>
             </header>
             

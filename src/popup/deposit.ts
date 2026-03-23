@@ -170,12 +170,15 @@ async function generateOnchainAddress(): Promise<void> {
     const copyBtn = document.getElementById('copy-onchain-address-btn') as HTMLButtonElement | null;
     const minDepositNoteEl = document.getElementById('onchain-min-deposit-note');
     const confNoteEl = document.getElementById('onchain-confirmation-note');
+    const onchainQrContainer = document.getElementById('onchain-qr-container');
+    const onchainQrCanvas = document.getElementById('onchain-qr-canvas') as HTMLCanvasElement | null;
 
     if (!loadingEl || !addressEl || !copyBtn) return;
 
     loadingEl.classList.remove('hidden');
     addressEl.classList.add('hidden');
     copyBtn.classList.add('hidden');
+    onchainQrContainer?.classList.add('hidden');
     addressEl.textContent = '';
     setOnchainDepositStatus('Waiting for on-chain deposit...');
 
@@ -206,6 +209,21 @@ async function generateOnchainAddress(): Promise<void> {
         addressEl.textContent = address;
         addressEl.classList.remove('hidden');
         copyBtn.classList.remove('hidden');
+
+        // Render QR for easier scanning from another wallet/device
+        if (onchainQrCanvas) {
+            try {
+                await QRCode.toCanvas(onchainQrCanvas, `bitcoin:${address}`, {
+                    width: 200,
+                    margin: 2,
+                    color: { dark: '#000000', light: '#FFFFFF' }
+                });
+                onchainQrContainer?.classList.remove('hidden');
+            } catch (qrError) {
+                console.warn('Failed to generate on-chain QR code:', qrError);
+                onchainQrContainer?.classList.add('hidden');
+            }
+        }
 
         startOnchainDepositPolling();
     } catch (error) {

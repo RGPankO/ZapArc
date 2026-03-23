@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:transparent;overflow:hidden;">
+<canvas id="c" width="512" height="512" style="display:block;"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 512;
+ctx.clearRect(0, 0, W, W);
+
+// Wider bolt geometry (explicit coordinates, no scaling hacks)
+const BOLT = [
+  [314, 60],
+  [164, 238],
+  [284, 226],
+  [198, 452],
+  [346, 262],
+  [230, 278],
+];
+
+function drawBoltPath() {
+  ctx.beginPath();
+  ctx.moveTo(BOLT[0][0], BOLT[0][1]);
+  ctx.lineTo(BOLT[1][0], BOLT[1][1]);
+  ctx.lineTo(BOLT[2][0], BOLT[2][1]);
+  ctx.lineTo(BOLT[3][0], BOLT[3][1]);
+  ctx.lineTo(BOLT[4][0], BOLT[4][1]);
+  ctx.lineTo(BOLT[5][0], BOLT[5][1]);
+  ctx.closePath();
+}
+
+// Base gradient exactly like v6 style
+drawBoltPath();
+const boltGrad = ctx.createLinearGradient(220, 60, 286, 452);
+boltGrad.addColorStop(0, '#FFD27C');
+boltGrad.addColorStop(0.28, '#F7931A');
+boltGrad.addColorStop(0.62, '#007AFF');
+boltGrad.addColorStop(1, '#7B61FF');
+ctx.fillStyle = boltGrad;
+ctx.fill();
+
+// Force explicit orange top face so it never washes out
+ctx.beginPath();
+ctx.moveTo(314, 60);
+ctx.lineTo(164, 238);
+ctx.lineTo(284, 226);
+ctx.lineTo(266, 300);
+ctx.lineTo(230, 278);
+ctx.closePath();
+ctx.fillStyle = '#F7931A';
+ctx.fill();
+
+// V6-like blue lower face emphasis
+ctx.beginPath();
+ctx.moveTo(220, 292);
+ctx.lineTo(346, 262);
+ctx.lineTo(198, 452);
+ctx.lineTo(230, 278);
+ctx.closePath();
+ctx.fillStyle = 'rgba(32, 120, 255, 0.95)';
+ctx.fill();
+
+// No white edge/stroke to avoid any internal white artifacts
+</script>
+</body>
+</html>

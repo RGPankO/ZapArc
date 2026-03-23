@@ -37,7 +37,7 @@ import {
 } from './state';
 
 // SDK imports
-import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks } from './sdk';
+import { connectBreezSDK, disconnectBreezSDK, setSdkEventCallbacks, claimPendingDepositsNow } from './sdk';
 
 // Notification imports
 import { showNotification, showError, showSuccess, showInfo } from './notifications';
@@ -151,6 +151,8 @@ function getTransactionEmptyStateHtml(message: string = 'No transactions yet', s
 const lightningAddressStorage = new ChromeStorageManager();
 const LIGHTNING_ADDRESS_USERNAME_PATTERN = /^[a-z0-9][a-z0-9_-]{1,30}[a-z0-9]$/;
 let currentLightningAddressInfo: LightningAddressInfo | null = null;
+let lastDepositClaimCheckAt = 0;
+const DEPOSIT_CLAIM_CHECK_INTERVAL_MS = 30_000;
 
 async function getActiveWalletId(): Promise<string | null> {
     const result = await chrome.storage.local.get(['multiWalletData']);
@@ -380,13 +382,39 @@ async function handleUnregisterLightningAddress(): Promise<void> {
     }
 }
 
-async function updateBalanceDisplay() {
+function setBalanceLoading(loading: boolean): void {
+    const balanceLoading = document.getElementById('balance-loading');
+    const balanceEl = document.getElementById('balance');
+    if (balanceLoading) {
+        if (loading) balanceLoading.classList.remove('hidden');
+        else balanceLoading.classList.add('hidden');
+    }
+    if (balanceEl) {
+        // Keep numeric text untouched; just visually soften while loading.
+        balanceEl.classList.toggle('loading', loading);
+    }
+}
+
+async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
     console.log('🔍 [Popup] Updating balance display...');
+
+    const balanceElement = document.getElementById('balance');
+    const shouldShowLoader = balanceElement?.textContent?.includes('--') ?? false;
+    if (shouldShowLoader) setBalanceLoading(true);
 
     try {
         if (!breezSDK) {
             console.warn('[Popup] SDK not connected - cannot update balance');
+            setBalanceLoading(false);
             return;
+        }
+
+        // Proactively claim on-chain deposits (covers cases where event misses)
+        const now = Date.now();
+        const shouldClaim = forceClaimCheck || (now - lastDepositClaimCheckAt > DEPOSIT_CLAIM_CHECK_INTERVAL_MS);
+        if (shouldClaim) {
+            lastDepositClaimCheckAt = now;
+            void claimPendingDepositsNow(breezSDK, forceClaimCheck ? 'manual refresh' : 'periodic balance refresh');
         }
 
         // Get fresh balance from SDK (ensure synced for accurate total)
@@ -399,10 +427,10 @@ async function updateBalanceDisplay() {
         setCurrentBalance(balance);
 
         // Update UI
-        const balanceElement = document.getElementById('balance');
         if (balanceElement) {
             balanceElement.textContent = `${balance.toLocaleString()} sats`;
         }
+        setBalanceLoading(false);
 
         // Also update withdraw balance display if visible
         const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
@@ -426,6 +454,7 @@ async function updateBalanceDisplay() {
 
     } catch (error) {
         console.error('❌ [Popup] Error updating balance:', error);
+        setBalanceLoading(false);
     }
 }
 
@@ -531,12 +560,20 @@ async function loadTransactionHistory() {
                 payment.details?.confirmations ??
                 undefined;
 
+            const rawStatus = String(payment.status || '').toLowerCase();
+            const isOnchain = !!(method && String(method).toLowerCase().includes('bitcoin')) ||
+                !!(method && String(method).toLowerCase().includes('onchain')) ||
+                !!(payment.details?.txId || payment.details?.txid || payment.txid || payment.details?.txHash);
+
+            // If SDK omits status for on-chain sends, treat as pending/confirming by default.
+            const normalizedStatus = rawStatus || (isOnchain && !isReceive ? 'pending' : 'completed');
+
             return {
                 id: payment.id || `tx-${index}`,
                 type: isReceive ? 'receive' : 'send',
                 amount: Number(payment.amount ?? payment.amountSats ?? 0),
                 timestamp: (payment.timestamp || 0) * 1000,
-                status: payment.status || 'completed',
+                status: normalizedStatus,
                 description: payment.description || undefined,
                 method,
                 feeSats: Number(payment.fees ?? payment.feeSats ?? 0) || undefined,
@@ -595,13 +632,11 @@ function getTransactionStatus(tx: StoredTransaction): { label: string; className
     const status = (tx.status || '').toLowerCase();
     if (status === 'failed' || status === 'error') return { label: 'Failed', className: 'tx-status-failed' };
     if (status.includes('complete') || status.includes('success')) return { label: '', className: '' };
-    // SDK reports "pending" for on-chain txns even after confirmation
-    // Only show "Pending" if there's no txid (not yet broadcast)
+    // For on-chain sends, keep visible as confirming/pending until confirmations appear.
     if (status === 'pending') {
-        const isOnchain = isOnchainTransaction(tx);
-        if (isOnchain && tx.txid) return { label: '', className: '' }; // broadcast = good enough
         if (tx.confirmations !== undefined && tx.confirmations >= 1) return { label: '', className: '' };
-        return { label: 'Pending', className: 'tx-status-pending' };
+        const isOnchain = isOnchainTransaction(tx);
+        return { label: isOnchain ? 'Confirming' : 'Pending', className: 'tx-status-pending' };
     }
     if (status === 'confirming' || status === 'mempool') return { label: 'Confirming', className: 'tx-status-pending' };
     if (tx.confirmations !== undefined && tx.confirmations === 0) return { label: 'Confirming', className: 'tx-status-pending' };
@@ -662,10 +697,10 @@ function showTransactionDetail(tx: StoredTransaction): void {
     let statusClass = 'completed';
     let statusIcon = '✓';
     let statusText = 'Completed';
-    if (tx.status === 'pending' && !(isOnchain && tx.txid)) {
+    if (tx.status === 'pending' || tx.status === 'confirming' || tx.status === 'mempool') {
         statusClass = 'pending';
         statusIcon = '⏳';
-        statusText = 'Pending';
+        statusText = isOnchain ? 'Confirming' : 'Pending';
     } else if (tx.status === 'failed') {
         statusClass = 'failed';
         statusIcon = '✗';
@@ -2929,7 +2964,7 @@ function setupEventListeners() {
             const startTime = Date.now();
 
             try {
-                await updateBalanceDisplay();
+                await updateBalanceDisplay(true);
                 await loadTransactionHistory();
                 await refreshLightningAddress(true);
                 console.log('[Popup] Refresh complete');
@@ -3257,10 +3292,7 @@ async function initializePopup() {
                     }
 
                     // Only show loading indicator if we don't have cached data
-                    const balanceLoading = document.getElementById('balance-loading');
-                    if (balanceLoading && !hasCachedBalance) {
-                        balanceLoading.classList.remove('hidden');
-                    }
+                    setBalanceLoading(!hasCachedBalance);
 
                     // Load cached transactions or show loading
                     const transactionList = document.getElementById('transaction-list');
