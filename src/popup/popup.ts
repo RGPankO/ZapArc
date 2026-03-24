@@ -3105,6 +3105,7 @@ async function handleSettings(): Promise<void> {
     if (lightningToggleBtn) lightningToggleBtn.setAttribute('aria-expanded', 'false');
 
     await refreshSettingsInterface();
+    await refreshFiatCurrencyUI();
 }
 
 function handleOpenSettingsPage() {
@@ -3160,26 +3161,25 @@ async function refreshFiatCurrencyUI(): Promise<void> {
 
 async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {
     try {
-        const response = await ExtensionMessaging.getUserSettings();
-        if (!response.success || !response.data) {
-            showError('Failed to load settings');
-            return;
-        }
-        
-        const settings = response.data as UserSettings;
-        settings.fiatCurrency = currency;
-
-        // Persist directly to canonical storage so preference survives popup close/reopen
+        // Persist first (no dependency on background response)
         await persistFiatCurrency(currency);
 
-        // Update in-memory cache FIRST so all subsequent reads in this popup session
-        // (across popup.ts, deposit.ts, withdrawal.ts) see the new value immediately
+        // Update in-memory cache so all modules use the new value immediately
         setFiatCurrencyCache(currency);
 
-        // Keep background path in sync as well
-        const saveResponse = await ExtensionMessaging.saveUserSettings(settings);
-        if (!saveResponse.success) {
-            console.warn('[Popup] Background saveUserSettings failed, but direct storage persist succeeded');
+        // Best-effort background sync for compatibility with settings consumers
+        try {
+            const response = await ExtensionMessaging.getUserSettings();
+            if (response.success && response.data) {
+                const settings = response.data as UserSettings;
+                settings.fiatCurrency = currency;
+                const saveResponse = await ExtensionMessaging.saveUserSettings(settings);
+                if (!saveResponse.success) {
+                    console.warn('[Popup] Background saveUserSettings failed, direct persist still succeeded');
+                }
+            }
+        } catch (syncError) {
+            console.warn('[Popup] Background settings sync failed, direct persist still succeeded', syncError);
         }
 
         // Update button UI directly
@@ -3194,9 +3194,11 @@ async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {
                 usdBtn.classList.remove('active');
             }
         }
-        await updateBalanceDisplay(); // Refresh balance to show new currency
+
+        await updateBalanceDisplay();
         showSuccess(`Currency changed to ${currency.toUpperCase()}`);
     } catch (error) {
+        setFiatCurrencyCache(null);
         showError('Failed to update currency preference');
     }
 }

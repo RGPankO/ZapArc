@@ -12,6 +12,7 @@ import { ExtensionMessaging } from '../utils/messaging';
 import type { UserSettings } from '../types';
 
 let _cached: FiatCurrency | null = null;
+const FIAT_CURRENCY_KEY = 'fiatCurrencyPreference';
 
 /**
  * Get the user's selected fiat currency.
@@ -20,24 +21,41 @@ let _cached: FiatCurrency | null = null;
 export async function getUserFiatCurrency(): Promise<FiatCurrency> {
     if (_cached) return _cached;
 
-    // Primary read path: direct storage (works even if background is sleeping/restarting)
+    // Primary read path: dedicated key (most resilient against userSettings rewrites)
+    try {
+        const dedicated = await chrome.storage.local.get([FIAT_CURRENCY_KEY]);
+        const value = dedicated?.[FIAT_CURRENCY_KEY];
+        if (value === 'usd' || value === 'eur') {
+            _cached = value;
+            return value;
+        }
+    } catch (error) {
+        console.warn('[CurrencyPref] Dedicated key read failed:', error);
+    }
+
+    // Secondary read path: canonical userSettings object
     try {
         const result = await chrome.storage.local.get(['userSettings']);
         const stored = result?.userSettings as Partial<UserSettings> | undefined;
         if (stored?.fiatCurrency === 'usd' || stored?.fiatCurrency === 'eur') {
-            _cached = stored.fiatCurrency;
-            return _cached;
+            const value: FiatCurrency = stored.fiatCurrency;
+            _cached = value;
+            // Backfill dedicated key for future fast/reliable reads
+            await chrome.storage.local.set({ [FIAT_CURRENCY_KEY]: value });
+            return value;
         }
     } catch (error) {
-        console.warn('[CurrencyPref] Direct storage read failed:', error);
+        console.warn('[CurrencyPref] userSettings read failed:', error);
     }
 
     // Fallback read path: background messaging
     try {
         const response = await ExtensionMessaging.getUserSettings();
         if (response.success && response.data) {
-            _cached = (response.data as UserSettings).fiatCurrency || 'usd';
-            return _cached;
+            const value: FiatCurrency = (response.data as UserSettings).fiatCurrency || 'usd';
+            _cached = value;
+            await chrome.storage.local.set({ [FIAT_CURRENCY_KEY]: value });
+            return value;
         }
     } catch (error) {
         console.warn('[CurrencyPref] Failed to read fiat currency via messaging:', error);
@@ -51,6 +69,7 @@ export async function persistFiatCurrency(currency: FiatCurrency): Promise<void>
     const result = await chrome.storage.local.get(['userSettings']);
     const existing = (result?.userSettings || {}) as Partial<UserSettings>;
     await chrome.storage.local.set({
+        [FIAT_CURRENCY_KEY]: currency,
         userSettings: {
             ...existing,
             fiatCurrency: currency
