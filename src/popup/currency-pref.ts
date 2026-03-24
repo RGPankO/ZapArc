@@ -19,6 +19,20 @@ let _cached: FiatCurrency | null = null;
  */
 export async function getUserFiatCurrency(): Promise<FiatCurrency> {
     if (_cached) return _cached;
+
+    // Primary read path: direct storage (works even if background is sleeping/restarting)
+    try {
+        const result = await chrome.storage.local.get(['userSettings']);
+        const stored = result?.userSettings as Partial<UserSettings> | undefined;
+        if (stored?.fiatCurrency === 'usd' || stored?.fiatCurrency === 'eur') {
+            _cached = stored.fiatCurrency;
+            return _cached;
+        }
+    } catch (error) {
+        console.warn('[CurrencyPref] Direct storage read failed:', error);
+    }
+
+    // Fallback read path: background messaging
     try {
         const response = await ExtensionMessaging.getUserSettings();
         if (response.success && response.data) {
@@ -26,9 +40,23 @@ export async function getUserFiatCurrency(): Promise<FiatCurrency> {
             return _cached;
         }
     } catch (error) {
-        console.warn('[CurrencyPref] Failed to read fiat currency:', error);
+        console.warn('[CurrencyPref] Failed to read fiat currency via messaging:', error);
     }
+
     return 'usd';
+}
+
+/** Persist fiat currency to canonical userSettings object in storage. */
+export async function persistFiatCurrency(currency: FiatCurrency): Promise<void> {
+    const result = await chrome.storage.local.get(['userSettings']);
+    const existing = (result?.userSettings || {}) as Partial<UserSettings>;
+    await chrome.storage.local.set({
+        userSettings: {
+            ...existing,
+            fiatCurrency: currency
+        }
+    });
+    _cached = currency;
 }
 
 /**

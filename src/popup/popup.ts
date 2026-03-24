@@ -200,7 +200,7 @@ async function getActiveWalletId(): Promise<string | null> {
     }
 }
 
-import { getUserFiatCurrency, setFiatCurrencyCache } from './currency-pref';
+import { getUserFiatCurrency, setFiatCurrencyCache, persistFiatCurrency } from './currency-pref';
 
 /** Get wallet cache key that includes sub-wallet index to avoid cross-wallet cache hits */
 function walletCacheKey(prefix: string, walletId: string, subIndex?: number): string {
@@ -3168,32 +3168,34 @@ async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {
         
         const settings = response.data as UserSettings;
         settings.fiatCurrency = currency;
-        
+
+        // Persist directly to canonical storage so preference survives popup close/reopen
+        await persistFiatCurrency(currency);
+
         // Update in-memory cache FIRST so all subsequent reads in this popup session
         // (across popup.ts, deposit.ts, withdrawal.ts) see the new value immediately
         setFiatCurrencyCache(currency);
-        
+
+        // Keep background path in sync as well
         const saveResponse = await ExtensionMessaging.saveUserSettings(settings);
-        if (saveResponse.success) {
-            // Update button UI directly
-            const usdBtn = document.getElementById('fiat-currency-usd-btn');
-            const eurBtn = document.getElementById('fiat-currency-eur-btn');
-            if (usdBtn && eurBtn) {
-                if (currency === 'usd') {
-                    usdBtn.classList.add('active');
-                    eurBtn.classList.remove('active');
-                } else {
-                    eurBtn.classList.add('active');
-                    usdBtn.classList.remove('active');
-                }
-            }
-            await updateBalanceDisplay(); // Refresh balance to show new currency
-            showSuccess(`Currency changed to ${currency.toUpperCase()}`);
-        } else {
-            // Revert cache on failure
-            setFiatCurrencyCache(null);
-            showError('Failed to save currency preference');
+        if (!saveResponse.success) {
+            console.warn('[Popup] Background saveUserSettings failed, but direct storage persist succeeded');
         }
+
+        // Update button UI directly
+        const usdBtn = document.getElementById('fiat-currency-usd-btn');
+        const eurBtn = document.getElementById('fiat-currency-eur-btn');
+        if (usdBtn && eurBtn) {
+            if (currency === 'usd') {
+                usdBtn.classList.add('active');
+                eurBtn.classList.remove('active');
+            } else {
+                eurBtn.classList.add('active');
+                usdBtn.classList.remove('active');
+            }
+        }
+        await updateBalanceDisplay(); // Refresh balance to show new currency
+        showSuccess(`Currency changed to ${currency.toUpperCase()}`);
     } catch (error) {
         showError('Failed to update currency preference');
     }
