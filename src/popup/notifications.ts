@@ -36,7 +36,7 @@ export function showNotification(message: string, type: 'info' | 'success' | 'er
     container.appendChild(notification);
 
     setTimeout(() => {
-        notification.style.animation = 'slideIn 0.3s ease-out reverse';
+        notification.style.animation = 'slideDown 0.3s ease-out reverse';
         setTimeout(() => {
             notification.remove();
             // Remove from active tracking
