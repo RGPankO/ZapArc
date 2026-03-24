@@ -121,6 +121,38 @@ function generateAndValidateMnemonic(): string {
 
 
 // ========================================
+// View Management
+// ========================================
+
+/** All top-level view container IDs. Only one should be visible at a time. */
+const ALL_VIEW_IDS = [
+    'main-interface',
+    'unlock-interface',
+    'onboarding-wizard',
+    'deposit-interface',
+    'withdraw-interface',
+    'settings-interface',
+    'contacts-interface',
+    'wallet-management-interface',
+    'wallet-selection-interface',
+    'archived-wallets-interface',
+    'rename-wallet-interface',
+    'transaction-history-view',
+    'qr-only-interface',
+] as const;
+
+/**
+ * Hide all top-level views. Call before showing any single view
+ * to prevent the "two views visible at once" bug.
+ */
+function hideAllViews(): void {
+    for (const id of ALL_VIEW_IDS) {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    }
+}
+
+// ========================================
 // Balance & Transaction Functions
 // ========================================
 
@@ -2207,15 +2239,9 @@ function handleImportContinue() {
 function showUnlockPrompt() {
     console.log('🔵 [Unlock] showUnlockPrompt ENTRY');
 
-    const wizard = document.getElementById('onboarding-wizard');
-    const mainInterface = document.getElementById('main-interface');
+    hideAllViews();
+
     const unlockInterface = document.getElementById('unlock-interface');
-    const settingsInterface = document.getElementById('settings-interface');
-
-    if (wizard) wizard.classList.add('hidden');
-    if (mainInterface) mainInterface.classList.add('hidden');
-    if (settingsInterface) settingsInterface.classList.add('hidden');
-
     if (unlockInterface) {
         unlockInterface.classList.remove('hidden');
     } else {
@@ -2716,16 +2742,13 @@ async function lockWallet() {
 function restoreMainInterface() {
     console.log('🔵 [Restore] Restoring main interface');
 
-    const wizard = document.getElementById('onboarding-wizard');
-    const mainInterface = document.getElementById('main-interface');
-    const settingsInterface = document.getElementById('settings-interface');
+    hideAllViews();
 
-    if (wizard && mainInterface) {
-        wizard.classList.add('hidden');
-        if (settingsInterface) settingsInterface.classList.add('hidden');
+    const mainInterface = document.getElementById('main-interface');
+    if (mainInterface) {
         mainInterface.classList.remove('hidden');
     } else {
-        console.warn('⚠️ [Restore] Elements not found - reloading');
+        console.warn('⚠️ [Restore] main-interface not found - reloading');
         window.location.reload();
     }
 }
@@ -2741,15 +2764,9 @@ function enableWalletControls() {
 function showWalletSetupPrompt() {
     console.log('[Setup] Showing wallet setup prompt');
 
-    const mainInterface = document.getElementById('main-interface');
+    hideAllViews();
+
     const wizard = document.getElementById('onboarding-wizard');
-    const unlockInterface = document.getElementById('unlock-interface');
-    const settingsInterface = document.getElementById('settings-interface');
-
-    if (mainInterface) mainInterface.classList.add('hidden');
-    if (unlockInterface) unlockInterface.classList.add('hidden');
-    if (settingsInterface) settingsInterface.classList.add('hidden');
-
     if (wizard) {
         wizard.classList.remove('hidden');
         showWizardStep('welcome-step');
@@ -2808,13 +2825,13 @@ function setupEventListeners() {
     // Deposit button
     const depositBtn = document.getElementById('deposit-btn');
     if (depositBtn) {
-        depositBtn.onclick = () => showDepositInterface();
+        depositBtn.onclick = () => { hideAllViews(); showDepositInterface(); };
     }
 
     // Withdraw button
     const withdrawBtn = document.getElementById('withdraw-btn');
     if (withdrawBtn) {
-        withdrawBtn.onclick = () => showWithdrawalInterface();
+        withdrawBtn.onclick = () => { hideAllViews(); showWithdrawalInterface(); };
     }
 
     // Settings button
@@ -2864,7 +2881,7 @@ function setupEventListeners() {
     // Contacts button
     const contactsBtn = document.getElementById('contacts-btn');
     if (contactsBtn) {
-        contactsBtn.onclick = () => showContactsInterface();
+        contactsBtn.onclick = () => { hideAllViews(); showContactsInterface(); };
     }
 
     // Lightning Address actions
@@ -3004,12 +3021,12 @@ function setupEventListeners() {
 }
 
 async function handleSettings(): Promise<void> {
-    const mainInterface = document.getElementById('main-interface');
+    hideAllViews();
+
     const settingsInterface = document.getElementById('settings-interface');
     const lightningSection = document.getElementById('lightning-address-section');
     const lightningToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
 
-    if (mainInterface) mainInterface.classList.add('hidden');
     if (settingsInterface) settingsInterface.classList.remove('hidden');
     if (lightningSection) lightningSection.classList.add('hidden');
     if (lightningToggleBtn) lightningToggleBtn.setAttribute('aria-expanded', 'false');
