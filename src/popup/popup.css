@@ -1146,6 +1146,11 @@ header h1 {
   opacity: 1;
 }
 
+.transaction-amount-col {
+  text-align: right;
+  flex-shrink: 0;
+}
+
 .transaction-amount {
   font-size: 12px;
   font-weight: 500;
@@ -1157,6 +1162,12 @@ header h1 {
 
 .transaction-amount.negative {
   color: var(--error);
+}
+
+.transaction-fiat {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 1px;
 }
 
 #settings-section {
@@ -3418,6 +3429,12 @@ body.modal-open {
 
 .tx-detail-amount.negative {
   color: var(--error);
+}
+
+.tx-detail-fiat-estimate {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
 }
 
 .tx-detail-status {

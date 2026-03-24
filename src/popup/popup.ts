@@ -705,11 +705,27 @@ function renderTransactionList(container: HTMLElement, transactions: StoredTrans
 <div class="transaction-type">${isReceive ? 'Received' : 'Sent'}${txStatus.label ? ` · <span class="${txStatus.className}">${txStatus.label}</span>` : ''}</div>
 <div class="transaction-time">${timestamp}</div>
 </div>
+<div class="transaction-amount-col">
 <div class="transaction-amount ${isReceive ? 'positive' : 'negative'}">
 ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
 </div>
+<div class="transaction-fiat" data-sats="${tx.amount}"></div>
+</div>
 </div>`;
     }).join('');
+
+    // Populate fiat estimates for transaction list
+    getUserFiatCurrency().then(currency => {
+        container.querySelectorAll('.transaction-fiat').forEach(async (el) => {
+            const sats = parseInt((el as HTMLElement).dataset.sats || '0', 10);
+            if (sats > 0) {
+                const fiatAmount = await satsToFiat(sats, currency);
+                if (fiatAmount !== null) {
+                    (el as HTMLElement).textContent = `≈ ${formatFiat(fiatAmount, currency)}`;
+                }
+            }
+        });
+    });
 
     // Add click handlers to transaction items
     container.querySelectorAll('.transaction-item').forEach((item) => {
@@ -849,6 +865,7 @@ function showTransactionDetail(tx: StoredTransaction): void {
             <div class="tx-detail-amount ${isReceive ? 'positive' : 'negative'}">
                 ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
             </div>
+            <div class="tx-detail-fiat-estimate" id="tx-detail-fiat"></div>
             <div class="tx-detail-status ${statusClass}">
                 ${statusIcon} ${statusText}
             </div>
@@ -857,6 +874,16 @@ function showTransactionDetail(tx: StoredTransaction): void {
             ${detailRows}
         </div>
     `;
+
+    // Async: populate fiat estimate
+    getUserFiatCurrency().then(currency =>
+        satsToFiat(tx.amount, currency).then(fiatAmount => {
+            const fiatEl = document.getElementById('tx-detail-fiat');
+            if (fiatEl && fiatAmount !== null) {
+                fiatEl.textContent = `≈ ${formatFiat(fiatAmount, currency)}`;
+            }
+        })
+    );
 
     // Add copy button handlers
     content.querySelectorAll('.tx-copy-btn').forEach(btn => {
