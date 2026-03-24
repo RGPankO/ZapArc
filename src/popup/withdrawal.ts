@@ -81,7 +81,11 @@ export function resetWithdrawForm(): void {
     const previewBtn = document.getElementById('preview-payment-btn') as HTMLButtonElement;
 
     if (paymentInput) paymentInput.value = '';
-    if (amountInput) amountInput.value = '';
+    if (amountInput) {
+        amountInput.value = '';
+        amountInput.disabled = false;
+        amountInput.placeholder = '';
+    }
     if (commentInput) commentInput.value = '';
     previewDiv?.classList.add('hidden');
 
@@ -188,17 +192,46 @@ export function setupWithdrawalListeners(): void {
     sendOnchainBtn?.addEventListener('click', sendOnchainPayment);
 }
 
+let autoPreviewInProgress = false;
+
 export function validateWithdrawalForm(): void {
     const paymentInput = document.getElementById('payment-input') as HTMLTextAreaElement;
     const previewBtn = document.getElementById('preview-payment-btn') as HTMLButtonElement;
+    const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
 
     if (!paymentInput || !previewBtn) return;
 
     const input = paymentInput.value.trim();
-    const isValidInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
+    const lower = input.toLowerCase();
+    const isValidInvoice = lower.startsWith('lnbc') || lower.startsWith('lntb');
     const isValidAddress = input.includes('@') && input.includes('.');
 
     previewBtn.disabled = !(isValidInvoice || isValidAddress);
+
+    // BOLT11 with encoded amount: auto-preview and disable amount input
+    if (isValidInvoice && !autoPreviewInProgress) {
+        // Check if amount is encoded in the invoice (lnbc<amount><multiplier>1...)
+        // e.g. lnbc500u1..., lnbc1m1..., lnbc2500n1...
+        const hasAmount = /^ln(bc|tb)\d+[munp]?1/i.test(input);
+        if (hasAmount) {
+            if (amountInput) {
+                amountInput.disabled = true;
+                amountInput.placeholder = 'Set by invoice';
+                amountInput.value = '';
+            }
+            autoPreviewInProgress = true;
+            previewPayment().finally(() => {
+                autoPreviewInProgress = false;
+            });
+            return;
+        }
+    }
+
+    // For non-invoice or zero-amount invoice: re-enable amount input
+    if (amountInput && amountInput.disabled) {
+        amountInput.disabled = false;
+        amountInput.placeholder = '';
+    }
 }
 
 let onchainFeeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -413,9 +446,18 @@ export async function previewPayment(): Promise<void> {
             const prepFee = prepared.paymentMethod?.type === 'bolt11Invoice' 
                 ? Number(prepared.paymentMethod.lightningFeeSats || 0) 
                 : 0;
+            const invoiceAmount = Number(prepared.amount || 0) || amount || 0;
+
+            // If invoice has a built-in amount, show it in the (disabled) amount field
+            if (invoiceAmount > 0 && amountInput) {
+                amountInput.value = invoiceAmount.toString();
+                amountInput.disabled = true;
+                amountInput.placeholder = 'Set by invoice';
+            }
+
             displayPaymentPreview({
                 recipient: 'Lightning Payment',
-                amount: Number(prepared.amount || 0) || amount || 0,
+                amount: invoiceAmount,
                 fee: prepFee,
                 type: 'bolt11',
                 prepareResponse: prepared
