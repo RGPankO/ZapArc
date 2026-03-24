@@ -3460,11 +3460,10 @@ async function initializePopup() {
                             balanceElement.textContent = `${storageData.cachedBalance.toLocaleString()} sats`;
                         }
 
-                        // Show cached fiat estimate immediately (then refresh with live rate later)
+                        // Show cached fiat estimate immediately (then reconcile with selected currency)
                         try {
                             const balanceFiatElement = document.getElementById('balance-fiat');
                             if (balanceFiatElement) {
-                                const fiatCurrency = await getUserFiatCurrency();
                                 const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
                                 let fiatCacheKey = 'cachedBalanceFiat';
                                 if (multiWalletResult.multiWalletData) {
@@ -3474,12 +3473,27 @@ async function initializePopup() {
                                         fiatCacheKey = walletCacheKey('cachedBalanceFiat', mwd.activeWalletId, subIdx);
                                     }
                                 }
+
                                 const fiatCacheData = await chrome.storage.local.get([fiatCacheKey, 'cachedBalanceFiat']);
                                 const fiatCache = fiatCacheData[fiatCacheKey] || fiatCacheData.cachedBalanceFiat;
-                                if (fiatCache && fiatCache.currency === fiatCurrency && fiatCache.balanceSats === storageData.cachedBalance && fiatCache.display) {
+
+                                // Immediate paint: if sats match, show cached fiat right away
+                                if (fiatCache && fiatCache.balanceSats === storageData.cachedBalance && fiatCache.display) {
                                     balanceFiatElement.textContent = fiatCache.display;
                                     balanceFiatElement.classList.remove('hidden');
                                 }
+
+                                // Background reconcile: if cached currency differs from selected, refresh display
+                                void (async () => {
+                                    const selectedCurrency = await getUserFiatCurrency();
+                                    if (!fiatCache || fiatCache.currency !== selectedCurrency || !fiatCache.display) {
+                                        const fiatAmount = await satsToFiat(storageData.cachedBalance, selectedCurrency);
+                                        if (fiatAmount !== null) {
+                                            balanceFiatElement.textContent = `≈ ${formatFiat(fiatAmount, selectedCurrency)}`;
+                                            balanceFiatElement.classList.remove('hidden');
+                                        }
+                                    }
+                                })();
                             }
                         } catch (e) { /* ignore cached fiat errors */ }
                         
