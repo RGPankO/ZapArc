@@ -91,7 +91,8 @@ import { initializeContactsUI, showContactsInterface } from './contacts';
 import { ExtensionMessaging } from '../utils/messaging';
 import { ChromeStorageManager } from '../utils/storage';
 import * as bip39 from 'bip39';
-import type { LightningAddressInfo } from '../types';
+import type { LightningAddressInfo, UserSettings } from '../types';
+import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 
 // Helper to generate mnemonic
 /**
@@ -197,6 +198,18 @@ async function getActiveWalletId(): Promise<string | null> {
         console.warn('[Popup] Failed to parse multiWalletData for active wallet id:', error);
         return null;
     }
+}
+
+async function getUserFiatCurrency(): Promise<FiatCurrency> {
+    try {
+        const response = await ExtensionMessaging.getUserSettings();
+        if (response.success && response.data) {
+            return (response.data as UserSettings).fiatCurrency || 'usd';
+        }
+    } catch (error) {
+        console.warn('[Popup] Failed to get fiat currency setting:', error);
+    }
+    return 'usd';
 }
 
 /** Get wallet cache key that includes sub-wallet index to avoid cross-wallet cache hits */
@@ -431,6 +444,7 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
     console.log('🔍 [Popup] Updating balance display...');
 
     const balanceElement = document.getElementById('balance');
+    const balanceFiatElement = document.getElementById('balance-fiat');
     const shouldShowLoader = balanceElement?.textContent?.includes('--') ?? false;
     if (shouldShowLoader) setBalanceLoading(true);
 
@@ -462,6 +476,19 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
         if (balanceElement) {
             balanceElement.textContent = `${balance.toLocaleString()} sats`;
         }
+
+        // Update fiat equivalent
+        if (balanceFiatElement) {
+            const fiatCurrency = await getUserFiatCurrency();
+            const fiatAmount = await satsToFiat(balance, fiatCurrency);
+            if (fiatAmount !== null) {
+                balanceFiatElement.textContent = `≈ ${formatFiat(fiatAmount, fiatCurrency)}`;
+                balanceFiatElement.classList.remove('hidden');
+            } else {
+                balanceFiatElement.classList.add('hidden');
+            }
+        }
+
         setBalanceLoading(false);
 
         // Also update withdraw balance display if visible
@@ -2873,6 +2900,35 @@ function setupEventListeners() {
         };
     }
 
+    const settingsFiatCurrencyToggleBtn = document.getElementById('settings-fiat-currency-toggle-btn');
+    if (settingsFiatCurrencyToggleBtn) {
+        settingsFiatCurrencyToggleBtn.onclick = async () => {
+            const section = document.getElementById('fiat-currency-section');
+            if (!section) return;
+
+            const isExpanded = settingsFiatCurrencyToggleBtn.getAttribute('aria-expanded') === 'true';
+            const nextExpanded = !isExpanded;
+
+            settingsFiatCurrencyToggleBtn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
+            section.classList.toggle('hidden', !nextExpanded);
+
+            if (nextExpanded) {
+                await refreshFiatCurrencyUI();
+            }
+        };
+    }
+
+    const fiatCurrencyUsdBtn = document.getElementById('fiat-currency-usd-btn');
+    const fiatCurrencyEurBtn = document.getElementById('fiat-currency-eur-btn');
+    if (fiatCurrencyUsdBtn && fiatCurrencyEurBtn) {
+        fiatCurrencyUsdBtn.addEventListener('click', async () => {
+            await saveFiatCurrency('usd');
+        });
+        fiatCurrencyEurBtn.addEventListener('click', async () => {
+            await saveFiatCurrency('eur');
+        });
+    }
+
     const settingsDeleteWalletBtn = document.getElementById('settings-delete-wallet-btn');
     if (settingsDeleteWalletBtn) {
         settingsDeleteWalletBtn.onclick = showForgotPinModal;
@@ -3068,16 +3124,61 @@ async function refreshSettingsInterface(): Promise<void> {
     }
 }
 
+async function refreshFiatCurrencyUI(): Promise<void> {
+    const usdBtn = document.getElementById('fiat-currency-usd-btn');
+    const eurBtn = document.getElementById('fiat-currency-eur-btn');
+    
+    if (!usdBtn || !eurBtn) return;
+    
+    const fiatCurrency = await getUserFiatCurrency();
+    
+    if (fiatCurrency === 'usd') {
+        usdBtn.classList.add('active');
+        eurBtn.classList.remove('active');
+    } else {
+        eurBtn.classList.add('active');
+        usdBtn.classList.remove('active');
+    }
+}
+
+async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {
+    try {
+        const response = await ExtensionMessaging.getUserSettings();
+        if (!response.success || !response.data) {
+            showError('Failed to load settings');
+            return;
+        }
+        
+        const settings = response.data as UserSettings;
+        settings.fiatCurrency = currency;
+        
+        const saveResponse = await ExtensionMessaging.saveUserSettings(settings);
+        if (saveResponse.success) {
+            await refreshFiatCurrencyUI();
+            await updateBalanceDisplay(); // Refresh balance to show new currency
+            showSuccess(`Currency changed to ${currency.toUpperCase()}`);
+        } else {
+            showError('Failed to save currency preference');
+        }
+    } catch (error) {
+        showError('Failed to update currency preference');
+    }
+}
+
 function hideSettingsInterface(): void {
     const settingsInterface = document.getElementById('settings-interface');
     const mainInterface = document.getElementById('main-interface');
     const lightningSection = document.getElementById('lightning-address-section');
     const lightningToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
+    const fiatSection = document.getElementById('fiat-currency-section');
+    const fiatToggleBtn = document.getElementById('settings-fiat-currency-toggle-btn');
 
     if (settingsInterface) settingsInterface.classList.add('hidden');
     if (mainInterface) mainInterface.classList.remove('hidden');
     if (lightningSection) lightningSection.classList.add('hidden');
     if (lightningToggleBtn) lightningToggleBtn.setAttribute('aria-expanded', 'false');
+    if (fiatSection) fiatSection.classList.add('hidden');
+    if (fiatToggleBtn) fiatToggleBtn.setAttribute('aria-expanded', 'false');
 }
 
 async function handleSettingsRenameWallet(): Promise<void> {

@@ -438,6 +438,7 @@
                             <div id="balance-loading" class="balance-loading hidden">updating...</div>
                         </div>
                         <div id="balance" class="balance-amount">-- sats</div>
+                        <div id="balance-fiat" class="balance-fiat hidden"></div>
                     </div>
                     
                     <div id="home-ln-address" class="home-ln-address hidden">
@@ -522,6 +523,19 @@
                     </div>
 
                     <div id="lightning-address-status" class="lightning-address-status hidden"></div>
+                </div>
+
+                <button id="settings-fiat-currency-toggle-btn" class="settings-action-btn settings-toggle-btn" aria-expanded="false">
+                    💱 Fiat Currency
+                    <span class="settings-toggle-chevron" aria-hidden="true">▾</span>
+                </button>
+
+                <div id="fiat-currency-section" class="lightning-address-section hidden">
+                    <div class="fiat-currency-description">Choose your preferred currency for balance and transaction displays</div>
+                    <div class="fiat-currency-toggle-group">
+                        <button id="fiat-currency-usd-btn" class="fiat-currency-toggle-btn active" data-currency="usd">USD ($)</button>
+                        <button id="fiat-currency-eur-btn" class="fiat-currency-toggle-btn" data-currency="eur">EUR (€)</button>
+                    </div>
                 </div>
             </div>
 

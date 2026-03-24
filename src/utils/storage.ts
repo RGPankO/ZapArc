@@ -354,7 +354,8 @@ export class ChromeStorageManager {
           customLNURL: result.userSettings.customLNURL !== undefined ? result.userSettings.customLNURL : defaults.customLNURL,
           facebookPostingMode: result.userSettings.facebookPostingMode || defaults.facebookPostingMode,
           allowedFacebookGroups: result.userSettings.allowedFacebookGroups || defaults.allowedFacebookGroups,
-          deniedFacebookGroups: result.userSettings.deniedFacebookGroups || defaults.deniedFacebookGroups
+          deniedFacebookGroups: result.userSettings.deniedFacebookGroups || defaults.deniedFacebookGroups,
+          fiatCurrency: result.userSettings.fiatCurrency || defaults.fiatCurrency
         };
         return merged;
       }
@@ -592,7 +593,8 @@ export class ChromeStorageManager {
       customLNURL: undefined,
       facebookPostingMode: 'global',
       allowedFacebookGroups: [],
-      deniedFacebookGroups: []
+      deniedFacebookGroups: [],
+      fiatCurrency: 'usd'
     };
   }
 

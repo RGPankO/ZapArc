@@ -43,7 +43,8 @@ function getDefaultSettings(): UserSettings {
         customLNURL: undefined,
         facebookPostingMode: 'global',
         allowedFacebookGroups: [],
-        deniedFacebookGroups: []
+        deniedFacebookGroups: [],
+        fiatCurrency: 'usd'
     };
 }
 
@@ -68,6 +69,7 @@ function populateForm(): void {
     // UI settings
     (document.getElementById('floating-menu-enabled') as HTMLInputElement).checked = currentSettings.floatingMenuEnabled;
     (document.getElementById('autolock-timeout') as HTMLSelectElement).value = currentSettings.autoLockTimeout.toString();
+    (document.getElementById('fiat-currency') as HTMLSelectElement).value = currentSettings.fiatCurrency || 'usd';
 }
 
 function setupEventListeners(): void {
@@ -133,7 +135,8 @@ function setupEventListeners(): void {
     // Auto-save on certain changes (optional)
     const autoSaveElements = [
         'floating-menu-enabled',
-        'autolock-timeout'
+        'autolock-timeout',
+        'fiat-currency'
     ];
     
     autoSaveElements.forEach(id => {
@@ -184,7 +187,8 @@ async function saveSettings(): Promise<void> {
             autoLockTimeout: autoLockTimeout.timeout!,
             facebookPostingMode: currentSettings.facebookPostingMode,
             allowedFacebookGroups: currentSettings.allowedFacebookGroups,
-            deniedFacebookGroups: currentSettings.deniedFacebookGroups
+            deniedFacebookGroups: currentSettings.deniedFacebookGroups,
+            fiatCurrency: (document.getElementById('fiat-currency') as HTMLSelectElement).value as 'usd' | 'eur'
         };
         
         // Save settings

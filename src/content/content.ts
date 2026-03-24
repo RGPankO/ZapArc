@@ -678,7 +678,8 @@ class TipDetector {
         customLNURL: undefined,
         facebookPostingMode: 'global' as const,
         allowedFacebookGroups: [],
-        deniedFacebookGroups: []
+        deniedFacebookGroups: [],
+        fiatCurrency: 'usd' as const
       };
 
       // Create enhanced tip prompt

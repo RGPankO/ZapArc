@@ -147,6 +147,8 @@ export interface UserSettings {
   facebookPostingMode: 'global' | 'selective';
   allowedFacebookGroups: string[];
   deniedFacebookGroups: string[];
+  // Fiat currency preference
+  fiatCurrency: 'usd' | 'eur';
 }
 
 export interface DomainSettings {

@@ -10,33 +10,20 @@ import {
     setInvoiceExpiryTime
 } from './state';
 import { showError, showSuccess } from './notifications';
+import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
+import { ExtensionMessaging } from '../utils/messaging';
+import type { UserSettings } from '../types';
 
-// Live BTC/USD rate cache (2-minute TTL)
-let cachedBtcUsd: number | null = null;
-let btcRateFetchedAt = 0;
-const BTC_RATE_TTL_MS = 120_000; // 2 minutes
-
-async function fetchBtcUsd(): Promise<number | null> {
-    const now = Date.now();
-    if (cachedBtcUsd && now - btcRateFetchedAt < BTC_RATE_TTL_MS) {
-        return cachedBtcUsd;
-    }
+async function getUserFiatCurrency(): Promise<FiatCurrency> {
     try {
-        const res = await fetch(
-            'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
-            { method: 'GET' }
-        );
-        const data = await res.json();
-        const rate = Number(data?.bitcoin?.usd || 0);
-        if (rate > 0) {
-            cachedBtcUsd = rate;
-            btcRateFetchedAt = Date.now();
+        const response = await ExtensionMessaging.getUserSettings();
+        if (response.success && response.data) {
+            return (response.data as UserSettings).fiatCurrency || 'usd';
         }
-        return rate || null;
-    } catch (err) {
-        console.warn('[Deposit] Failed to fetch BTC/USD rate:', err);
-        return cachedBtcUsd; // return stale cache if available
+    } catch (error) {
+        console.warn('[Deposit] Failed to get fiat currency setting:', error);
     }
+    return 'usd';
 }
 
 function updateDepositEstimate(amount: number): void {
@@ -54,19 +41,21 @@ function updateDepositEstimate(amount: number): void {
     valueEl.textContent = '≈ ...';
     row.classList.remove('hidden');
 
-    fetchBtcUsd().then((btcPrice) => {
-        if (!btcPrice) {
+    // Use the shared currency service
+    (async () => {
+        const fiatCurrency = await getUserFiatCurrency();
+        const fiatAmount = await satsToFiat(amount, fiatCurrency);
+        if (!fiatAmount) {
             valueEl.textContent = '≈ rate unavailable';
             return;
         }
-        const usdEstimate = (amount / 100_000_000) * btcPrice;
-        if (usdEstimate >= 0.01) {
-            valueEl.textContent = `≈ $${usdEstimate.toFixed(2)} USD`;
+        if (fiatAmount >= 0.01) {
+            valueEl.textContent = `≈ ${formatFiat(fiatAmount, fiatCurrency)}`;
             row.classList.remove('hidden');
         } else {
             row.classList.add('hidden');
         }
-    });
+    })();
 }
 
 export type DepositCallbacks = {
