@@ -683,17 +683,8 @@ export async function sendPayment(): Promise<void> {
                 }
             }
 
-            try {
-                const inputValue = paymentInput.value.trim().toLowerCase();
-                if (inputValue.includes('@')) {
-                    const amountEl = document.getElementById('preview-amount');
-                    const amountText = amountEl?.textContent || '0';
-                    const amount = parseInt(amountText.replace(/[^0-9]/g, '')) || 0;
-                    triggerPaymentNotification({ lightningAddress: inputValue }, amount).catch(() => {});
-                } else {
-                    console.log('🔔 [Notification] Skipping push trigger (no lightning address identifier)');
-                }
-            } catch {}
+            // Push notification is triggered once after both payment paths (below).
+            // Do NOT trigger here — it causes duplicate notifications.
         } else {
             sendResult = await breezSDK.sendPayment({ prepareResponse: preparedPayment });
 
