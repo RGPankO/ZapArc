@@ -3152,9 +3152,24 @@ async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {
         const settings = response.data as UserSettings;
         settings.fiatCurrency = currency;
         
+        // Also write directly to chrome.storage.local so popup-side reads
+        // (like updateBalanceDisplay → getUserFiatCurrency) see the new value immediately.
+        await chrome.storage.local.set({ fiatCurrency: currency });
+        
         const saveResponse = await ExtensionMessaging.saveUserSettings(settings);
         if (saveResponse.success) {
-            await refreshFiatCurrencyUI();
+            // Update button UI directly (don't re-read storage — avoids race condition)
+            const usdBtn = document.getElementById('fiat-currency-usd-btn');
+            const eurBtn = document.getElementById('fiat-currency-eur-btn');
+            if (usdBtn && eurBtn) {
+                if (currency === 'usd') {
+                    usdBtn.classList.add('active');
+                    eurBtn.classList.remove('active');
+                } else {
+                    eurBtn.classList.add('active');
+                    usdBtn.classList.remove('active');
+                }
+            }
             await updateBalanceDisplay(); // Refresh balance to show new currency
             showSuccess(`Currency changed to ${currency.toUpperCase()}`);
         } else {
