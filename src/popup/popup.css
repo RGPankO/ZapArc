@@ -2800,6 +2800,49 @@ body.modal-open {
   resize: none;
 }
 
+/* Currency toggle on amount input */
+.amount-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.amount-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.currency-toggle-btn {
+  padding: 8px 14px;
+  background: rgba(255, 193, 7, 0.15);
+  color: var(--brand, #FFC107);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s;
+  min-width: 56px;
+  text-align: center;
+}
+
+.currency-toggle-btn:hover {
+  background: rgba(255, 193, 7, 0.25);
+  border-color: rgba(255, 193, 7, 0.5);
+}
+
+.conversion-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+.conversion-hint.hidden {
+  display: none;
+}
+
 /* Notification System */
 #notification-container {
   position: fixed;

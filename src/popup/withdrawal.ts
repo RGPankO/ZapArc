@@ -12,6 +12,7 @@ import { isExistingContact, openContactModalWithAddress } from './contacts';
 import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { triggerPaymentNotification } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
+import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -24,6 +25,71 @@ let withdrawalListenersInitialized = false;
 let activeSendTab: 'lightning' | 'onchain' = 'lightning';
 let onchainPreparedBySpeed: Partial<Record<'fast' | 'medium' | 'slow', any>> = {};
 let onchainSelectedSpeed: 'fast' | 'medium' | 'slow' = 'medium';
+
+// Currency toggle state for send amount input
+let sendInputCurrency: 'sats' | FiatCurrency = 'sats';
+let userFiatCurrency: FiatCurrency = 'usd';
+
+/** Load the user's fiat currency preference */
+async function loadFiatCurrencySetting(): Promise<void> {
+    try {
+        const result = await chrome.storage.local.get('fiatCurrency');
+        userFiatCurrency = (result.fiatCurrency === 'eur') ? 'eur' : 'usd';
+    } catch { /* default usd */ }
+}
+
+/** Update the currency toggle button label and conversion hint */
+function updateCurrencyToggleUI(): void {
+    const toggleBtn = document.getElementById('send-currency-toggle');
+    const conversionHint = document.getElementById('send-conversion-hint');
+    const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
+    
+    if (toggleBtn) {
+        const label = sendInputCurrency === 'sats' ? 'sats' : sendInputCurrency.toUpperCase();
+        toggleBtn.textContent = label;
+    }
+    
+    if (amountInput) {
+        amountInput.placeholder = sendInputCurrency === 'sats' ? 'Amount in sats' : `Amount in ${sendInputCurrency.toUpperCase()}`;
+    }
+
+    // Update conversion hint based on current input value
+    updateConversionHint();
+}
+
+/** Show live conversion below the amount input */
+async function updateConversionHint(): Promise<void> {
+    const conversionHint = document.getElementById('send-conversion-hint');
+    const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
+    if (!conversionHint || !amountInput) return;
+
+    const rawValue = parseFloat(amountInput.value);
+    if (!rawValue || rawValue <= 0) {
+        conversionHint.textContent = '';
+        conversionHint.classList.add('hidden');
+        return;
+    }
+
+    conversionHint.classList.remove('hidden');
+
+    if (sendInputCurrency === 'sats') {
+        // Show fiat equivalent
+        const fiatAmount = await satsToFiat(rawValue, userFiatCurrency);
+        if (fiatAmount !== null) {
+            conversionHint.textContent = `≈ ${formatFiat(fiatAmount, userFiatCurrency)}`;
+        } else {
+            conversionHint.textContent = '≈ rate unavailable';
+        }
+    } else {
+        // Show sats equivalent
+        const sats = await fiatToSats(rawValue, sendInputCurrency);
+        if (sats !== null) {
+            conversionHint.textContent = `= ${sats.toLocaleString()} sats`;
+        } else {
+            conversionHint.textContent = '= rate unavailable';
+        }
+    }
+}
 
 export function setWithdrawalCallbacks(cb: WithdrawalCallbacks): void {
     callbacks = cb;
@@ -39,9 +105,12 @@ export function showWithdrawalInterface(): void {
     const balanceDisplay = document.getElementById('withdraw-balance-display');
     if (balanceDisplay) balanceDisplay.textContent = `${currentBalance.toLocaleString()}`;
 
-    resetWithdrawForm();
-    setupWithdrawalListeners();
-    setSendTab('lightning');
+    // Load fiat currency preference before resetting form
+    loadFiatCurrencySetting().then(() => {
+        resetWithdrawForm();
+        setupWithdrawalListeners();
+        setSendTab('lightning');
+    });
 }
 
 export function hideWithdrawInterface(): void {
@@ -88,6 +157,12 @@ export function resetWithdrawForm(): void {
     }
     if (commentInput) commentInput.value = '';
     previewDiv?.classList.add('hidden');
+
+    // Reset currency toggle
+    sendInputCurrency = 'sats';
+    updateCurrencyToggleUI();
+    const conversionHint = document.getElementById('send-conversion-hint');
+    if (conversionHint) { conversionHint.textContent = ''; conversionHint.classList.add('hidden'); }
 
     if (sendBtn) {
         sendBtn.classList.add('hidden');
@@ -166,8 +241,21 @@ export function setupWithdrawalListeners(): void {
     });
 
     paymentInput?.addEventListener('input', validateWithdrawalForm);
-    amountInput?.addEventListener('input', validateWithdrawalForm);
+    amountInput?.addEventListener('input', () => {
+        validateWithdrawalForm();
+        updateConversionHint();
+    });
     previewBtn?.addEventListener('click', previewPayment);
+
+    // Currency toggle button
+    const currencyToggle = document.getElementById('send-currency-toggle');
+    currencyToggle?.addEventListener('click', () => {
+        sendInputCurrency = sendInputCurrency === 'sats' ? userFiatCurrency : 'sats';
+        const amtInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
+        if (amtInput) amtInput.value = ''; // clear on toggle to avoid confusion
+        updateCurrencyToggleUI();
+        validateWithdrawalForm();
+    });
     sendBtn?.addEventListener('click', () => sendPayment());
 
     const onchainAddressInput = document.getElementById('onchain-address-input') as HTMLInputElement;
@@ -433,7 +521,16 @@ export async function previewPayment(): Promise<void> {
         previewBtn.textContent = 'Analyzing...';
 
         const input = paymentInput.value.trim();
-        const amount = amountInput ? parseInt(amountInput.value) || 0 : 0;
+        
+        // Convert amount to sats if user entered fiat
+        let amount: number;
+        if (sendInputCurrency !== 'sats' && amountInput && parseFloat(amountInput.value) > 0) {
+            const converted = await fiatToSats(parseFloat(amountInput.value), sendInputCurrency);
+            amount = converted || 0;
+        } else {
+            amount = amountInput ? parseInt(amountInput.value) || 0 : 0;
+        }
+        
         const isInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
 
         if (isInvoice) {
@@ -525,7 +622,16 @@ export function displayPaymentPreview(previewData: any): void {
     if (recipientEl) recipientEl.textContent = previewData.recipient || 'Lightning Payment';
     if (amountEl) amountEl.textContent = `${previewData.amount.toLocaleString()} sats`;
     if (feeEl) feeEl.textContent = `${previewData.fee.toLocaleString()} sats`;
-    if (totalEl) totalEl.textContent = `${(previewData.amount + previewData.fee).toLocaleString()} sats`;
+    
+    const total = previewData.amount + previewData.fee;
+    if (totalEl) totalEl.textContent = `${total.toLocaleString()} sats`;
+
+    // Add fiat equivalent to total
+    satsToFiat(total, userFiatCurrency).then(fiatAmount => {
+        if (fiatAmount !== null && totalEl) {
+            totalEl.textContent = `${total.toLocaleString()} sats (≈ ${formatFiat(fiatAmount, userFiatCurrency)})`;
+        }
+    });
 
     previewDiv.classList.remove('hidden');
     sendBtn.classList.remove('hidden');
