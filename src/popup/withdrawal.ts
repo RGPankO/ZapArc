@@ -520,13 +520,22 @@ export async function previewPayment(): Promise<void> {
 
         const input = paymentInput.value.trim();
         
-        // Convert amount to sats if user entered fiat
+        // Convert amount to sats — SDK always expects integer sats
         let amount: number;
         if (sendInputCurrency !== 'sats' && amountInput && parseFloat(amountInput.value) > 0) {
+            // User entered fiat amount — convert to sats
             const converted = await fiatToSats(parseFloat(amountInput.value), sendInputCurrency);
-            amount = converted || 0;
+            if (!converted || converted <= 0) {
+                showError('Could not convert to sats — rate unavailable. Try again.');
+                previewBtn.disabled = false;
+                previewBtn.textContent = 'Preview Payment';
+                return;
+            }
+            amount = Math.round(converted); // ensure integer sats
+            console.log(`[Withdrawal] Converted ${amountInput.value} ${sendInputCurrency.toUpperCase()} → ${amount} sats`);
         } else {
-            amount = amountInput ? parseInt(amountInput.value) || 0 : 0;
+            // User entered sats directly — must be integer
+            amount = amountInput ? Math.round(parseFloat(amountInput.value) || 0) : 0;
         }
         
         const isInvoice = input.toLowerCase().startsWith('lnbc') || input.toLowerCase().startsWith('lntb');
