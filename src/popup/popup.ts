@@ -200,17 +200,7 @@ async function getActiveWalletId(): Promise<string | null> {
     }
 }
 
-async function getUserFiatCurrency(): Promise<FiatCurrency> {
-    try {
-        const response = await ExtensionMessaging.getUserSettings();
-        if (response.success && response.data) {
-            return (response.data as UserSettings).fiatCurrency || 'usd';
-        }
-    } catch (error) {
-        console.warn('[Popup] Failed to get fiat currency setting:', error);
-    }
-    return 'usd';
-}
+import { getUserFiatCurrency, setFiatCurrencyCache } from './currency-pref';
 
 /** Get wallet cache key that includes sub-wallet index to avoid cross-wallet cache hits */
 function walletCacheKey(prefix: string, walletId: string, subIndex?: number): string {
@@ -3152,13 +3142,13 @@ async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {
         const settings = response.data as UserSettings;
         settings.fiatCurrency = currency;
         
-        // Also write directly to chrome.storage.local so popup-side reads
-        // (like updateBalanceDisplay → getUserFiatCurrency) see the new value immediately.
-        await chrome.storage.local.set({ fiatCurrency: currency });
+        // Update in-memory cache FIRST so all subsequent reads in this popup session
+        // (across popup.ts, deposit.ts, withdrawal.ts) see the new value immediately
+        setFiatCurrencyCache(currency);
         
         const saveResponse = await ExtensionMessaging.saveUserSettings(settings);
         if (saveResponse.success) {
-            // Update button UI directly (don't re-read storage — avoids race condition)
+            // Update button UI directly
             const usdBtn = document.getElementById('fiat-currency-usd-btn');
             const eurBtn = document.getElementById('fiat-currency-eur-btn');
             if (usdBtn && eurBtn) {
@@ -3173,6 +3163,8 @@ async function saveFiatCurrency(currency: FiatCurrency): Promise<void> {
             await updateBalanceDisplay(); // Refresh balance to show new currency
             showSuccess(`Currency changed to ${currency.toUpperCase()}`);
         } else {
+            // Revert cache on failure
+            setFiatCurrencyCache(null);
             showError('Failed to save currency preference');
         }
     } catch (error) {

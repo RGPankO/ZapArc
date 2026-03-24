@@ -11,20 +11,7 @@ import {
 } from './state';
 import { showError, showSuccess } from './notifications';
 import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
-import { ExtensionMessaging } from '../utils/messaging';
-import type { UserSettings } from '../types';
-
-async function getUserFiatCurrency(): Promise<FiatCurrency> {
-    try {
-        const response = await ExtensionMessaging.getUserSettings();
-        if (response.success && response.data) {
-            return (response.data as UserSettings).fiatCurrency || 'usd';
-        }
-    } catch (error) {
-        console.warn('[Deposit] Failed to get fiat currency setting:', error);
-    }
-    return 'usd';
-}
+import { getUserFiatCurrency } from './currency-pref';
 
 function updateDepositEstimate(amount: number): void {
     const row = document.getElementById('deposit-estimate-row');

@@ -13,6 +13,7 @@ import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { triggerPaymentNotification } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
+import { getUserFiatCurrency } from './currency-pref';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -30,12 +31,9 @@ let onchainSelectedSpeed: 'fast' | 'medium' | 'slow' = 'medium';
 let sendInputCurrency: 'sats' | FiatCurrency = 'sats';
 let userFiatCurrency: FiatCurrency = 'usd';
 
-/** Load the user's fiat currency preference */
+/** Load the user's fiat currency preference from shared cache */
 async function loadFiatCurrencySetting(): Promise<void> {
-    try {
-        const result = await chrome.storage.local.get('fiatCurrency');
-        userFiatCurrency = (result.fiatCurrency === 'eur') ? 'eur' : 'usd';
-    } catch { /* default usd */ }
+    userFiatCurrency = await getUserFiatCurrency();
 }
 
 /** Update the currency toggle button label and conversion hint */
