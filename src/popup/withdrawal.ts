@@ -104,11 +104,15 @@ export function showWithdrawalInterface(): void {
     if (balanceDisplay) balanceDisplay.textContent = `${currentBalance.toLocaleString()}`;
 
     // Load fiat currency preference before resetting form
-    loadFiatCurrencySetting().then(() => {
-        resetWithdrawForm();
-        setupWithdrawalListeners();
-        setSendTab('lightning');
-    });
+    loadFiatCurrencySetting()
+        .catch(() => {
+            userFiatCurrency = 'usd';
+        })
+        .finally(() => {
+            resetWithdrawForm();
+            setupWithdrawalListeners();
+            setSendTab('lightning');
+        });
 }
 
 export function hideWithdrawInterface(): void {

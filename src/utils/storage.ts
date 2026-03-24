@@ -339,11 +339,18 @@ export class ChromeStorageManager {
    */
   async getUserSettings(): Promise<UserSettings> {
     try {
-      const result = await chrome.storage.local.get(['userSettings']);
+      const FIAT_CURRENCY_KEY = 'fiatCurrencyPreference';
+      const result = await chrome.storage.local.get(['userSettings', FIAT_CURRENCY_KEY]);
       const defaults = this.getDefaultSettings();
       
       // Merge stored settings with defaults to ensure all fields are present
       if (result.userSettings) {
+        // Prefer dedicated fiat key when present (more resilient), fallback to userSettings/defaults
+        const dedicatedFiat = result[FIAT_CURRENCY_KEY];
+        const fiatCurrency = (dedicatedFiat === 'usd' || dedicatedFiat === 'eur')
+          ? dedicatedFiat
+          : (result.userSettings.fiatCurrency || defaults.fiatCurrency);
+
         // Properly merge settings, preserving 0 values (like autoLockTimeout: 0 for "Never")
         const merged: UserSettings = {
           defaultPostingAmounts: result.userSettings.defaultPostingAmounts || defaults.defaultPostingAmounts,
@@ -355,9 +362,15 @@ export class ChromeStorageManager {
           facebookPostingMode: result.userSettings.facebookPostingMode || defaults.facebookPostingMode,
           allowedFacebookGroups: result.userSettings.allowedFacebookGroups || defaults.allowedFacebookGroups,
           deniedFacebookGroups: result.userSettings.deniedFacebookGroups || defaults.deniedFacebookGroups,
-          fiatCurrency: result.userSettings.fiatCurrency || defaults.fiatCurrency
+          fiatCurrency
         };
         return merged;
+      }
+
+      // No userSettings object yet, but dedicated fiat key may exist
+      const dedicatedFiat = result[FIAT_CURRENCY_KEY];
+      if (dedicatedFiat === 'usd' || dedicatedFiat === 'eur') {
+        return { ...defaults, fiatCurrency: dedicatedFiat };
       }
       
       return defaults;
@@ -372,7 +385,11 @@ export class ChromeStorageManager {
    */
   async saveUserSettings(settings: UserSettings): Promise<void> {
     try {
-      await chrome.storage.local.set({ userSettings: settings });
+      const FIAT_CURRENCY_KEY = 'fiatCurrencyPreference';
+      await chrome.storage.local.set({
+        userSettings: settings,
+        [FIAT_CURRENCY_KEY]: settings.fiatCurrency
+      });
     } catch (error) {
       console.error('Failed to save user settings:', error);
       throw error;
