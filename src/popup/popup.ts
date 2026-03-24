@@ -3121,12 +3121,19 @@ async function handleSettings(): Promise<void> {
     const settingsInterface = document.getElementById('settings-interface');
     const lightningSection = document.getElementById('lightning-address-section');
     const lightningToggleBtn = document.getElementById('settings-lightning-address-toggle-btn');
+    const fiatSection = document.getElementById('fiat-currency-section');
+    const fiatToggleBtn = document.getElementById('settings-fiat-currency-toggle-btn');
 
     if (settingsInterface) settingsInterface.classList.remove('hidden');
-    if (lightningSection) lightningSection.classList.add('hidden');
-    if (lightningToggleBtn) lightningToggleBtn.setAttribute('aria-expanded', 'false');
+
+    // Default-open both dropdown sections in settings
+    if (lightningSection) lightningSection.classList.remove('hidden');
+    if (lightningToggleBtn) lightningToggleBtn.setAttribute('aria-expanded', 'true');
+    if (fiatSection) fiatSection.classList.remove('hidden');
+    if (fiatToggleBtn) fiatToggleBtn.setAttribute('aria-expanded', 'true');
 
     await refreshSettingsInterface();
+    await refreshLightningAddress(true);
     await refreshFiatCurrencyUI();
 }
 
