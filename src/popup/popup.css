@@ -3698,7 +3698,18 @@ body.modal-open {
   gap: 8px;
 }
 
-#settings-interface { height: 100%; box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+#settings-interface {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 .settings-header { display: flex; align-items: center; gap: 10px; }
 .settings-header h2 { margin: 0; font-size: 18px; }
 .settings-wallet-card { border: 1px solid var(--border-light); border-radius: 12px; padding: 12px; background: rgba(255,255,255,0.05); }
