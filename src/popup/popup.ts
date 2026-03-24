@@ -472,8 +472,30 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
             const fiatCurrency = await getUserFiatCurrency();
             const fiatAmount = await satsToFiat(balance, fiatCurrency);
             if (fiatAmount !== null) {
-                balanceFiatElement.textContent = `≈ ${formatFiat(fiatAmount, fiatCurrency)}`;
+                const fiatDisplay = `≈ ${formatFiat(fiatAmount, fiatCurrency)}`;
+                balanceFiatElement.textContent = fiatDisplay;
                 balanceFiatElement.classList.remove('hidden');
+
+                // Cache fiat display for instant render on next popup open
+                const fiatCacheUpdate: Record<string, any> = {
+                    cachedBalanceFiat: {
+                        currency: fiatCurrency,
+                        balanceSats: balance,
+                        display: fiatDisplay,
+                        updatedAt: Date.now()
+                    }
+                };
+                try {
+                    const mw = await chrome.storage.local.get(['multiWalletData']);
+                    if (mw.multiWalletData) {
+                        const mwd = JSON.parse(mw.multiWalletData);
+                        if (mwd.activeWalletId) {
+                            const subIdx = mwd.activeSubWalletIndex || 0;
+                            fiatCacheUpdate[walletCacheKey('cachedBalanceFiat', mwd.activeWalletId, subIdx)] = fiatCacheUpdate.cachedBalanceFiat;
+                        }
+                    }
+                    await chrome.storage.local.set(fiatCacheUpdate);
+                } catch (e) { /* ignore cache errors */ }
             } else {
                 balanceFiatElement.classList.add('hidden');
             }
@@ -3437,6 +3459,29 @@ async function initializePopup() {
                         if (balanceElement) {
                             balanceElement.textContent = `${storageData.cachedBalance.toLocaleString()} sats`;
                         }
+
+                        // Show cached fiat estimate immediately (then refresh with live rate later)
+                        try {
+                            const balanceFiatElement = document.getElementById('balance-fiat');
+                            if (balanceFiatElement) {
+                                const fiatCurrency = await getUserFiatCurrency();
+                                const multiWalletResult = await chrome.storage.local.get(['multiWalletData']);
+                                let fiatCacheKey = 'cachedBalanceFiat';
+                                if (multiWalletResult.multiWalletData) {
+                                    const mwd = JSON.parse(multiWalletResult.multiWalletData);
+                                    if (mwd.activeWalletId) {
+                                        const subIdx = mwd.activeSubWalletIndex || 0;
+                                        fiatCacheKey = walletCacheKey('cachedBalanceFiat', mwd.activeWalletId, subIdx);
+                                    }
+                                }
+                                const fiatCacheData = await chrome.storage.local.get([fiatCacheKey, 'cachedBalanceFiat']);
+                                const fiatCache = fiatCacheData[fiatCacheKey] || fiatCacheData.cachedBalanceFiat;
+                                if (fiatCache && fiatCache.currency === fiatCurrency && fiatCache.balanceSats === storageData.cachedBalance && fiatCache.display) {
+                                    balanceFiatElement.textContent = fiatCache.display;
+                                    balanceFiatElement.classList.remove('hidden');
+                                }
+                            }
+                        } catch (e) { /* ignore cached fiat errors */ }
                         
                         // Also update withdraw balance if visible
                         const withdrawBalanceElement = document.getElementById('withdraw-balance-display');
