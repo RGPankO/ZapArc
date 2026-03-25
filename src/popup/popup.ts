@@ -632,8 +632,9 @@ async function loadTransactionHistory() {
                 undefined;
 
             const rawStatus = String(payment.status || '').toLowerCase();
-            const isOnchain = !!(method && String(method).toLowerCase().includes('bitcoin')) ||
-                !!(method && String(method).toLowerCase().includes('onchain')) ||
+            const methodLower = method ? String(method).toLowerCase() : '';
+            const isOnchain = methodLower === 'withdraw' || methodLower === 'deposit' ||
+                methodLower.includes('bitcoin') || methodLower.includes('onchain') ||
                 !!(payment.details?.txId || payment.details?.txid || payment.txid || payment.details?.txHash);
 
             // If SDK omits status for on-chain sends, treat as pending/confirming by default.
