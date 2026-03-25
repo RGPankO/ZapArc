@@ -89,11 +89,16 @@ async function claimSingleDeposit(sdk: BreezSdk, txid: string, vout: number): Pr
     }
 
     try {
-        await sdk.claimDeposit({ txid, vout });
+        console.log(`🔄 [Breez-SDK] Attempting to claim deposit ${key}...`);
+        const result = await sdk.claimDeposit({ txid, vout });
         claimedDepositKeys.add(key);
-        console.log(`✅ [Breez-SDK] Claimed deposit ${key}`);
+        console.log(`✅ [Breez-SDK] Claimed deposit ${key}, result:`, JSON.stringify(result));
     } catch (error) {
-        console.warn(`⚠️ [Breez-SDK] Failed to claim deposit ${key}:`, error);
+        claimedDepositKeys.add(key); // Don't retry endlessly
+        console.error(`❌ [Breez-SDK] Failed to claim deposit ${key}:`, error);
+        if (error && typeof error === 'object') {
+            console.error(`❌ [Breez-SDK] Claim error details:`, JSON.stringify(error, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+        }
     }
 }
 
@@ -105,8 +110,9 @@ async function claimPendingDeposits(sdk: BreezSdk, reason: string): Promise<void
     isClaimingDeposits = true;
     try {
         const response = await sdk.listUnclaimedDeposits({});
+        console.log(`🔍 [Breez-SDK] listUnclaimedDeposits raw response (${reason}):`, JSON.stringify(response, (_, v) => typeof v === 'bigint' ? v.toString() : v));
         const deposits = response?.deposits || [];
-        console.log(`🔍 [Breez-SDK] listUnclaimedDeposits (${reason}):`, JSON.stringify(deposits));
+        console.log(`🔍 [Breez-SDK] listUnclaimedDeposits (${reason}): ${deposits.length} deposits`);
         if (!deposits?.length) {
             return;
         }
