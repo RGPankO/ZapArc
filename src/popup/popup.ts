@@ -638,7 +638,17 @@ async function loadTransactionHistory() {
                 !!(payment.details?.txId || payment.details?.txid || payment.txid || payment.details?.txHash);
 
             // If SDK omits status for on-chain sends, treat as pending/confirming by default.
-            const normalizedStatus = rawStatus || (isOnchain && !isReceive ? 'pending' : 'completed');
+            let normalizedStatus = rawStatus || (isOnchain && !isReceive ? 'pending' : 'completed');
+
+            // On-chain txs: SDK marks as "completed" immediately (internal Spark transfer done),
+            // but the actual L1 tx may still be unconfirmed. Show as pending if < 1 hour old.
+            if (isOnchain && normalizedStatus === 'completed') {
+                const txTimestamp = (payment.timestamp || 0) * 1000;
+                const ageMs = txTimestamp > 0 ? Date.now() - txTimestamp : 0;
+                if (ageMs > 0 && ageMs < 60 * 60 * 1000) {
+                    normalizedStatus = 'pending';
+                }
+            }
 
             return {
                 id: payment.id || `tx-${index}`,
