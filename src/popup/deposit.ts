@@ -106,13 +106,17 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
                 await callbacks?.loadTransactionHistory();
                 showSuccess('Deposit claimed successfully!');
             } catch (claimError) {
+                const errMsg = claimError instanceof Error ? claimError.message : String(claimError);
+                const isDust = errMsg.includes('dust') || errMsg.includes('less than');
                 console.warn(`[Deposit] Failed to claim ${key}:`, claimError);
-                // Mark as claimed to stop retry loop — if it's already claimed
-                // the SDK will keep returning it in listUnclaimedDeposits until next sync
                 claimedOnchainDeposits.add(key);
-                setOnchainDepositStatus('');
-                const statusEl = document.getElementById('onchain-deposit-status');
-                if (statusEl) statusEl.classList.add('hidden');
+                if (isDust) {
+                    setOnchainDepositStatus(`⚠️ Deposit too small to claim — fees exceed the ${deposit.amountSats.toLocaleString()} sats amount`);
+                } else {
+                    setOnchainDepositStatus('');
+                    const statusEl = document.getElementById('onchain-deposit-status');
+                    if (statusEl) statusEl.classList.add('hidden');
+                }
             }
         }
 

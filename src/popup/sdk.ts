@@ -95,9 +95,12 @@ async function claimSingleDeposit(sdk: BreezSdk, txid: string, vout: number): Pr
         console.log(`✅ [Breez-SDK] Claimed deposit ${key}, result:`, JSON.stringify(result));
     } catch (error) {
         claimedDepositKeys.add(key); // Don't retry endlessly
-        console.error(`❌ [Breez-SDK] Failed to claim deposit ${key}:`, error);
-        if (error && typeof error === 'object') {
-            console.error(`❌ [Breez-SDK] Claim error details:`, JSON.stringify(error, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const isDust = errMsg.includes('dust') || errMsg.includes('less than');
+        if (isDust) {
+            console.warn(`⚠️ [Breez-SDK] Deposit ${key} too small to claim (below dust threshold after fees)`);
+        } else {
+            console.error(`❌ [Breez-SDK] Failed to claim deposit ${key}:`, error);
         }
     }
 }
