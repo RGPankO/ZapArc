@@ -347,6 +347,8 @@ function validateOnchainForm(): void {
     const address = addressInput.value.trim();
     const amount = parseInt(amountInput.value) || 0;
 
+    const MIN_ONCHAIN_SATS = 1000;
+
     // Validate bitcoin address format
     if (address.length > 0 && !isValidBitcoinAddress(address)) {
         if (validationMessage) {
@@ -354,12 +356,18 @@ function validateOnchainForm(): void {
             validationMessage.classList.remove('hidden');
         }
         previewBtn.disabled = true;
+    } else if (amount > 0 && amount < MIN_ONCHAIN_SATS) {
+        if (validationMessage) {
+            validationMessage.textContent = `Minimum on-chain send: ${MIN_ONCHAIN_SATS.toLocaleString()} sats`;
+            validationMessage.classList.remove('hidden');
+        }
+        previewBtn.disabled = true;
     } else {
-        if (validationMessage && !validationMessage.textContent?.includes('amount')) {
+        if (validationMessage) {
             validationMessage.textContent = '';
             validationMessage.classList.add('hidden');
         }
-        previewBtn.disabled = !(isValidBitcoinAddress(address) && amount > 0);
+        previewBtn.disabled = !(isValidBitcoinAddress(address) && amount >= MIN_ONCHAIN_SATS);
     }
 
     // Auto-fetch fees when address + amount are valid
