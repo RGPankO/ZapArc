@@ -3971,6 +3971,48 @@ body.modal-open {
   color: var(--text-secondary);
 }
 
+.pending-deposits-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 12px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pending-deposit-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin: 4px 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+}
+
+.pending-deposit-item .deposit-amount {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.pending-deposit-item .deposit-status {
+  font-size: 11px;
+}
+
+.pending-deposit-item .deposit-status.claiming {
+  color: #ffc107;
+}
+
+.pending-deposit-item .deposit-status.claimed {
+  color: var(--success);
+}
+
+.pending-deposit-item .deposit-status.too-small {
+  color: var(--text-secondary);
+}
+
 /* Send/Deposit button icons — simple Unicode arrows */
 .wallet-btn.action-card .btn-icon {
   font-size: 20px;

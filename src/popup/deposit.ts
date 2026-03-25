@@ -87,44 +87,107 @@ function setOnchainDepositStatus(message: string): void {
     statusEl.classList.remove('hidden');
 }
 
+// Track deposit claim results: 'claiming' | 'claimed' | 'too-small' | 'failed'
+const depositClaimResults = new Map<string, { status: string; amountSats: number; txid: string }>();
+
+function renderPendingDeposits(): void {
+    const section = document.getElementById('pending-deposits-section');
+    const list = document.getElementById('pending-deposits-list');
+    if (!section || !list) return;
+
+    // Only show deposits from last 5 days
+    const entries = Array.from(depositClaimResults.values());
+    if (entries.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    section.classList.remove('hidden');
+    list.innerHTML = entries.map(d => {
+        let statusText = '';
+        let statusClass = '';
+        switch (d.status) {
+            case 'claiming':
+                statusText = '⏳ Claiming...';
+                statusClass = 'claiming';
+                break;
+            case 'claimed':
+                statusText = '✅ Claimed';
+                statusClass = 'claimed';
+                break;
+            case 'too-small':
+                statusText = '⚠️ Too small to claim';
+                statusClass = 'too-small';
+                break;
+            default:
+                statusText = '❌ Failed';
+                statusClass = 'too-small';
+        }
+        const shortTxid = `${d.txid.slice(0, 8)}…${d.txid.slice(-6)}`;
+        return `<div class="pending-deposit-item">
+            <div>
+                <span class="deposit-amount">${d.amountSats.toLocaleString()} sats</span>
+                <span style="color: var(--text-secondary); font-size: 10px; margin-left: 6px">${shortTxid}</span>
+            </div>
+            <span class="deposit-status ${statusClass}">${statusText}</span>
+        </div>`;
+    }).join('');
+}
+
 async function checkAndClaimOnchainDeposits(): Promise<void> {
     if (!breezSDK || depositTab !== 'onchain') return;
 
     try {
         const response = await breezSDK.listUnclaimedDeposits({});
         const deposits = response?.deposits || [];
+
+        // Hide old status indicator
+        const statusEl = document.getElementById('onchain-deposit-status');
+        if (statusEl) statusEl.classList.add('hidden');
+
         for (const deposit of deposits) {
             const key = `${deposit.txid}:${deposit.vout}`;
             if (claimedOnchainDeposits.has(key)) continue;
 
-            setOnchainDepositStatus(`⏳ Deposit detected: ${deposit.amountSats.toLocaleString()} sats — claiming...`);
+            depositClaimResults.set(key, {
+                status: 'claiming',
+                amountSats: deposit.amountSats,
+                txid: deposit.txid,
+            });
+            renderPendingDeposits();
+
             try {
                 await breezSDK.claimDeposit({ txid: deposit.txid, vout: deposit.vout });
                 claimedOnchainDeposits.add(key);
-                setOnchainDepositStatus('✅ Deposit claimed!');
+                depositClaimResults.set(key, { status: 'claimed', amountSats: deposit.amountSats, txid: deposit.txid });
+                renderPendingDeposits();
                 await callbacks?.updateBalanceDisplay();
                 await callbacks?.loadTransactionHistory();
-                showSuccess('Deposit claimed successfully!');
+                showSuccess(`Deposit of ${deposit.amountSats.toLocaleString()} sats claimed!`);
+
+                // Remove claimed item after 5 seconds
+                setTimeout(() => {
+                    depositClaimResults.delete(key);
+                    renderPendingDeposits();
+                }, 5000);
             } catch (claimError) {
                 const errMsg = claimError instanceof Error ? claimError.message : String(claimError);
                 const isDust = errMsg.includes('dust') || errMsg.includes('less than');
                 console.warn(`[Deposit] Failed to claim ${key}:`, claimError);
                 claimedOnchainDeposits.add(key);
-                if (isDust) {
-                    setOnchainDepositStatus(`⚠️ Deposit too small to claim — fees exceed the ${deposit.amountSats.toLocaleString()} sats amount`);
-                } else {
-                    setOnchainDepositStatus('');
-                    const statusEl = document.getElementById('onchain-deposit-status');
-                    if (statusEl) statusEl.classList.add('hidden');
-                }
+                depositClaimResults.set(key, {
+                    status: isDust ? 'too-small' : 'failed',
+                    amountSats: deposit.amountSats,
+                    txid: deposit.txid,
+                });
+                renderPendingDeposits();
             }
         }
 
-        // Clear status if no unclaimed deposits remain
-        if (deposits.length === 0 || deposits.every(d => claimedOnchainDeposits.has(`${d.txid}:${d.vout}`))) {
-            setOnchainDepositStatus('');
-            const statusEl = document.getElementById('onchain-deposit-status');
-            if (statusEl) statusEl.classList.add('hidden');
+        // If no deposits at all, clear the section
+        if (deposits.length === 0 && depositClaimResults.size === 0) {
+            const section = document.getElementById('pending-deposits-section');
+            if (section) section.classList.add('hidden');
         }
     } catch (error) {
         console.warn('[Deposit] Failed to poll/claim on-chain deposits:', error);
