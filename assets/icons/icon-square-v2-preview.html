@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:transparent;">
+<canvas id="c" width="512" height="512" style="display:block;"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 512;
+
+// Dark navy background
+const bg = ctx.createRadialGradient(256, 180, 40, 256, 300, 430);
+bg.addColorStop(0, '#1c2156');
+bg.addColorStop(0.55, '#0f143b');
+bg.addColorStop(1, '#070b24');
+ctx.fillStyle = bg;
+ctx.fillRect(0, 0, W, W);
+
+// Blue arcs (brand continuity)
+for (let i = 0; i < 4; i++) {
+  const r = 92 + i * 44;
+  const alpha = 0.22 - i * 0.04;
+  ctx.strokeStyle = `rgba(86, 140, 255, ${alpha})`;
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.arc(256, 256, r, -Math.PI * 0.72 - i * 0.08, Math.PI * 0.22 + i * 0.08);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(256, 256, r, Math.PI * 0.28 - i * 0.08, Math.PI * 1.22 + i * 0.08);
+  ctx.stroke();
+}
+
+// Orange ambient glow (bitcoin color)
+const orangeAura = ctx.createRadialGradient(245, 300, 20, 245, 290, 240);
+orangeAura.addColorStop(0, 'rgba(255, 153, 0, 0.20)');
+orangeAura.addColorStop(0.45, 'rgba(255, 133, 0, 0.06)');
+orangeAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+ctx.fillStyle = orangeAura;
+ctx.fillRect(0, 0, W, W);
+
+// Bolt shape
+ctx.beginPath();
+ctx.moveTo(294, 62);
+ctx.lineTo(196, 235);
+ctx.lineTo(269, 226);
+ctx.lineTo(219, 448);
+ctx.lineTo(322, 267);
+ctx.lineTo(248, 280);
+ctx.closePath();
+
+// Main bolt gradient: orange dominant + blue tail accent
+const boltGrad = ctx.createLinearGradient(220, 62, 286, 448);
+boltGrad.addColorStop(0, '#FFD36A');
+boltGrad.addColorStop(0.22, '#FFB347');
+boltGrad.addColorStop(0.45, '#FF9800');
+boltGrad.addColorStop(0.72, '#4E7DFF');
+boltGrad.addColorStop(1, '#5A58D8');
+ctx.fillStyle = boltGrad;
+ctx.shadowColor = '#FF9A00';
+ctx.shadowBlur = 18;
+ctx.fill();
+
+// Subtle blue rim glow for contrast on toolbar (reduced blur)
+ctx.globalCompositeOperation = 'screen';
+ctx.shadowColor = '#4A8DFF';
+ctx.shadowBlur = 10;
+ctx.fill();
+ctx.globalCompositeOperation = 'source-over';
+ctx.shadowBlur = 0;
+
+// Crisp bolt edge
+ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+ctx.lineWidth = 1.5;
+ctx.stroke();
+
+// Specular highlight
+ctx.beginPath();
+ctx.moveTo(294, 62);
+ctx.lineTo(196, 235);
+ctx.lineTo(269, 226);
+ctx.lineTo(244, 310);
+ctx.lineTo(248, 280);
+ctx.closePath();
+const highlight = ctx.createLinearGradient(202, 70, 282, 300);
+highlight.addColorStop(0, 'rgba(255,255,255,0.28)');
+highlight.addColorStop(0.55, 'rgba(255,255,255,0.08)');
+highlight.addColorStop(1, 'rgba(255,255,255,0)');
+ctx.fillStyle = highlight;
+ctx.fill();
+
+// Tiny spark
+const spark = ctx.createRadialGradient(286, 92, 2, 286, 92, 36);
+spark.addColorStop(0, 'rgba(255, 243, 220, 0.8)');
+spark.addColorStop(1, 'rgba(255, 243, 220, 0)');
+ctx.fillStyle = spark;
+ctx.fillRect(242, 54, 90, 90);
+</script>
+</body>
+</html>

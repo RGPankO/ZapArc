@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#16213e;">
+<canvas id="c" width="512" height="512" style="display:block;"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 512;
+
+// Transparent background (clear)
+ctx.clearRect(0, 0, W, W);
+
+// Lightning bolt - scaled up and centered more
+const scale = 1.15;
+const ox = (W - W * scale) / 2;
+const oy = (W - W * scale) / 2 - 10;
+
+function sx(x) { return x * scale + ox; }
+function sy(y) { return y * scale + oy; }
+
+ctx.beginPath();
+ctx.moveTo(sx(290), sy(65));
+ctx.lineTo(sx(195), sy(235));
+ctx.lineTo(sx(265), sy(225));
+ctx.lineTo(sx(218), sy(445));
+ctx.lineTo(sx(320), sy(265));
+ctx.lineTo(sx(248), sy(278));
+ctx.closePath();
+const boltGrad = ctx.createLinearGradient(sx(220), sy(65), sx(280), sy(445));
+boltGrad.addColorStop(0, '#00CCFF');
+boltGrad.addColorStop(0.3, '#007AFF');
+boltGrad.addColorStop(0.7, '#5856D6');
+boltGrad.addColorStop(1, '#7B61FF');
+ctx.fillStyle = boltGrad;
+ctx.shadowColor = '#007AFF';
+ctx.shadowBlur = 30;
+ctx.fill();
+ctx.shadowBlur = 15;
+ctx.fill();
+ctx.shadowBlur = 0;
+
+// Highlight
+ctx.beginPath();
+ctx.moveTo(sx(290), sy(65));
+ctx.lineTo(sx(195), sy(235));
+ctx.lineTo(sx(265), sy(225));
+ctx.lineTo(sx(240), sy(310));
+ctx.lineTo(sx(248), sy(278));
+ctx.closePath();
+const highlight = ctx.createLinearGradient(sx(200), sy(65), sx(280), sy(300));
+highlight.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+highlight.addColorStop(0.6, 'rgba(255, 255, 255, 0.05)');
+highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+ctx.fillStyle = highlight;
+ctx.fill();
+
+// Top glow
+const topGlow = ctx.createRadialGradient(sx(280), sy(90), 2, sx(280), sy(90), 35);
+topGlow.addColorStop(0, 'rgba(200, 240, 255, 0.5)');
+topGlow.addColorStop(1, 'rgba(200, 240, 255, 0)');
+ctx.fillStyle = topGlow;
+ctx.fillRect(sx(240), sy(50), 80 * scale, 80 * scale);
+</script>
+</body>
+</html>

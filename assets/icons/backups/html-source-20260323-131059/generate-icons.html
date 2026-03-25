@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#222;">
+<p>Right-click each canvas → "Save image as" to export, or use the download links below.</p>
+<div id="out"></div>
+<script>
+const sizes = [16, 32, 48, 128];
+const container = document.getElementById('out');
+
+function drawIcon(size) {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  const W = size;
+  const S = W / 512; // scale factor
+
+  // No rounded corners — fill entire canvas
+  const bg = ctx.createRadialGradient(256*S, 200*S, 50*S, 256*S, 300*S, 400*S);
+  bg.addColorStop(0, '#1a1a4a');
+  bg.addColorStop(0.6, '#0d0d2b');
+  bg.addColorStop(1, '#050510');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, W);
+
+  // Circular arcs
+  for (let i = 0; i < 4; i++) {
+    const r = (90 + i * 45) * S;
+    const alpha = 0.25 - i * 0.05;
+    ctx.strokeStyle = `rgba(88, 86, 214, ${alpha})`;
+    ctx.lineWidth = Math.max(1, 2.5 * S);
+    ctx.beginPath();
+    ctx.arc(256*S, 256*S, r, -Math.PI * 0.7 - i * 0.1, Math.PI * 0.2 + i * 0.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(256*S, 256*S, r, Math.PI * 0.3 - i * 0.1, Math.PI * 1.2 + i * 0.1);
+    ctx.stroke();
+  }
+
+  // Glow
+  const glow = ctx.createRadialGradient(256*S, 230*S, 20*S, 256*S, 260*S, 200*S);
+  glow.addColorStop(0, 'rgba(0, 140, 255, 0.4)');
+  glow.addColorStop(0.4, 'rgba(60, 60, 220, 0.15)');
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, W);
+
+  // Lightning bolt
+  ctx.beginPath();
+  ctx.moveTo(290*S, 65*S);
+  ctx.lineTo(195*S, 235*S);
+  ctx.lineTo(265*S, 225*S);
+  ctx.lineTo(218*S, 445*S);
+  ctx.lineTo(320*S, 265*S);
+  ctx.lineTo(248*S, 278*S);
+  ctx.closePath();
+  const boltGrad = ctx.createLinearGradient(220*S, 65*S, 280*S, 445*S);
+  boltGrad.addColorStop(0, '#00CCFF');
+  boltGrad.addColorStop(0.3, '#007AFF');
+  boltGrad.addColorStop(0.7, '#5856D6');
+  boltGrad.addColorStop(1, '#7B61FF');
+  ctx.fillStyle = boltGrad;
+  ctx.shadowColor = '#007AFF';
+  ctx.shadowBlur = Math.max(2, 40 * S);
+  ctx.fill();
+  ctx.shadowBlur = Math.max(1, 20 * S);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Highlight on upper bolt
+  ctx.beginPath();
+  ctx.moveTo(290*S, 65*S);
+  ctx.lineTo(195*S, 235*S);
+  ctx.lineTo(265*S, 225*S);
+  ctx.lineTo(240*S, 310*S);
+  ctx.lineTo(248*S, 278*S);
+  ctx.closePath();
+  const highlight = ctx.createLinearGradient(200*S, 65*S, 280*S, 300*S);
+  highlight.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+  highlight.addColorStop(0.6, 'rgba(255, 255, 255, 0.05)');
+  highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = highlight;
+  ctx.fill();
+
+  // Top glow
+  const topGlow = ctx.createRadialGradient(280*S, 90*S, 2*S, 280*S, 90*S, 40*S);
+  topGlow.addColorStop(0, 'rgba(200, 240, 255, 0.6)');
+  topGlow.addColorStop(1, 'rgba(200, 240, 255, 0)');
+  ctx.fillStyle = topGlow;
+  ctx.fillRect(240*S, 50*S, 80*S, 80*S);
+
+  return c;
+}
+
+sizes.forEach(size => {
+  const canvas = drawIcon(size);
+  const label = document.createElement('div');
+  label.style.cssText = 'display:inline-block;margin:20px;text-align:center;color:#fff;';
+  label.innerHTML = `<p>${size}x${size}</p>`;
+  label.appendChild(canvas);
+  canvas.style.cssText = `border:1px solid #444; image-rendering: pixelated;${size < 64 ? 'width:128px;height:128px;' : ''}`;
+  
+  // Download link
+  const link = document.createElement('a');
+  link.download = `icon${size}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.textContent = `Download icon${size}.png`;
+  link.style.cssText = 'display:block;color:#0af;margin-top:8px;';
+  label.appendChild(link);
+  
+  container.appendChild(label);
+});
+</script>
+</body>
+</html>

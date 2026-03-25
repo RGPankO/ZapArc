@@ -399,9 +399,17 @@ async function autoFetchOnchainFees(address: string, amount: number): Promise<vo
 
         for (const speed of ['fast', 'medium', 'slow'] as const) {
             const quote = speedMap[speed];
-            const feeSats = quote?.userFeeSat ?? 0;
+            const serviceFee = Number(quote?.userFeeSat ?? 0);
+            const l1Fee = Number(quote?.l1BroadcastFeeSat ?? 0);
+            const totalFee = serviceFee + l1Fee;
             const feeEl = document.getElementById(`speed-fee-${speed}`);
-            if (feeEl) feeEl.textContent = feeSats > 0 ? `Fee: ${feeSats.toLocaleString()} sats` : 'Fee: unavailable';
+            if (feeEl) {
+                if (totalFee > 0) {
+                    feeEl.innerHTML = `Fee: ${totalFee.toLocaleString()} sats<br><small style="opacity:0.6">L1: ${l1Fee.toLocaleString()} · Service: ${serviceFee.toLocaleString()}</small>`;
+                } else {
+                    feeEl.textContent = 'Fee: unavailable';
+                }
+            }
         }
 
         updateOnchainPreviewFromSelection();
@@ -457,9 +465,20 @@ async function previewOnchainPayment(): Promise<void> {
 
         for (const speed of ['fast', 'medium', 'slow'] as const) {
             const quote = speedMap[speed];
-            const feeSats = quote?.userFeeSat ?? 0;
+            const serviceFee = Number(quote?.userFeeSat ?? 0);
+            const l1Fee = Number(quote?.l1BroadcastFeeSat ?? 0);
+            const totalFee = serviceFee + l1Fee;
             const feeEl = document.getElementById(`speed-fee-${speed}`);
-            if (feeEl) feeEl.textContent = feeSats > 0 ? `Fee: ${feeSats.toLocaleString()} sats` : 'Fee: unavailable';
+            if (feeEl) {
+                if (totalFee > 0) {
+                    const breakdown = l1Fee > 0 && serviceFee > 0
+                        ? ` (L1: ${l1Fee.toLocaleString()} + Service: ${serviceFee.toLocaleString()})`
+                        : '';
+                    feeEl.textContent = `Fee: ${totalFee.toLocaleString()} sats${breakdown}`;
+                } else {
+                    feeEl.textContent = 'Fee: unavailable';
+                }
+            }
         }
 
         updateOnchainPreviewFromSelection();
@@ -483,11 +502,19 @@ function updateOnchainPreviewFromSelection(): void {
 
     const feeQuote = (prepared?.paymentMethod as any)?.feeQuote;
     const speedKey = onchainSelectedSpeed === 'fast' ? 'speedFast' : onchainSelectedSpeed === 'slow' ? 'speedSlow' : 'speedMedium';
-    const feeSats = Number(feeQuote?.[speedKey]?.userFeeSat ?? 0);
+    const quote = feeQuote?.[speedKey];
+    const serviceFee = Number(quote?.userFeeSat ?? 0);
+    const l1Fee = Number(quote?.l1BroadcastFeeSat ?? 0);
+    const feeSats = serviceFee + l1Fee;
     const total = amount + feeSats;
 
     const networkFeeSummary = document.getElementById('onchain-network-fee');
-    if (networkFeeSummary) networkFeeSummary.textContent = `${feeSats.toLocaleString()} sats`;
+    if (networkFeeSummary) {
+        const breakdown = l1Fee > 0 && serviceFee > 0
+            ? ` (L1: ${l1Fee.toLocaleString()} + Service: ${serviceFee.toLocaleString()})`
+            : '';
+        networkFeeSummary.textContent = `${feeSats.toLocaleString()} sats${breakdown}`;
+    }
 
     const recipientEl = document.getElementById('onchain-preview-recipient');
     const amountEl = document.getElementById('onchain-preview-amount');
@@ -497,7 +524,12 @@ function updateOnchainPreviewFromSelection(): void {
 
     if (recipientEl) recipientEl.textContent = address;
     if (amountEl) amountEl.textContent = `${amount.toLocaleString()} sats`;
-    if (feeEl) feeEl.textContent = `${feeSats.toLocaleString()} sats`;
+    if (feeEl) {
+        const feeBreakdown = l1Fee > 0 && serviceFee > 0
+            ? ` (L1: ${l1Fee.toLocaleString()} + Service: ${serviceFee.toLocaleString()})`
+            : '';
+        feeEl.textContent = `${feeSats.toLocaleString()} sats${feeBreakdown}`;
+    }
     if (speedEl) speedEl.textContent = onchainSelectedSpeed[0].toUpperCase() + onchainSelectedSpeed.slice(1);
     if (totalEl) totalEl.textContent = `${total.toLocaleString()} sats`;
 
@@ -837,8 +869,8 @@ async function sendOnchainPayment(): Promise<void> {
             prepareResponse: prepared,
             options: {
                 type: 'bitcoinAddress',
-                confirmationSpeed: onchainSelectedSpeed
-            }
+                confirmationSpeed: onchainSelectedSpeed,
+            },
         });
 
         if (statusText) {

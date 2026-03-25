@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:transparent;overflow:hidden;">
+<canvas id="c" width="512" height="512" style="display:block;"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 512;
+
+// Transparent background (for in-wallet usage)
+ctx.clearRect(0, 0, W, W);
+
+// Bolt shape (current in-wallet shape)
+ctx.beginPath();
+ctx.moveTo(296, 60);
+ctx.lineTo(188, 238);
+ctx.lineTo(273, 226);
+ctx.lineTo(215, 452);
+ctx.lineTo(326, 262);
+ctx.lineTo(244, 278);
+ctx.closePath();
+
+// Gradient fill: BTC orange -> blue -> violet
+const boltGrad = ctx.createLinearGradient(220, 60, 286, 452);
+boltGrad.addColorStop(0, '#FFD27C');
+boltGrad.addColorStop(0.28, '#F7931A'); // Bitcoin orange anchor
+boltGrad.addColorStop(0.62, '#007AFF');
+boltGrad.addColorStop(1, '#7B61FF');
+ctx.fillStyle = boltGrad;
+
+// Fill without outer glow (keeps icon fully transparent around shape)
+ctx.fill();
+
+// Light internal edge (no outer box/background)
+ctx.strokeStyle = 'rgba(225, 232, 255, 0.35)';
+ctx.lineWidth = 1.2;
+ctx.stroke();
+
+// Highlight
+ctx.beginPath();
+ctx.moveTo(296, 60);
+ctx.lineTo(188, 238);
+ctx.lineTo(273, 226);
+ctx.lineTo(246, 310);
+ctx.lineTo(244, 278);
+ctx.closePath();
+const highlight = ctx.createLinearGradient(198, 60, 286, 310);
+highlight.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+highlight.addColorStop(0.65, 'rgba(255, 255, 255, 0.04)');
+highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+ctx.fillStyle = highlight;
+ctx.fill();
+</script>
+</body>
+</html>

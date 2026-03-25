@@ -98,13 +98,29 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
             if (claimedOnchainDeposits.has(key)) continue;
 
             setOnchainDepositStatus(`⏳ Deposit detected: ${deposit.amountSats.toLocaleString()} sats — claiming...`);
-            await breezSDK.claimDeposit({ txid: deposit.txid, vout: deposit.vout });
-            claimedOnchainDeposits.add(key);
+            try {
+                await breezSDK.claimDeposit({ txid: deposit.txid, vout: deposit.vout });
+                claimedOnchainDeposits.add(key);
+                setOnchainDepositStatus('✅ Deposit claimed!');
+                await callbacks?.updateBalanceDisplay();
+                await callbacks?.loadTransactionHistory();
+                showSuccess('Deposit claimed successfully!');
+            } catch (claimError) {
+                console.warn(`[Deposit] Failed to claim ${key}:`, claimError);
+                // Mark as claimed to stop retry loop — if it's already claimed
+                // the SDK will keep returning it in listUnclaimedDeposits until next sync
+                claimedOnchainDeposits.add(key);
+                setOnchainDepositStatus('');
+                const statusEl = document.getElementById('onchain-deposit-status');
+                if (statusEl) statusEl.classList.add('hidden');
+            }
+        }
 
-            setOnchainDepositStatus('✅ Deposit claimed!');
-            await callbacks?.updateBalanceDisplay();
-            await callbacks?.loadTransactionHistory();
-            showSuccess('Deposit claimed successfully!');
+        // Clear status if no unclaimed deposits remain
+        if (deposits.length === 0 || deposits.every(d => claimedOnchainDeposits.has(`${d.txid}:${d.vout}`))) {
+            setOnchainDepositStatus('');
+            const statusEl = document.getElementById('onchain-deposit-status');
+            if (statusEl) statusEl.classList.add('hidden');
         }
     } catch (error) {
         console.warn('[Deposit] Failed to poll/claim on-chain deposits:', error);
