@@ -229,11 +229,19 @@ async function generateOnchainAddress(): Promise<void> {
             throw new Error('Failed to generate Bitcoin address');
         }
 
-        const minDepositSats = (response as any)?.paymentMethod?.minAmountSats || (response as any)?.minAmountSats;
+        // Calculate minimum deposit from recommended fees
+        // Dust limit is 546 sats; claim tx is ~140 vBytes; need amount > dust + claim fee
+        let minDepositSats = (response as any)?.paymentMethod?.minAmountSats || (response as any)?.minAmountSats;
+        if (!minDepositSats && breezSDK) {
+            try {
+                const fees = await breezSDK.recommendedFees();
+                const claimFee = (fees.halfHourFee || 5) * 140; // ~140 vBytes for claim tx
+                minDepositSats = 546 + claimFee + 200; // dust + fee + safety margin
+            } catch { /* ignore */ }
+        }
+        if (!minDepositSats || minDepositSats < 1000) minDepositSats = 1000; // absolute minimum
         if (minDepositNoteEl) {
-            minDepositNoteEl.textContent = minDepositSats
-                ? `Minimum recommended deposit: ${Number(minDepositSats).toLocaleString()} sats.`
-                : 'Minimum deposit depends on current network and swap conditions.';
+            minDepositNoteEl.textContent = `⚠️ Minimum deposit: ${Number(minDepositSats).toLocaleString()} sats. Smaller amounts cannot be claimed due to network fees.`;
         }
         if (confNoteEl) {
             confNoteEl.textContent = 'It may take 1-3 confirmations before funds appear.';
