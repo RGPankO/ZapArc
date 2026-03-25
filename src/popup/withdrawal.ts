@@ -405,7 +405,7 @@ async function autoFetchOnchainFees(address: string, amount: number): Promise<vo
             const feeEl = document.getElementById(`speed-fee-${speed}`);
             if (feeEl) {
                 if (totalFee > 0) {
-                    feeEl.innerHTML = `Fee: ${totalFee.toLocaleString()} sats<br><small style="opacity:0.6">L1: ${l1Fee.toLocaleString()} · Service: ${serviceFee.toLocaleString()}</small>`;
+                    feeEl.textContent = `Fee: ${totalFee.toLocaleString()} sats`;
                 } else {
                     feeEl.textContent = 'Fee: unavailable';
                 }
@@ -471,10 +471,7 @@ async function previewOnchainPayment(): Promise<void> {
             const feeEl = document.getElementById(`speed-fee-${speed}`);
             if (feeEl) {
                 if (totalFee > 0) {
-                    const breakdown = l1Fee > 0 && serviceFee > 0
-                        ? ` (L1: ${l1Fee.toLocaleString()} + Service: ${serviceFee.toLocaleString()})`
-                        : '';
-                    feeEl.textContent = `Fee: ${totalFee.toLocaleString()} sats${breakdown}`;
+                    feeEl.textContent = `Fee: ${totalFee.toLocaleString()} sats`;
                 } else {
                     feeEl.textContent = 'Fee: unavailable';
                 }
@@ -509,12 +506,7 @@ function updateOnchainPreviewFromSelection(): void {
     const total = amount + feeSats;
 
     const networkFeeSummary = document.getElementById('onchain-network-fee');
-    if (networkFeeSummary) {
-        const breakdown = l1Fee > 0 && serviceFee > 0
-            ? ` (L1: ${l1Fee.toLocaleString()} + Service: ${serviceFee.toLocaleString()})`
-            : '';
-        networkFeeSummary.textContent = `${feeSats.toLocaleString()} sats${breakdown}`;
-    }
+    if (networkFeeSummary) networkFeeSummary.textContent = `${feeSats.toLocaleString()} sats`;
 
     const recipientEl = document.getElementById('onchain-preview-recipient');
     const amountEl = document.getElementById('onchain-preview-amount');
@@ -524,12 +516,7 @@ function updateOnchainPreviewFromSelection(): void {
 
     if (recipientEl) recipientEl.textContent = address;
     if (amountEl) amountEl.textContent = `${amount.toLocaleString()} sats`;
-    if (feeEl) {
-        const feeBreakdown = l1Fee > 0 && serviceFee > 0
-            ? ` (L1: ${l1Fee.toLocaleString()} + Service: ${serviceFee.toLocaleString()})`
-            : '';
-        feeEl.textContent = `${feeSats.toLocaleString()} sats${feeBreakdown}`;
-    }
+    if (feeEl) feeEl.textContent = `${feeSats.toLocaleString()} sats`;
     if (speedEl) speedEl.textContent = onchainSelectedSpeed[0].toUpperCase() + onchainSelectedSpeed.slice(1);
     if (totalEl) totalEl.textContent = `${total.toLocaleString()} sats`;
 

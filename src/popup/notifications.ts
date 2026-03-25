@@ -33,28 +33,32 @@ export function showNotification(message: string, type: 'info' | 'success' | 'er
     // Track this notification
     activeNotifications.set(notificationKey, notification);
 
-    container.appendChild(notification);
-
-    setTimeout(() => {
-        notification.style.animation = 'slideDown 0.3s ease-out reverse';
+    const dismiss = () => {
+        notification.style.animation = 'slideDown 0.25s ease-out reverse';
         setTimeout(() => {
             notification.remove();
-            // Remove from active tracking
             activeNotifications.delete(notificationKey);
-        }, 300);
-    }, duration);
+        }, 250);
+    };
+
+    // Click to dismiss
+    notification.addEventListener('click', dismiss);
+
+    container.appendChild(notification);
+
+    setTimeout(dismiss, duration);
 }
 
 export function showError(message: string): void {
-    showNotification(message, 'error', 5000);
+    showNotification(message, 'error', 3000);
 }
 
 export function showSuccess(message: string): void {
-    showNotification(message, 'success', 3000);
+    showNotification(message, 'success', 2000);
 }
 
 export function showInfo(message: string): void {
-    showNotification(message, 'info', 3000);
+    showNotification(message, 'info', 2000);
 }
 
 // ========================================
