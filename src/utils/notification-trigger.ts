@@ -15,6 +15,7 @@ interface NotificationResponse {
 interface RecipientInfo {
   lightningAddress?: string;
   pushToken?: string;
+  identityPubkey?: string;
 }
 
 /**
@@ -28,13 +29,14 @@ export async function triggerPaymentNotification(
 ): Promise<NotificationResponse> {
   try {
     // Only attempt if we have recipient info
-    if (!recipient.lightningAddress && !recipient.pushToken) {
+    if (!recipient.lightningAddress && !recipient.pushToken && !recipient.identityPubkey) {
       console.log('🔔 [Notification] No recipient info available, skipping notification');
       return { success: false, error: 'No recipient info' };
     }
 
     console.log('🔔 [Notification] Triggering push notification for payment:', {
       recipientLightningAddress: recipient.lightningAddress,
+      recipientPubkey: recipient.identityPubkey?.substring(0, 16),
       amount: amountSats
     });
 
@@ -45,6 +47,7 @@ export async function triggerPaymentNotification(
       },
       body: JSON.stringify({
         recipientLightningAddress: recipient.lightningAddress,
+        recipientPubkey: recipient.identityPubkey,
         expoPushToken: recipient.pushToken,
         amount: amountSats,
       }),
