@@ -2991,6 +2991,14 @@ function setupEventListeners() {
         contactsBtn.onclick = () => { hideAllViews(); showContactsInterface(); };
     }
 
+    const openWindowBtn = document.getElementById('open-window-btn');
+    if (openWindowBtn) {
+        openWindowBtn.addEventListener('click', () => {
+            const fullViewUrl = chrome.runtime.getURL('popup.html?view=full');
+            chrome.tabs.create({ url: fullViewUrl });
+        });
+    }
+
     // Lightning Address actions
     const lightningAddressRegisterBtn = document.getElementById('lightning-address-register-btn');
     if (lightningAddressRegisterBtn) {
@@ -3416,6 +3424,20 @@ function setupModuleCallbacks(): void {
 // ========================================
 
 let popupInitialized = false;
+
+function isFullWindowMode(): boolean {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') === 'full';
+}
+
+function applyViewModeClass(): void {
+    if (isFullWindowMode()) {
+        document.body.classList.add('full-window-mode');
+    } else {
+        document.body.classList.remove('full-window-mode');
+    }
+}
+
 async function initializePopup() {
     if (popupInitialized) {
         console.warn('[Popup] Already initialized, skipping duplicate init');
@@ -3619,7 +3641,10 @@ async function initializePopup() {
 }
 
 // Start initialization when DOM is ready
-document.addEventListener('DOMContentLoaded', initializePopup);
+document.addEventListener('DOMContentLoaded', () => {
+    applyViewModeClass();
+    void initializePopup();
+});
 
 // ========================================
 // Hierarchical Wallet Switching Event Handler
