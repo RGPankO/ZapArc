@@ -4007,6 +4007,7 @@ body.modal-open {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  cursor: pointer;
   padding: 8px 10px;
   margin: 4px 0;
   border-radius: 8px;
@@ -4035,6 +4036,12 @@ body.modal-open {
 .pending-deposit-item .deposit-status.too-small {
   color: var(--text-secondary);
 }
+
+
+.pending-deposit-item .deposit-status.failed {
+  color: var(--error, #ef5350);
+}
+
 
 /* Send/Deposit button icons — simple Unicode arrows */
 .wallet-btn.action-card .btn-icon {

@@ -10,6 +10,7 @@ import {
     setInvoiceExpiryTime
 } from './state';
 import { showError, showSuccess } from './notifications';
+import { showModal } from './modals';
 import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
 import { getUserFiatCurrency } from './currency-pref';
 
@@ -88,7 +89,55 @@ function setOnchainDepositStatus(message: string): void {
 }
 
 // Track deposit claim results: 'claiming' | 'claimed' | 'too-small' | 'failed'
-const depositClaimResults = new Map<string, { status: string; amountSats: number; txid: string }>();
+const depositClaimResults = new Map<string, { status: string; amountSats: number; txid: string; failureReason?: string }>();
+
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function showPendingDepositDetail(key: string): void {
+    const deposit = depositClaimResults.get(key);
+    if (!deposit) return;
+
+    const content = document.getElementById('tx-detail-content');
+    if (!content) return;
+
+    const statusLabel = deposit.status === 'claiming'
+        ? 'Claiming'
+        : deposit.status === 'claimed'
+            ? 'Claimed'
+            : deposit.status === 'too-small'
+                ? 'Too small'
+                : 'Failed';
+
+    const failureRow = deposit.failureReason
+        ? `<div class="tx-detail-row">
+                <span class="tx-detail-label">Failure reason</span>
+                <span class="tx-detail-value">${escapeHtml(deposit.failureReason)}</span>
+            </div>`
+        : '';
+
+    content.innerHTML = `
+        <div class="tx-detail-amount-section">
+            <div class="tx-detail-amount positive">${deposit.amountSats.toLocaleString()} sats</div>
+            <div class="tx-detail-status ${deposit.status === 'failed' ? 'failed' : deposit.status === 'too-small' ? 'pending' : 'completed'}">${statusLabel}</div>
+        </div>
+        <div class="tx-detail-rows">
+            <div class="tx-detail-row">
+                <span class="tx-detail-label">Transaction ID</span>
+                <span class="tx-detail-value">${escapeHtml(deposit.txid)}</span>
+            </div>
+            ${failureRow}
+        </div>`;
+
+    showModal('transaction-detail-modal');
+}
 
 function renderPendingDeposits(): void {
     const section = document.getElementById('pending-deposits-section');
@@ -96,14 +145,14 @@ function renderPendingDeposits(): void {
     if (!section || !list) return;
 
     // Only show deposits from last 5 days
-    const entries = Array.from(depositClaimResults.values());
+    const entries = Array.from(depositClaimResults.entries());
     if (entries.length === 0) {
         section.classList.add('hidden');
         return;
     }
 
     section.classList.remove('hidden');
-    list.innerHTML = entries.map(d => {
+    list.innerHTML = entries.map(([key, d]) => {
         let statusText = '';
         let statusClass = '';
         switch (d.status) {
@@ -121,10 +170,10 @@ function renderPendingDeposits(): void {
                 break;
             default:
                 statusText = '❌ Failed';
-                statusClass = 'too-small';
+                statusClass = 'failed';
         }
         const shortTxid = `${d.txid.slice(0, 8)}…${d.txid.slice(-6)}`;
-        return `<div class="pending-deposit-item">
+        return `<div class="pending-deposit-item" data-deposit-key="${key}" role="button" tabindex="0" title="Tap for details">
             <div>
                 <span class="deposit-amount">${d.amountSats.toLocaleString()} sats</span>
                 <span style="color: var(--text-secondary); font-size: 10px; margin-left: 6px">${shortTxid}</span>
@@ -132,6 +181,21 @@ function renderPendingDeposits(): void {
             <span class="deposit-status ${statusClass}">${statusText}</span>
         </div>`;
     }).join('');
+
+    list.querySelectorAll('.pending-deposit-item').forEach((item) => {
+        const key = item.getAttribute('data-deposit-key');
+        if (!key) return;
+
+        item.addEventListener('click', () => showPendingDepositDetail(key));
+        item.addEventListener('keydown', (e) => {
+            const k = (e as KeyboardEvent).key;
+            if (k === 'Enter' || k === ' ') {
+                e.preventDefault();
+                showPendingDepositDetail(key);
+            }
+        });
+    });
+
 }
 
 async function checkAndClaimOnchainDeposits(): Promise<void> {
@@ -157,13 +221,17 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
             renderPendingDeposits();
 
             try {
-                await breezSDK.claimDeposit({ txid: deposit.txid, vout: deposit.vout });
+                await breezSDK.claimDeposit({
+                    txid: deposit.txid,
+                    vout: deposit.vout,
+                    maxFee: { type: 'networkRecommended', leewaySatPerVbyte: 2 }
+                });
                 claimedOnchainDeposits.add(key);
                 depositClaimResults.set(key, { status: 'claimed', amountSats: deposit.amountSats, txid: deposit.txid });
                 renderPendingDeposits();
                 await callbacks?.updateBalanceDisplay();
                 await callbacks?.loadTransactionHistory();
-                showSuccess(`Deposit of ${deposit.amountSats.toLocaleString()} sats claimed!`);
+                showSuccess(`Receive of ${deposit.amountSats.toLocaleString()} sats claimed!`);
 
                 // Remove claimed item after 5 seconds
                 setTimeout(() => {
@@ -179,6 +247,7 @@ async function checkAndClaimOnchainDeposits(): Promise<void> {
                     status: isDust ? 'too-small' : 'failed',
                     amountSats: deposit.amountSats,
                     txid: deposit.txid,
+                    failureReason: errMsg,
                 });
                 renderPendingDeposits();
             }
@@ -276,7 +345,7 @@ async function generateOnchainAddress(): Promise<void> {
     copyBtn.classList.add('hidden');
     onchainQrContainer?.classList.add('hidden');
     addressEl.textContent = '';
-    setOnchainDepositStatus('Waiting for on-chain deposit...');
+    setOnchainDepositStatus('Waiting for on-chain receive...');
 
     try {
         if (!breezSDK) {
@@ -304,7 +373,7 @@ async function generateOnchainAddress(): Promise<void> {
         }
         if (!minDepositSats || minDepositSats < 1000) minDepositSats = 1000; // absolute minimum
         if (minDepositNoteEl) {
-            minDepositNoteEl.textContent = `⚠️ Minimum deposit: ${Number(minDepositSats).toLocaleString()} sats. Smaller amounts cannot be claimed due to network fees.`;
+            minDepositNoteEl.textContent = `⚠️ Minimum receive: ${Number(minDepositSats).toLocaleString()} sats. Smaller amounts cannot be claimed due to network fees.`;
         }
         if (confNoteEl) {
             confNoteEl.textContent = 'It may take 1-3 confirmations before funds appear.';
@@ -417,7 +486,7 @@ export async function generateDepositInvoice(amount: number): Promise<void> {
             return;
         }
 
-        const description = `Deposit ${amount.toLocaleString()} sats to ZapArc Wallet`;
+        const description = `Receive ${amount.toLocaleString()} sats in ZapArc Wallet`;
         const response = await breezSDK.receivePayment({
             paymentMethod: {
                 type: 'bolt11Invoice',
@@ -545,7 +614,7 @@ export function handlePaymentReceived(): void {
     if (timerElement) timerElement.textContent = 'Completed';
 
     callbacks?.updateBalanceDisplay();
-    showSuccess('Deposit received successfully!');
+    showSuccess('Receive completed successfully!');
 
     setTimeout(() => hideDepositInterface(), 3000);
 }

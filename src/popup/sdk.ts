@@ -90,7 +90,11 @@ async function claimSingleDeposit(sdk: BreezSdk, txid: string, vout: number): Pr
 
     try {
         console.log(`🔄 [Breez-SDK] Attempting to claim deposit ${key}...`);
-        const result = await sdk.claimDeposit({ txid, vout });
+        const result = await sdk.claimDeposit({
+            txid,
+            vout,
+            maxFee: { type: 'networkRecommended', leewaySatPerVbyte: 2 }
+        });
         claimedDepositKeys.add(key);
         console.log(`✅ [Breez-SDK] Claimed deposit ${key}, result:`, JSON.stringify(result));
     } catch (error) {
