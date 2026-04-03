@@ -233,7 +233,10 @@ export function setupWithdrawalListeners(): void {
     const sendBtn = document.getElementById('send-payment-btn') as HTMLButtonElement;
 
     const contactsBtn = document.getElementById('withdraw-contacts-btn');
-    contactsBtn?.addEventListener('click', () => {
+    contactsBtn?.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         openContactPicker((contact) => {
             if (paymentInput) {
                 paymentInput.value = contact.lightningAddress;
