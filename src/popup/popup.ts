@@ -200,7 +200,7 @@ async function getActiveWalletId(): Promise<string | null> {
     }
 }
 
-import { getUserFiatCurrency, setFiatCurrencyCache, persistFiatCurrency } from './currency-pref';
+import { getUserFiatCurrency, getDisplayCurrency, setFiatCurrencyCache, persistFiatCurrency } from './currency-pref';
 
 /** Get wallet cache key that includes sub-wallet index to avoid cross-wallet cache hits */
 function walletCacheKey(prefix: string, walletId: string, subIndex?: number): string {
@@ -462,42 +462,44 @@ async function updateBalanceDisplay(forceClaimCheck: boolean = false) {
         // Update state
         setCurrentBalance(balance);
 
-        // Update UI
-        if (balanceElement) {
-            balanceElement.textContent = `${balance.toLocaleString()} sats`;
-        }
+        // Update UI according to display currency
+        if (balanceElement && balanceFiatElement) {
+            const displayCurrency = await getDisplayCurrency();
 
-        // Update fiat equivalent
-        if (balanceFiatElement) {
-            const fiatCurrency = await getUserFiatCurrency();
-            const fiatAmount = await satsToFiat(balance, fiatCurrency);
-            if (fiatAmount !== null) {
-                const fiatDisplay = `≈ ${formatFiat(fiatAmount, fiatCurrency)}`;
-                balanceFiatElement.textContent = fiatDisplay;
-                balanceFiatElement.classList.remove('hidden');
-
-                // Cache fiat display for instant render on next popup open
-                const fiatCacheUpdate: Record<string, any> = {
-                    cachedBalanceFiat: {
-                        currency: fiatCurrency,
-                        balanceSats: balance,
-                        display: fiatDisplay,
-                        updatedAt: Date.now()
-                    }
-                };
-                try {
-                    const mw = await chrome.storage.local.get(['multiWalletData']);
-                    if (mw.multiWalletData) {
-                        const mwd = JSON.parse(mw.multiWalletData);
-                        if (mwd.activeWalletId) {
-                            const subIdx = mwd.activeSubWalletIndex || 0;
-                            fiatCacheUpdate[walletCacheKey('cachedBalanceFiat', mwd.activeWalletId, subIdx)] = fiatCacheUpdate.cachedBalanceFiat;
-                        }
-                    }
-                    await chrome.storage.local.set(fiatCacheUpdate);
-                } catch (e) { /* ignore cache errors */ }
-            } else {
+            if (displayCurrency === 'sats') {
+                balanceElement.textContent = `${balance.toLocaleString()} sats`;
                 balanceFiatElement.classList.add('hidden');
+            } else {
+                const fiatAmount = await satsToFiat(balance, displayCurrency);
+                if (fiatAmount !== null) {
+                    const fiatDisplay = formatFiat(fiatAmount, displayCurrency);
+                    balanceElement.textContent = fiatDisplay;
+                    balanceFiatElement.textContent = `${balance.toLocaleString()} sats`;
+                    balanceFiatElement.classList.remove('hidden');
+
+                    const fiatCacheUpdate: Record<string, any> = {
+                        cachedBalanceFiat: {
+                            currency: displayCurrency,
+                            balanceSats: balance,
+                            display: fiatDisplay,
+                            updatedAt: Date.now()
+                        }
+                    };
+                    try {
+                        const mw = await chrome.storage.local.get(['multiWalletData']);
+                        if (mw.multiWalletData) {
+                            const mwd = JSON.parse(mw.multiWalletData);
+                            if (mwd.activeWalletId) {
+                                const subIdx = mwd.activeSubWalletIndex || 0;
+                                fiatCacheUpdate[walletCacheKey('cachedBalanceFiat', mwd.activeWalletId, subIdx)] = fiatCacheUpdate.cachedBalanceFiat;
+                            }
+                        }
+                        await chrome.storage.local.set(fiatCacheUpdate);
+                    } catch (e) { /* ignore cache errors */ }
+                } else {
+                    balanceElement.textContent = `${balance.toLocaleString()} sats`;
+                    balanceFiatElement.classList.add('hidden');
+                }
             }
         }
 
@@ -748,15 +750,20 @@ ${isReceive ? '+' : '-'}${tx.amount.toLocaleString()} sats
 </div>`;
     }).join('');
 
-    // Populate fiat estimates for transaction list
-    getUserFiatCurrency().then(currency => {
+    // Populate secondary amount display according to global display currency
+    getDisplayCurrency().then(displayCurrency => {
         container.querySelectorAll('.transaction-fiat').forEach(async (el) => {
             const sats = parseInt((el as HTMLElement).dataset.sats || '0', 10);
-            if (sats > 0) {
-                const fiatAmount = await satsToFiat(sats, currency);
-                if (fiatAmount !== null) {
-                    (el as HTMLElement).textContent = `≈ ${formatFiat(fiatAmount, currency)}`;
-                }
+            if (sats <= 0) return;
+
+            if (displayCurrency === 'sats') {
+                (el as HTMLElement).textContent = '';
+                return;
+            }
+
+            const fiatAmount = await satsToFiat(sats, displayCurrency);
+            if (fiatAmount !== null) {
+                (el as HTMLElement).textContent = `≈ ${formatFiat(fiatAmount, displayCurrency)}`;
             }
         });
     });
@@ -909,15 +916,22 @@ function showTransactionDetail(tx: StoredTransaction): void {
         </div>
     `;
 
-    // Async: populate fiat estimate
-    getUserFiatCurrency().then(currency =>
-        satsToFiat(tx.amount, currency).then(fiatAmount => {
-            const fiatEl = document.getElementById('tx-detail-fiat');
-            if (fiatEl && fiatAmount !== null) {
-                fiatEl.textContent = `≈ ${formatFiat(fiatAmount, currency)}`;
+    // Async: populate secondary estimate for fiat display modes
+    getDisplayCurrency().then(displayCurrency => {
+        const fiatEl = document.getElementById('tx-detail-fiat');
+        if (!fiatEl) return;
+
+        if (displayCurrency === 'sats') {
+            fiatEl.textContent = '';
+            return;
+        }
+
+        satsToFiat(tx.amount, displayCurrency).then(fiatAmount => {
+            if (fiatAmount !== null) {
+                fiatEl.textContent = `≈ ${formatFiat(fiatAmount, displayCurrency)}`;
             }
-        })
-    );
+        });
+    });
 
     // Add copy button handlers
     content.querySelectorAll('.tx-copy-btn').forEach(btn => {
@@ -3518,19 +3532,24 @@ async function initializePopup() {
                                 const fiatCacheData = await chrome.storage.local.get([fiatCacheKey, 'cachedBalanceFiat']);
                                 const fiatCache = fiatCacheData[fiatCacheKey] || fiatCacheData.cachedBalanceFiat;
 
-                                // Immediate paint: if sats match, show cached fiat right away
-                                if (fiatCache && fiatCache.balanceSats === storageData.cachedBalance && fiatCache.display) {
+                                // Immediate paint: if sats match, show cached fiat right away (fiat display modes only)
+                                if (fiatCache && fiatCache.balanceSats === storageData.cachedBalance && fiatCache.display && fiatCache.currency !== 'sats') {
                                     balanceFiatElement.textContent = fiatCache.display;
                                     balanceFiatElement.classList.remove('hidden');
                                 }
 
                                 // Background reconcile: if cached currency differs from selected, refresh display
                                 void (async () => {
-                                    const selectedCurrency = await getUserFiatCurrency();
+                                    const selectedCurrency = await getDisplayCurrency();
+                                    if (selectedCurrency === 'sats') {
+                                        balanceFiatElement.classList.add('hidden');
+                                        return;
+                                    }
+
                                     if (!fiatCache || fiatCache.currency !== selectedCurrency || !fiatCache.display) {
                                         const fiatAmount = await satsToFiat(storageData.cachedBalance, selectedCurrency);
                                         if (fiatAmount !== null) {
-                                            balanceFiatElement.textContent = `≈ ${formatFiat(fiatAmount, selectedCurrency)}`;
+                                            balanceFiatElement.textContent = formatFiat(fiatAmount, selectedCurrency);
                                             balanceFiatElement.classList.remove('hidden');
                                         }
                                     }

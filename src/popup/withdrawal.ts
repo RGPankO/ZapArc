@@ -13,7 +13,7 @@ import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { triggerPaymentNotification } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
-import { getUserFiatCurrency } from './currency-pref';
+import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, cycleDisplayCurrency, type DisplayCurrency } from './currency-pref';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -28,12 +28,13 @@ let onchainPreparedBySpeed: Partial<Record<'fast' | 'medium' | 'slow', any>> = {
 let onchainSelectedSpeed: 'fast' | 'medium' | 'slow' = 'medium';
 
 // Currency toggle state for send amount input
-let sendInputCurrency: 'sats' | FiatCurrency = 'sats';
+let sendInputCurrency: DisplayCurrency = 'sats';
 let userFiatCurrency: FiatCurrency = 'usd';
 
-/** Load the user's fiat currency preference from shared cache */
+/** Load currency preferences from shared cache */
 async function loadFiatCurrencySetting(): Promise<void> {
     userFiatCurrency = await getUserFiatCurrency();
+    sendInputCurrency = await getDisplayCurrency();
 }
 
 /** Update the currency toggle button label and conversion hint */
@@ -160,8 +161,6 @@ export function resetWithdrawForm(): void {
     if (commentInput) commentInput.value = '';
     previewDiv?.classList.add('hidden');
 
-    // Reset currency toggle
-    sendInputCurrency = 'sats';
     updateCurrencyToggleUI();
     const conversionHint = document.getElementById('send-conversion-hint');
     if (conversionHint) { conversionHint.textContent = ''; conversionHint.classList.add('hidden'); }
@@ -255,7 +254,11 @@ export function setupWithdrawalListeners(): void {
     // Currency toggle button
     const currencyToggle = document.getElementById('send-currency-toggle');
     currencyToggle?.addEventListener('click', () => {
-        sendInputCurrency = sendInputCurrency === 'sats' ? userFiatCurrency : 'sats';
+        sendInputCurrency = cycleDisplayCurrency(sendInputCurrency);
+        void persistDisplayCurrency(sendInputCurrency).catch((error) => {
+            console.warn('[Withdrawal] Failed to persist display currency:', error);
+        });
+
         const amtInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
         if (amtInput) amtInput.value = ''; // clear on toggle to avoid confusion
         updateCurrencyToggleUI();

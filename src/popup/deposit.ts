@@ -12,7 +12,7 @@ import {
 import { showError, showSuccess } from './notifications';
 import { showModal } from './modals';
 import { satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
-import { getUserFiatCurrency } from './currency-pref';
+import { getDisplayCurrency } from './currency-pref';
 
 function updateDepositEstimate(amount: number): void {
     const row = document.getElementById('deposit-estimate-row');
@@ -29,16 +29,22 @@ function updateDepositEstimate(amount: number): void {
     valueEl.textContent = '≈ ...';
     row.classList.remove('hidden');
 
-    // Use the shared currency service
+    // Use the shared currency display selection
     (async () => {
-        const fiatCurrency = await getUserFiatCurrency();
-        const fiatAmount = await satsToFiat(amount, fiatCurrency);
+        const displayCurrency = await getDisplayCurrency();
+        if (displayCurrency === 'sats') {
+            valueEl.textContent = `≈ ${amount.toLocaleString()} sats`;
+            row.classList.remove('hidden');
+            return;
+        }
+
+        const fiatAmount = await satsToFiat(amount, displayCurrency);
         if (!fiatAmount) {
             valueEl.textContent = '≈ rate unavailable';
             return;
         }
         if (fiatAmount >= 0.01) {
-            valueEl.textContent = `≈ ${formatFiat(fiatAmount, fiatCurrency)}`;
+            valueEl.textContent = `≈ ${formatFiat(fiatAmount, displayCurrency)}`;
             row.classList.remove('hidden');
         } else {
             row.classList.add('hidden');

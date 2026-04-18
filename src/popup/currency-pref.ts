@@ -11,8 +11,13 @@ import type { FiatCurrency } from '../utils/currency';
 import { ExtensionMessaging } from '../utils/messaging';
 import type { UserSettings } from '../types';
 
+export type DisplayCurrency = 'sats' | FiatCurrency;
+
 let _cached: FiatCurrency | null = null;
+let _displayCached: DisplayCurrency | null = null;
 const FIAT_CURRENCY_KEY = 'fiatCurrencyPreference';
+const DISPLAY_CURRENCY_KEY = 'display_currency';
+const DISPLAY_ORDER: DisplayCurrency[] = ['sats', 'usd', 'eur'];
 
 /**
  * Get the user's selected fiat currency.
@@ -78,6 +83,45 @@ export async function persistFiatCurrency(currency: FiatCurrency): Promise<void>
     _cached = currency;
 }
 
+export async function getDisplayCurrency(): Promise<DisplayCurrency> {
+    if (_displayCached) return _displayCached;
+
+    try {
+        const result = await chrome.storage.local.get([DISPLAY_CURRENCY_KEY]);
+        const value = result?.[DISPLAY_CURRENCY_KEY];
+        if (value === 'sats' || value === 'usd' || value === 'eur') {
+            _displayCached = value;
+            return value;
+        }
+    } catch (error) {
+        console.warn('[CurrencyPref] display_currency read failed:', error);
+    }
+
+    const migrated = await getUserFiatCurrency();
+    _displayCached = migrated;
+    try {
+        await chrome.storage.local.set({ [DISPLAY_CURRENCY_KEY]: migrated });
+    } catch (error) {
+        console.warn('[CurrencyPref] display_currency migration write failed:', error);
+    }
+    return migrated;
+}
+
+export async function persistDisplayCurrency(currency: DisplayCurrency): Promise<void> {
+    await chrome.storage.local.set({ [DISPLAY_CURRENCY_KEY]: currency });
+    _displayCached = currency;
+
+    if (currency === 'usd' || currency === 'eur') {
+        await persistFiatCurrency(currency);
+    }
+}
+
+export function cycleDisplayCurrency(current: DisplayCurrency): DisplayCurrency {
+    const idx = DISPLAY_ORDER.indexOf(current);
+    if (idx === -1) return 'sats';
+    return DISPLAY_ORDER[(idx + 1) % DISPLAY_ORDER.length];
+}
+
 /**
  * Set the in-memory cache. Call this immediately after saving the new preference
  * so all modules see the update without waiting for storage.
@@ -85,4 +129,8 @@ export async function persistFiatCurrency(currency: FiatCurrency): Promise<void>
  */
 export function setFiatCurrencyCache(currency: FiatCurrency | null): void {
     _cached = currency;
+}
+
+export function setDisplayCurrencyCache(currency: DisplayCurrency | null): void {
+    _displayCached = currency;
 }
