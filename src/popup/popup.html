@@ -731,7 +731,11 @@
                         <label>Amount</label>
                         <div class="amount-input-row">
                             <input type="number" id="withdrawal-amount" placeholder="Amount in sats" min="0.01" step="any">
-                            <button type="button" id="send-currency-toggle" class="currency-toggle-btn" title="Cycle display currency: sats → USD → EUR">sats</button>
+                            <select id="send-currency-select" class="currency-select" aria-label="Select amount currency">
+                                <option value="sats">sats</option>
+                                <option value="usd">USD ($)</option>
+                                <option value="eur">EUR (€)</option>
+                            </select>
                         </div>
                         <div id="send-conversion-hint" class="conversion-hint hidden"></div>
                     </div>

@@ -13,7 +13,7 @@ import { showError, showSuccess, showConfirmDialog } from './notifications';
 import { triggerPaymentNotification } from '../utils/notification-trigger';
 import { openContactPicker } from './contacts';
 import { currencyService, fiatToSats, satsToFiat, formatFiat, type FiatCurrency } from '../utils/currency';
-import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, cycleDisplayCurrency, type DisplayCurrency } from './currency-pref';
+import { getUserFiatCurrency, getDisplayCurrency, persistDisplayCurrency, type DisplayCurrency } from './currency-pref';
 
 export type WithdrawalCallbacks = {
     updateBalanceDisplay: () => Promise<void>;
@@ -37,17 +37,15 @@ async function loadFiatCurrencySetting(): Promise<void> {
     sendInputCurrency = await getDisplayCurrency();
 }
 
-/** Update the currency toggle button label and conversion hint */
+/** Update the currency selector value and conversion hint */
 function updateCurrencyToggleUI(): void {
-    const toggleBtn = document.getElementById('send-currency-toggle');
-    const conversionHint = document.getElementById('send-conversion-hint');
+    const currencySelect = document.getElementById('send-currency-select') as HTMLSelectElement | null;
     const amountInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
-    
-    if (toggleBtn) {
-        const label = sendInputCurrency === 'sats' ? 'sats' : sendInputCurrency.toUpperCase();
-        toggleBtn.textContent = label;
+
+    if (currencySelect) {
+        currencySelect.value = sendInputCurrency;
     }
-    
+
     if (amountInput) {
         amountInput.placeholder = sendInputCurrency === 'sats' ? 'Amount in sats' : `Amount in ${sendInputCurrency.toUpperCase()}`;
     }
@@ -251,16 +249,21 @@ export function setupWithdrawalListeners(): void {
     });
     previewBtn?.addEventListener('click', previewPayment);
 
-    // Currency toggle button
-    const currencyToggle = document.getElementById('send-currency-toggle');
-    currencyToggle?.addEventListener('click', () => {
-        sendInputCurrency = cycleDisplayCurrency(sendInputCurrency);
+    // Currency select dropdown
+    const currencySelect = document.getElementById('send-currency-select') as HTMLSelectElement | null;
+    currencySelect?.addEventListener('change', () => {
+        const nextCurrency = currencySelect.value as DisplayCurrency;
+        if (nextCurrency !== 'sats' && nextCurrency !== 'usd' && nextCurrency !== 'eur') {
+            return;
+        }
+
+        sendInputCurrency = nextCurrency;
         void persistDisplayCurrency(sendInputCurrency).catch((error) => {
             console.warn('[Withdrawal] Failed to persist display currency:', error);
         });
 
         const amtInput = document.getElementById('withdrawal-amount') as HTMLInputElement;
-        if (amtInput) amtInput.value = ''; // clear on toggle to avoid confusion
+        if (amtInput) amtInput.value = ''; // clear on currency change to avoid confusion
         updateCurrencyToggleUI();
         validateWithdrawalForm();
     });
